@@ -18,11 +18,14 @@ LDFLAGS += -L$(CURDIR)/src/.libs
 export LDFLAGS CXXFLAGS
 
 # Set install ruby locations for configure
-export RUBY_LIB = $(shell ruby1.8 -r rbconfig -e 'print Config::CONFIG["rubylibdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
-export RUBY_LIB_ARCH = $(shell ruby1.8 -r rbconfig -e 'print Config::CONFIG["archdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
+export RUBY_LIB = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["rubylibdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
+export RUBY_LIB_ARCH = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["archdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
+export RUBY_INC_ARCH = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["rubyarchhdrdir"]')
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-sasl --with-xml --with-rdma --with-ssl --with-cpg --with-swig --libexecdir='/usr/lib' --enable-fast-install
+	dh_auto_configure -- --with-sasl --with-xml --with-rdma --with-ssl --with-swig --libexecdir='/usr/lib' --enable-fast-install
+
+override_dh_auto_test:
 
 %:
 	dh  $@ --with python2 --with autoreconf
