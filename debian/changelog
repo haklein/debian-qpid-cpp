@@ -1,9 +1,66 @@
+qpid-cpp (0.16-7.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Import changes from Ubuntu:
+    - Fix RC FTBFS with recent gcc (Closes: #713449)
+    - Disable building with cman, since cman is deprecated
+    - Cherry-pick patch to build against recent boost
+    - Drop build-dependency on obsolete libxmltooling5 (Closes: #716737)
+  * Build against default ruby (2.0/2.1) (Closes: #735511)
+  * Cherry-pick patch from upstream to fix building with format-security.
+
+ -- Dimitri John Ledkov <xnox@ubuntu.com>  Wed, 30 Apr 2014 00:07:42 +0100
+
+qpid-cpp (0.16-7ubuntu5) trusty; urgency=low
+
+  * Rebuild for Perl 5.18.
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Mon, 21 Oct 2013 13:44:56 +0100
+
+qpid-cpp (0.16-7ubuntu4) saucy; urgency=low
+
+  * Drop build-dependency on obsolete libxmltooling5 package (closes:
+    #716737).
+
+ -- Colin Watson <cjwatson@ubuntu.com>  Thu, 10 Oct 2013 00:03:54 +0100
+
+qpid-cpp (0.16-7ubuntu3) saucy; urgency=low
+
+  * Disable build 'with-cpg' because it Depends on libcman-dev, which is a
+    deprecated library and will be soon be removed from the archive (as part
+    of redhat-cluster) support. (Newer upstream releases do not seem to
+    have a '--with-cpg' configure option nor support for cman/corosync).
+    - debian/rules: Remove '--with-cpg'.
+    - debian/control: Drop Build-Dep on libcman-dev, libcorosync-dev, libopenais-dev.
+
+ -- Andres Rodriguez <andreserl@ubuntu.com>  Fri, 26 Jul 2013 12:02:18 -0400
+
+qpid-cpp (0.16-7ubuntu2) saucy; urgency=low
+
+  * Cherry-pick patch from fedora to fix FTBFS with gcc-4.8.
+  * Use patch from QPID-4095 to build against Boost FS Version 3.
+
+ -- Dmitrijs Ledkovs <dmitrij.ledkov@ubuntu.com>  Fri, 24 May 2013 16:56:12 +0100
+
+qpid-cpp (0.16-7ubuntu1) quantal; urgency=low
+
+  * Merge from Debian, remaining changes: 
+    - Disable testsuite due to IPv6 failure see 1016778.
+
+ -- Oussama Bounaim <o.bounaim@gmail.com>  Fri, 28 Sep 2012 09:22:53 +0100
+
 qpid-cpp (0.16-7) unstable; urgency=low
 
   * Fixes security issue CVE-2012-3467 which may allow bypassing the
     broker authentication mechanism. Closes: #684456.
 
  -- Cajus Pollmeier <cajus@debian.org>  Fri, 10 Aug 2012 20:39:06 +0200
+
+qpid-cpp (0.16-6ubuntu1) quantal; urgency=low
+
+  * Disable testsuite due to IPv6 failure see 1016778.
+
+ -- Dmitrijs Ledkovs <dmitrij.ledkov@ubuntu.com>  Wed, 04 Jul 2012 08:59:42 +0100
 
 qpid-cpp (0.16-6) unstable; urgency=low
 

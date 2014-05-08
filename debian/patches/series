@@ -9,3 +9,6 @@ fix-perl-install.patch
 module-location.patch
 fix-armel-compilation.patch
 sasldb-location.patch
+04-QPID-4579-Fixes-building-Qpid-under-the-latest-GCC-4.patch
+qpid_boost_fs.patch
+0001-QPID-5499-Fix-Ruby-Perl-bindings-when-built-with-Wer.patch
