@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: qpid-cpp
-Upstream-Contact: QPID development team <dev@qpid.apache.org>
-Source: http://qpid.apache.org
+Upstream-Contact: Qpid Development Team <dev@qpid.apache.org>
+Source: http://qpid.apache.org/
 
 Files: *
 Copyright: 2006, The Apache Software Foundation
@@ -17,7 +17,8 @@ License: Apache-2.0
  can be found in the file '/usr/share/common-licenses/Apache-2.0'.
 
 Files: debian/*
-Copyright: 2010, Cajus Pollmeier <cajus@debian.org>
-License: GPL-2+
+Copyright: 2014, Darryl L. Pierce <mcpierce@gmail.com>
+License: GPL3
  On Debian systems, the complete text of the GNU General Public
- License can be found in the file '/usr/share/common-licenses/GPL-2'.
+ License can be found in the file '/usr/share/common-licenses/GPL-3'.
+
