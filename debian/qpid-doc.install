@@ -1,1 +1,2 @@
-usr/share/qpidc/examples /usr/share/doc/qpid
+usr/share/qpid/examples
+usr/share/doc/qpid-cpp

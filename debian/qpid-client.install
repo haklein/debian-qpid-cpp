@@ -1,3 +1,0 @@
-etc/qpid/qpidc.conf
-usr/lib/qpid/client/rdmaconnector.so usr/lib/qpid/client
-usr/lib/qpid/client/sslconnector.so usr/lib/qpid/client
