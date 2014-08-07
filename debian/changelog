@@ -1,3 +1,19 @@
+qpid-cpp (0.28-1) unstable; urgency=medium
+
+  * New maintainer. (Closes: #729207)
+  * Dropped the qpid-client package.
+  * Dropped the qpid-client package.
+  * Removed the following packages for libraries no longer produced:
+    * libqmf1 and libqmf-dev
+    * libqmfconsole2 and libqmfconsole2-dev
+    * librdmawrap2 and librdmawrap2-dev
+    * libsslcommon2 and libsslcommon2-dev
+  * Renamed qmfgen to qmf-gen.
+  * Created the qpidd-store package.
+  * Created the qpidd-ha package.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Thu, 07 Aug 2014 11:29:12 -0400
+
 qpid-cpp (0.16-7.1) unstable; urgency=medium
 
   * Non-maintainer upload.
@@ -180,3 +196,4 @@ qpid-cpp (0.12-1) unstable; urgency=low
   * Initial release. (Closes: #640497)
 
  -- Cajus Pollmeier <cajus@debian.org>  Fri, 06 May 2011 11:59:58 +0200
+

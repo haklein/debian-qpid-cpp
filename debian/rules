@@ -1,31 +1,36 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
-# debian/rules for qpidd that uses debhelper.
+# Sample debian/rules that uses debhelper.
+#
 # This file was originally written by Joey Hess and Craig Small.
 # As a special exception, when this file is copied by dh-make into a
 # dh-make output file, you may use that output file without restriction.
 # This special exception was added by Craig Small in version 0.37 of dh-make.
+#
+# Modified to make a template file for a multi-binary package with separated
+# build-arch and build-indep targets  by Bill Allombert 2001
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+# export DH_VERBOSE=1
 
+# DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+# DPKG_EXPORT_BUILDFLAGS = 1
+# include /usr/share/dpkg/buildflags.mk
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+export DH_ALWAYS_EXCLUDE=LICENSE
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-DPKG_EXPORT_BUILDFLAGS = 1
-include /usr/share/dpkg/buildflags.mk
-CXXFLAGS += -Wno-error=cast-qual -Wno-error=cast-align
-LDFLAGS += -L$(CURDIR)/src/.libs
-export LDFLAGS CXXFLAGS
-
-# Set install ruby locations for configure
-export RUBY_LIB = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["rubylibdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
-export RUBY_LIB_ARCH = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["archdir"]' | sed 's,/ruby/,/ruby/vendor_ruby/,')
-export RUBY_INC_ARCH = $(shell ruby -r rbconfig -e 'print RbConfig::CONFIG["rubyarchhdrdir"]')
+%:
+	dh $@ --with python2
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-sasl --with-xml --with-rdma --with-ssl --with-swig --libexecdir='/usr/lib' --enable-fast-install
+	dh_auto_configure -- -DLIB_INSTALL_DIR=/usr/lib/${DEB_HOST_MULTIARCH} \
+                             -DDOC_INSTALL_DIR:PATH=/usr/share/doc/qpid-cpp \
+                             -DSYSCONF_INSTALL_DIR:PATH=/etc
+
+override_dh_auto_build:
+	dh_auto_build -- -j4 docs
 
 override_dh_auto_test:
-
-%:
-	dh  $@ --with python2 --with autoreconf
+	# TODO enable them when they work again
