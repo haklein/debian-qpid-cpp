@@ -23,58 +23,49 @@
  */
 
 #include "qpid/broker/BrokerImportExport.h"
-#include "qpid/broker/ConnectionFactory.h"
-#include "qpid/broker/ConnectionToken.h"
-#include "qpid/broker/DirectExchange.h"
+
+#include "qpid/DataDir.h"
+#include "qpid/Plugin.h"
 #include "qpid/broker/DtxManager.h"
 #include "qpid/broker/ExchangeRegistry.h"
-#include "qpid/broker/MessageStore.h"
+#include "qpid/broker/ObjectFactory.h"
+#include "qpid/broker/Protocol.h"
 #include "qpid/broker/QueueRegistry.h"
 #include "qpid/broker/LinkRegistry.h"
 #include "qpid/broker/SessionManager.h"
 #include "qpid/broker/QueueCleaner.h"
-#include "qpid/broker/QueueEvents.h"
 #include "qpid/broker/Vhost.h"
 #include "qpid/broker/System.h"
-#include "qpid/broker/ExpiryPolicy.h"
 #include "qpid/broker/ConsumerFactory.h"
 #include "qpid/broker/ConnectionObservers.h"
-#include "qpid/broker/ConfigurationObservers.h"
+#include "qpid/broker/SessionHandlerObserver.h"
+#include "qpid/broker/BrokerObservers.h"
 #include "qpid/management/Manageable.h"
-#include "qpid/management/ManagementAgent.h"
-#include "qmf/org/apache/qpid/broker/Broker.h"
-#include "qmf/org/apache/qpid/broker/ArgsBrokerConnect.h"
-#include "qpid/Options.h"
-#include "qpid/Plugin.h"
-#include "qpid/DataDir.h"
-#include "qpid/framing/FrameHandler.h"
-#include "qpid/framing/OutputHandler.h"
-#include "qpid/framing/ProtocolInitiation.h"
-#include "qpid/sys/Runnable.h"
-#include "qpid/sys/Timer.h"
-#include "qpid/types/Variant.h"
-#include "qpid/RefCounted.h"
-#include "qpid/broker/AclModule.h"
+#include "qpid/sys/ConnectionCodec.h"
 #include "qpid/sys/Mutex.h"
+#include "qpid/sys/Runnable.h"
 
 #include <boost/intrusive_ptr.hpp>
+
 #include <string>
 #include <vector>
 
 namespace qpid {
-
 namespace sys {
-class ProtocolFactory;
+class TransportAcceptor;
+class TransportConnector;
 class Poller;
+class Timer;
 }
 
 struct Url;
 
 namespace broker {
 
-class ConnectionState;
+class AclModule;
 class ExpiryPolicy;
 class Message;
+struct QueueSettings;
 
 static const  uint16_t DEFAULT_PORT=5672;
 
@@ -96,18 +87,22 @@ class Broker : public sys::Runnable, public Plugin::Target,
     struct Options : public qpid::Options {
         static const std::string DEFAULT_DATA_DIR_LOCATION;
         static const std::string DEFAULT_DATA_DIR_NAME;
+        static const std::string DEFAULT_PAGED_QUEUE_DIR;
 
         QPID_BROKER_EXTERN Options(const std::string& name="Broker Options");
 
         bool noDataDir;
         std::string dataDir;
+        std::string pagingDir;
         uint16_t port;
+        std::vector<std::string> listenInterfaces;
+        std::vector<std::string> listenDisabled;
         int workerThreads;
         int connectionBacklog;
         bool enableMgmt;
         bool mgmtPublish;
-        uint16_t mgmtPubInterval;
-        uint16_t queueCleanInterval;
+        sys::Duration mgmtPubInterval;
+        sys::Duration queueCleanInterval;
         bool auth;
         std::string realm;
         size_t replayFlushLimit;
@@ -117,7 +112,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
         bool requireEncrypted;
         std::string knownHosts;
         std::string saslConfigPath;
-        bool asyncQueueEvents;
         bool qmf2Support;
         bool qmf1Support;
         uint queueFlowStopRatio;    // producer flow control: on
@@ -125,8 +119,10 @@ class Broker : public sys::Runnable, public Plugin::Target,
         uint16_t queueThresholdEventRatio;
         std::string defaultMsgGroup;
         bool timestampRcvMsgs;
-        double linkMaintenanceInterval; // FIXME aconway 2012-02-13: consistent parsing of SECONDS values.
-        uint16_t linkHeartbeatInterval;
+        sys::Duration linkMaintenanceInterval;
+        sys::Duration linkHeartbeatInterval;
+        uint32_t dtxDefaultTimeout; // Default timeout of a DTX transaction
+        uint32_t dtxMaxTimeout;     // Maximal timeout of a DTX transaction
         uint32_t maxNegotiateTime;  // Max time in ms for connection with no negotiation
         std::string fedTag;
 
@@ -135,37 +131,59 @@ class Broker : public sys::Runnable, public Plugin::Target,
     };
 
   private:
-    typedef std::map<std::string, boost::shared_ptr<sys::ProtocolFactory> > ProtocolFactoryMap;
+    struct TransportInfo {
+        boost::shared_ptr<sys::TransportAcceptor> acceptor;
+        boost::shared_ptr<sys::TransportConnector> connectorFactory;
+        uint16_t port;
+
+        TransportInfo() :
+            port(0)
+        {}
+
+        TransportInfo(boost::shared_ptr<sys::TransportAcceptor> a, boost::shared_ptr<sys::TransportConnector> c, uint16_t p) :
+            acceptor(a),
+            connectorFactory(c),
+            port(p)
+        {}
+    };
+    typedef std::map<std::string, TransportInfo > TransportMap;
 
     void declareStandardExchange(const std::string& name, const std::string& type);
     void setStore ();
     void setLogLevel(const std::string& level);
     std::string getLogLevel();
+    void setLogHiresTimestamp(bool enabled);
+    bool getLogHiresTimestamp();
     void createObject(const std::string& type, const std::string& name,
-                      const qpid::types::Variant::Map& properties, bool strict, const ConnectionState* context);
+                      const qpid::types::Variant::Map& properties, bool strict, const Connection* context);
     void deleteObject(const std::string& type, const std::string& name,
-                      const qpid::types::Variant::Map& options, const ConnectionState* context);
+                      const qpid::types::Variant::Map& options, const Connection* context);
+    void checkDeleteQueue(boost::shared_ptr<Queue> queue, bool ifUnused, bool ifEmpty);
     Manageable::status_t queryObject(const std::string& type, const std::string& name,
-                                     qpid::types::Variant::Map& results, const ConnectionState* context);
+                                     qpid::types::Variant::Map& results, const Connection* context);
     Manageable::status_t queryQueue( const std::string& name,
                                      const std::string& userId,
                                      const std::string& connectionId,
                                      qpid::types::Variant::Map& results);
     Manageable::status_t getTimestampConfig(bool& receive,
-                                            const ConnectionState* context);
+                                            const Connection* context);
     Manageable::status_t setTimestampConfig(const bool receive,
-                                            const ConnectionState* context);
+                                            const Connection* context);
+    Manageable::status_t queueRedirect(const std::string& srcQueue, const std::string& tgtQueue);
+    void queueRedirectDestroy(boost::shared_ptr<Queue> srcQ, boost::shared_ptr<Queue> tgtQ, bool moveMsgs);
     boost::shared_ptr<sys::Poller> poller;
-    sys::Timer timer;
-    std::auto_ptr<sys::Timer> clusterTimer;
+    std::auto_ptr<sys::Timer> timer;
     Options config;
     std::auto_ptr<management::ManagementAgent> managementAgent;
-    ProtocolFactoryMap protocolFactories;
+    std::set<std::string> disabledListeningTransports;
+    TransportMap transportMap;
     std::auto_ptr<MessageStore> store;
     AclModule* acl;
     DataDir dataDir;
+    DataDir pagingDir;
     ConnectionObservers connectionObservers;
-    ConfigurationObservers configurationObservers;
+    SessionHandlerObservers sessionHandlerObservers;
+    BrokerObservers brokerObservers;
 
     QueueRegistry queues;
     ExchangeRegistry exchanges;
@@ -173,20 +191,20 @@ class Broker : public sys::Runnable, public Plugin::Target,
     boost::shared_ptr<sys::ConnectionCodec::Factory> factory;
     DtxManager dtxManager;
     SessionManager sessionManager;
-    qmf::org::apache::qpid::broker::Broker* mgmtObject;
+    qmf::org::apache::qpid::broker::Broker::shared_ptr mgmtObject;
     Vhost::shared_ptr            vhostObject;
     System::shared_ptr           systemObject;
     QueueCleaner queueCleaner;
-    QueueEvents queueEvents;
     std::vector<Url> knownBrokers;
     std::vector<Url> getKnownBrokersImpl();
     bool deferDeliveryImpl(const std::string& queue,
-                           const boost::intrusive_ptr<Message>& msg);
+                           const Message& msg);
     std::string federationTag;
-    bool recovery;
-    bool inCluster, clusterUpdatee;
+    bool recoveryInProgress;
     boost::intrusive_ptr<ExpiryPolicy> expiryPolicy;
     ConsumerFactories consumerFactories;
+    ProtocolRegistry protocolRegistry;
+    ObjectFactoryRegistry objectFactory;
 
     mutable sys::Mutex linkClientPropertiesLock;
     framing::FieldTable linkClientProperties;
@@ -215,7 +233,8 @@ class Broker : public sys::Runnable, public Plugin::Target,
     /** Shut down the broker */
     QPID_BROKER_EXTERN virtual void shutdown();
 
-    QPID_BROKER_EXTERN void setStore (boost::shared_ptr<MessageStore>& store);
+    QPID_BROKER_EXTERN void setStore (const boost::shared_ptr<MessageStore>& store);
+    bool hasStore() const { return store.get(); }
     MessageStore& getStore() { return *store; }
     void setAcl (AclModule* _acl) {acl = _acl;}
     AclModule* getAcl() { return acl; }
@@ -223,9 +242,11 @@ class Broker : public sys::Runnable, public Plugin::Target,
     ExchangeRegistry& getExchanges() { return exchanges; }
     LinkRegistry& getLinks() { return links; }
     DtxManager& getDtxManager() { return dtxManager; }
-    DataDir& getDataDir() { return dataDir; }
+    const DataDir& getDataDir() { return dataDir; }
+    const DataDir& getPagingDir() { return pagingDir; }
     Options& getOptions() { return config; }
-    QueueEvents& getQueueEvents() { return queueEvents; }
+    ProtocolRegistry& getProtocolRegistry() { return protocolRegistry; }
+    ObjectFactoryRegistry& getObjectFactoryRegistry() { return objectFactory; }
 
     void setExpiryPolicy(const boost::intrusive_ptr<ExpiryPolicy>& e) { expiryPolicy = e; }
     boost::intrusive_ptr<ExpiryPolicy> getExpiryPolicy() { return expiryPolicy; }
@@ -233,81 +254,65 @@ class Broker : public sys::Runnable, public Plugin::Target,
     SessionManager& getSessionManager() { return sessionManager; }
     const std::string& getFederationTag() const { return federationTag; }
 
-    QPID_BROKER_EXTERN management::ManagementObject* GetManagementObject() const;
+    QPID_BROKER_EXTERN management::ManagementObject::shared_ptr GetManagementObject() const;
     QPID_BROKER_EXTERN management::Manageable* GetVhostObject() const;
     QPID_BROKER_EXTERN management::Manageable::status_t ManagementMethod(
         uint32_t methodId, management::Args& args, std::string& text);
 
+    // Should we listen using this protocol or not?
+    QPID_BROKER_EXTERN bool shouldListen(std::string transport);
+
+    // Turn off listening for a protocol
+    QPID_BROKER_EXTERN void disableListening(std::string transport);
+
     /** Add to the broker's protocolFactorys */
-    QPID_BROKER_EXTERN void registerProtocolFactory(
-        const std::string& name, boost::shared_ptr<sys::ProtocolFactory>);
+    QPID_BROKER_EXTERN void registerTransport(
+        const std::string& name,
+        boost::shared_ptr<sys::TransportAcceptor>, boost::shared_ptr<sys::TransportConnector>,
+        uint16_t port);
 
     /** Accept connections */
     QPID_BROKER_EXTERN void accept();
 
     /** Create a connection to another broker. */
-    void connect(const std::string& host, const std::string& port,
+    void connect(const std::string& name,
+                 const std::string& host, const std::string& port,
                  const std::string& transport,
-                 boost::function2<void, int, std::string> failed,
-                 sys::ConnectionCodec::Factory* =0);
-    /** Create a connection to another broker. */
-    void connect(const Url& url,
-                 boost::function2<void, int, std::string> failed,
-                 sys::ConnectionCodec::Factory* =0);
+                 boost::function2<void, int, std::string> failed);
+    QPID_BROKER_EXTERN void connect(const std::string& name,
+                                    const std::string& host, const std::string& port,
+                                    const std::string& transport,
+                                    sys::ConnectionCodec::Factory*,
+                                    boost::function2<void, int, std::string> failed);
+
 
     /** Move messages from one queue to another.
         A zero quantity means to move all messages
+        Return -1 if one of the queues does not exist, otherwise
+               the number of messages moved.
     */
-    QPID_BROKER_EXTERN uint32_t queueMoveMessages(
+    QPID_BROKER_EXTERN int32_t queueMoveMessages(
         const std::string& srcQueue,
         const std::string& destQueue,
         uint32_t  qty,
         const qpid::types::Variant::Map& filter);
 
-    QPID_BROKER_EXTERN boost::shared_ptr<sys::ProtocolFactory> getProtocolFactory(
+    QPID_BROKER_EXTERN const TransportInfo& getTransportInfo(
         const std::string& name = TCP_TRANSPORT) const;
 
     /** Expose poller so plugins can register their descriptors. */
     QPID_BROKER_EXTERN boost::shared_ptr<sys::Poller> getPoller();
 
-    boost::shared_ptr<sys::ConnectionCodec::Factory> getConnectionFactory() { return factory; }
-    void setConnectionFactory(boost::shared_ptr<sys::ConnectionCodec::Factory> f) { factory = f; }
-
     /** Timer for local tasks affecting only this broker */
-    sys::Timer& getTimer() { return timer; }
-
-    /** Timer for tasks that must be synchronized if we are in a cluster */
-    sys::Timer& getClusterTimer() { return clusterTimer.get() ? *clusterTimer : timer; }
-    QPID_BROKER_EXTERN void setClusterTimer(std::auto_ptr<sys::Timer>);
+    sys::Timer& getTimer() { return *timer; }
 
     boost::function<std::vector<Url> ()> getKnownBrokers;
 
     static QPID_BROKER_EXTERN const std::string TCP_TRANSPORT;
 
-    void setRecovery(bool set) { recovery = set; }
-    bool getRecovery() const { return recovery; }
-
-    /** True of this broker is part of a cluster.
-     * Only valid after early initialization of plugins is complete.
-     */
-    bool isInCluster() const { return inCluster; }
-    void setInCluster(bool set) { inCluster = set; }
-
-    /** True if this broker is joining a cluster and in the process of
-     * receiving a state update.
-     */
-    bool isClusterUpdatee() const { return clusterUpdatee; }
-    void setClusterUpdatee(bool set) { clusterUpdatee = set; }
+    bool inRecovery() const { return recoveryInProgress; }
 
     management::ManagementAgent* getManagementAgent() { return managementAgent.get(); }
-
-    /**
-     * Never true in a stand-alone broker. In a cluster, return true
-     * to defer delivery of messages deliveredg in a cluster-unsafe
-     * context.
-     *@return true if delivery of a message should be deferred.
-     */
-    boost::function<bool (const std::string& queue, const boost::intrusive_ptr<Message>& msg)> deferDelivery;
 
     bool isAuthenticating ( ) { return config.auth; }
     bool isTimestamping() { return config.timestampRcvMsgs; }
@@ -316,11 +321,9 @@ class Broker : public sys::Runnable, public Plugin::Target,
 
     QPID_BROKER_EXTERN std::pair<boost::shared_ptr<Queue>, bool> createQueue(
         const std::string& name,
-        bool durable,
-        bool autodelete,
+        const QueueSettings& settings,
         const OwnershipToken* owner,
         const std::string& alternateExchange,
-        const qpid::framing::FieldTable& arguments,
         const std::string& userId,
         const std::string& connectionId);
 
@@ -334,6 +337,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
         const std::string& name,
         const std::string& type,
         bool durable,
+        bool autodelete,
         const std::string& alternateExchange,
         const qpid::framing::FieldTable& args,
         const std::string& userId, const std::string& connectionId);
@@ -347,6 +351,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
         const std::string& exchange,
         const std::string& key,
         const qpid::framing::FieldTable& arguments,
+        const OwnershipToken* owner,
         const std::string& userId,
         const std::string& connectionId);
 
@@ -354,12 +359,14 @@ class Broker : public sys::Runnable, public Plugin::Target,
         const std::string& queue,
         const std::string& exchange,
         const std::string& key,
+        const OwnershipToken* owner,
         const std::string& userId,
         const std::string& connectionId);
 
     ConsumerFactories&  getConsumerFactories() { return consumerFactories; }
     ConnectionObservers& getConnectionObservers() { return connectionObservers; }
-    ConfigurationObservers& getConfigurationObservers() { return configurationObservers; }
+    SessionHandlerObservers& getSessionHandlerObservers() { return sessionHandlerObservers; }
+    BrokerObservers& getBrokerObservers() { return brokerObservers; }
 
     /** Properties to be set on outgoing link connections */
     QPID_BROKER_EXTERN framing::FieldTable getLinkClientProperties() const;
@@ -367,6 +374,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
 
     /** Information identifying this system */
     boost::shared_ptr<const System> getSystem() const { return systemObject; }
+  friend class StatusCheckThread;
 };
 
 }}

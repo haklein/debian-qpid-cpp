@@ -96,7 +96,7 @@ struct Options : public qpid::Options
     Options(const std::string& argv0=std::string())
         : qpid::Options("Options"),
           help(false),
-          url("amqp:tcp:127.0.0.1"),
+          url("127.0.0.1"),
           messages(1),
           sendEos(0),
           durable(false),
@@ -165,8 +165,7 @@ struct Options : public qpid::Options
             if (address.empty()) throw qpid::Exception("Address must be specified!");
             qpid::log::Logger::instance().configure(log);
             if (help) {
-                std::ostringstream msg;
-                std::cout << msg << *this << std::endl << std::endl
+                std::cout << *this << std::endl << std::endl
                           << "Drains messages from the specified address" << std::endl;
                 return false;
             } else {
@@ -200,7 +199,7 @@ struct Options : public qpid::Options
         std::string name;
         std::string value;
         if (nameval(property, name, value)) {
-            message.getProperties()[name] = value;
+            message.getProperties()[name].parse(value);
         } else {
             message.getProperties()[name] = Variant();
         }
@@ -241,8 +240,8 @@ class GetlineContentGenerator : public ContentGenerator {
   public:
     virtual bool setContent(Message& msg) {
         string content;
-        bool got = getline(std::cin, content);
-        if (got) msg.setContent(content);
+        bool got = !!getline(std::cin, content);
+        if (got) msg.setContentObject(content);
         return got;
     }
 };
@@ -251,7 +250,7 @@ class FixedContentGenerator   : public ContentGenerator {
   public:
     FixedContentGenerator(const string& s) : content(s) {}
     virtual bool setContent(Message& msg) {
-        msg.setContent(content);
+        msg.setContentObject(content);
         return true;
     }
   private:
@@ -262,9 +261,8 @@ class MapContentGenerator   : public ContentGenerator {
   public:
     MapContentGenerator(const Options& opt) : opts(opt) {}
     virtual bool setContent(Message& msg) {
-        Variant::Map map;
-        opts.setEntries(map);
-        encode(map, msg);
+        msg.getContentObject() = qpid::types::Variant::Map();
+        opts.setEntries(msg.getContentObject().asMap());
         return true;
     }
   private:
@@ -350,8 +348,8 @@ using qpid::tests::EOS;
 int main(int argc, char ** argv)
 {
     Connection connection;
-    Options opts;
     try {
+        Options opts;
         if (opts.parse(argc, argv)) {
              connection = Connection(opts.url, opts.connectionOptions);
             connection.open();
@@ -371,6 +369,7 @@ int main(int argc, char ** argv)
                 msg.setReplyTo(Address(opts.replyto));
             }
             if (!opts.userid.empty()) msg.setUserId(opts.userid);
+            if (!opts.id.empty()) msg.setMessageId(opts.id);
             if (!opts.correlationid.empty()) msg.setCorrelationId(opts.correlationid);
             opts.setProperties(msg);
             uint sent = 0;

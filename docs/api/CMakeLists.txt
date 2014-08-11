@@ -17,7 +17,7 @@
 # under the License.
 #
 
-if (GEN_DOXYGEN)
+if (BUILD_DOCS)
     # The user.doxygen.in file was originally written for a
     # configure-generated situation so makes use of configure names that
     # need to be set from the CMake equivalents.
@@ -30,14 +30,16 @@ if (GEN_DOXYGEN)
                     ${CMAKE_CURRENT_BINARY_DIR}/developer.doxygen)
     add_custom_target (docs-user-api COMMAND ${DOXYGEN_EXECUTABLE} user.doxygen)
     add_custom_target (docs-developer COMMAND ${DOXYGEN_EXECUTABLE} developer.doxygen)
+    add_dependencies (docs docs-developer docs-user-api)
 
     # HTML files are generated to ./html - put those in the install.
     install (DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html/
-             DESTINATION ${QPID_INSTALL_HTMLDIR}
-             COMPONENT ${QPID_COMPONENT_CLIENT_INCLUDE})
+             DESTINATION ${QPID_INSTALL_DOCDIR}/api/html
+             COMPONENT ${QPID_COMPONENT_CLIENT_INCLUDE}
+             ${OPTIONAL_ARG})
     if (CPACK_GENERATOR STREQUAL "NSIS")
         set (CPACK_NSIS_MENU_LINKS
              "${QPID_INSTALL_HTMLDIR}/index.html" "Qpid C++ API Documentation"
              "https://issues.apache.org/jira/browse/QPID" "Report Qpid Problem")
     endif (CPACK_GENERATOR STREQUAL "NSIS")
-endif (GEN_DOXYGEN)
+endif (BUILD_DOCS)

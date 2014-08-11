@@ -21,6 +21,7 @@
 #include "qpid/broker/Broker.h"
 #include "qpid/Plugin.h"
 #include "qpid/Options.h"
+#include "qpid/sys/Path.h"
 #include "qpid/log/Statement.h"
 
 #include <boost/shared_ptr.hpp>
@@ -42,9 +43,10 @@ struct AclOptions : public Options {
         values.aclMaxConnectTotal = 500;
         addOptions()
             ("acl-file",           optValue(values.aclFile, "FILE"), "The policy file to load from, loaded from data dir")
+            ("connection-limit-per-user", optValue(values.aclMaxConnectPerUser, "N"), "The maximum number of connections allowed per user. 0 implies no limit.")
             ("max-connections"         , optValue(values.aclMaxConnectTotal, "N"),   "The maximum combined number of connections allowed. 0 implies no limit.")
-            ("max-connections-per-user", optValue(values.aclMaxConnectPerUser, "N"), "The maximum number of connections allowed per user. 0 implies no limit.")
-            ("max-connections-per-ip"  , optValue(values.aclMaxConnectPerIp, "N"),   "The maximum number of connections allowed per host IP address. 0 implies no limit.")
+            ("connection-limit-per-ip"  , optValue(values.aclMaxConnectPerIp, "N"),   "The maximum number of connections allowed per host IP address. 0 implies no limit.")
+            ("max-queues-per-user",      optValue(values.aclMaxQueuesPerUser, "N"),  "The maximum number of queues allowed per user. 0 implies no limit.")
             ;
     }
 };
@@ -60,18 +62,14 @@ struct AclPlugin : public Plugin {
     Options* getOptions() { return &options; }
 
     void init(broker::Broker& b) {
-        if (values.aclFile.empty()){
-            QPID_LOG(info, "Policy file not specified. ACL Disabled, no ACL checking being done!");
-        	return;
+        if (acl) throw Exception("ACL plugin cannot be initialized twice in one process.");
+
+        if (!values.aclFile.empty()){
+            sys::Path aclFile(values.aclFile);
+            sys::Path dataDir(b.getDataDir().getPath());
+            if (!aclFile.isAbsolute() && !dataDir.empty())
+                values.aclFile =  (dataDir + aclFile).str();
         }
-
-    	if (acl) throw Exception("ACL plugin cannot be initialized twice in one process.");
-
-    	if (values.aclFile.at(0) != '/' && !b.getDataDir().getPath().empty()) {
-            std::ostringstream oss;
-            oss << b.getDataDir().getPath() << "/" << values.aclFile;
-            values.aclFile = oss.str();
-    	}
         acl = new Acl(values, b);
         b.setAcl(acl.get());
         b.addFinalizer(boost::bind(&AclPlugin::shutdown, this));

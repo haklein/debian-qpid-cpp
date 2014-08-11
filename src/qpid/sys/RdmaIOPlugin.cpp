@@ -19,10 +19,11 @@
  *
  */
 
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/TransportFactory.h"
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/NameGenerator.h"
 #include "qpid/framing/AMQP_HighestVersion.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/rdma/RdmaIO.h"
@@ -66,8 +67,8 @@ class RdmaIOHandler : public OutputControl {
     // Output side
     void close();
     void abort();
+    void connectionEstablished();
     void activateOutput();
-    void giveReadCredit(int32_t credit);
     void initProtocolOut();
 
     // Input side
@@ -83,7 +84,7 @@ class RdmaIOHandler : public OutputControl {
 };
 
 RdmaIOHandler::RdmaIOHandler(Rdma::Connection::intrusive_ptr c, qpid::sys::ConnectionCodec::Factory* f) :
-    identifier(c->getFullName()),
+    identifier(broker::QPID_NAME_PREFIX+c->getFullName()),
     factory(f),
     codec(0),
     readError(false),
@@ -129,6 +130,10 @@ void RdmaIOHandler::close() {
 
 // TODO: Dummy implementation, need to fill this in for heartbeat timeout to work
 void RdmaIOHandler::abort() {
+}
+
+// TODO: Dummy implementation, need to fill this in for connection establishment timeout to work
+void RdmaIOHandler::connectionEstablished() {
 }
 
 void RdmaIOHandler::activateOutput() {
@@ -199,10 +204,6 @@ void RdmaIOHandler::full(Rdma::AsynchIO&) {
     QPID_LOG(debug, "Rdma: buffer full [" << identifier << "]");
 }
 
-// TODO: Dummy implementation of read throttling
-void RdmaIOHandler::giveReadCredit(int32_t) {
-}
-
 // The logic here is subtly different from TCP as RDMA is message oriented
 // so we define that an RDMA message is a frame - in this case there is no putting back
 // of any message remainder - there shouldn't be any. And what we read here can't be
@@ -243,14 +244,14 @@ void RdmaIOHandler::initProtocolIn(Rdma::Buffer* buff) {
     }
 }
 
-class RdmaIOProtocolFactory : public ProtocolFactory {
+class RdmaIOProtocolFactory : public TransportAcceptor, public TransportConnector {
     auto_ptr<Rdma::Listener> listener;
     const uint16_t listeningPort;
 
   public:
     RdmaIOProtocolFactory(int16_t port, int backlog);
     void accept(Poller::shared_ptr, ConnectionCodec::Factory*);
-    void connect(Poller::shared_ptr, const string& host, const std::string& port, ConnectionCodec::Factory*, ConnectFailedCallback);
+    void connect(Poller::shared_ptr, const std::string& name, const string& host, const std::string& port, ConnectionCodec::Factory*, ConnectFailedCallback);
 
     uint16_t getPort() const;
 
@@ -279,9 +280,10 @@ static class RdmaIOPlugin : public Plugin {
         // Only provide to a Broker
         if (broker) {
             const broker::Broker::Options& opts = broker->getOptions();
-            ProtocolFactory::shared_ptr protocol(new RdmaIOProtocolFactory(opts.port, opts.connectionBacklog));
-            QPID_LOG(notice, "Rdma: Listening on RDMA port " << protocol->getPort());
-            broker->registerProtocolFactory("rdma", protocol);
+            boost::shared_ptr<RdmaIOProtocolFactory> protocol(new RdmaIOProtocolFactory(opts.port, opts.connectionBacklog));
+            uint16_t port = protocol->getPort();
+            QPID_LOG(notice, "Rdma: Listening on RDMA port " << port);
+            broker->registerTransport("rdma", protocol, protocol, port);
         }
     }
 } rdmaPlugin;
@@ -371,6 +373,7 @@ void RdmaIOProtocolFactory::connected(Poller::shared_ptr poller, Rdma::Connectio
 
 void RdmaIOProtocolFactory::connect(
     Poller::shared_ptr poller,
+    const std::string& /*name*/,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* f,
     ConnectFailedCallback failed)

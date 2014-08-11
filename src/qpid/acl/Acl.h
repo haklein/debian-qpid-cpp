@@ -43,12 +43,14 @@ class Connection;
 
 namespace acl {
 class ConnectionCounter;
+class ResourceCounter;
 
 struct AclValues {
     std::string aclFile;
     uint16_t    aclMaxConnectPerUser;
     uint16_t    aclMaxConnectPerIp;
     uint16_t    aclMaxConnectTotal;
+    uint16_t    aclMaxQueuesPerUser;
 };
 
 
@@ -60,10 +62,12 @@ private:
     broker::Broker*                      broker;
     bool                                 transferAcl;
     boost::shared_ptr<AclData>           data;
-    qmf::org::apache::qpid::acl::Acl*    mgmtObject; // mgnt owns lifecycle
+    qmf::org::apache::qpid::acl::Acl::shared_ptr mgmtObject;
     qpid::management::ManagementAgent*   agent;
     mutable qpid::sys::Mutex             dataLock;
     boost::shared_ptr<ConnectionCounter> connectionCounter;
+    boost::shared_ptr<ResourceCounter>   resourceCounter;
+    bool                                 userRules;
 
 public:
     Acl (AclValues& av, broker::Broker& b);
@@ -72,9 +76,18 @@ public:
      * issue management counts and alerts for denied connections
      */
     void reportConnectLimit(const std::string user, const std::string addr);
+    void reportQueueLimit(const std::string user, const std::string queueName);
 
     inline virtual bool doTransferAcl() {
         return transferAcl;
+    };
+
+    inline virtual uint16_t getMaxConnectTotal() {
+        return aclValues.aclMaxConnectTotal;
+    };
+
+    inline virtual bool userAclRules() {
+      return userRules;
     };
 
 // create specilied authorise methods for cases that need faster matching as needed.
@@ -92,9 +105,10 @@ public:
         const std::string&               ExchangeName,
         const std::string&               RoutingKey);
 
+    // Resource quota tracking
     virtual bool approveConnection(const broker::Connection& connection);
-
-    virtual void setUserId(const broker::Connection& connection, const std::string& username);
+    virtual bool approveCreateQueue(const std::string& userId, const std::string& queueName);
+    virtual void recordDestroyQueue(const std::string& queueName);
 
     virtual ~Acl();
 private:
@@ -106,9 +120,10 @@ private:
         const std::string& name);
     bool readAclFile(std::string& errorText);
     bool readAclFile(std::string& aclFile, std::string& errorText);
+    void loadEmptyAclRuleset();
     Manageable::status_t lookup       (management::Args& args, std::string& text);
     Manageable::status_t lookupPublish(management::Args& args, std::string& text);
-    virtual qpid::management::ManagementObject* GetManagementObject(void) const;
+    virtual qpid::management::ManagementObject::shared_ptr GetManagementObject(void) const;
     virtual management::Manageable::status_t ManagementMethod (uint32_t methodId, management::Args& args, std::string& text);
 
 };

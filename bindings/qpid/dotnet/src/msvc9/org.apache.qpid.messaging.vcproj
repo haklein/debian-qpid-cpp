@@ -530,7 +530,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AssemblyInfo.cpp"
+				RelativePath="$(QPID_BUILD_ROOT)\src\windows\generated_src\AssemblyInfo.cpp"
 				>
 			</File>
 			<File
@@ -539,6 +539,10 @@
 			</File>
 			<File
 				RelativePath="..\FailoverUpdates.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\Logger.cpp"
 				>
 			</File>
 			<File
@@ -581,6 +585,10 @@
 			</File>
 			<File
 				RelativePath="..\FailoverUpdates.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Logger.h"
 				>
 			</File>
 			<File

@@ -31,34 +31,30 @@
 #include "qpid/ptr_map.h"
 
 namespace qpid {
+namespace sys {
+class Timer;
+}
+
 namespace broker {
 
 class DtxManager{
     typedef boost::ptr_map<std::string, DtxWorkRecord> WorkMap;
 
-    struct DtxCleanup : public sys::TimerTask
-    {
-        DtxManager& mgr;
-        const std::string& xid;
-
-        DtxCleanup(uint32_t timeout, DtxManager& mgr, const std::string& xid);
-        void fire();
-    };
-
     WorkMap work;
     TransactionalStore* store;
     qpid::sys::Mutex lock;
     qpid::sys::Timer* timer;
+    uint32_t dtxDefaultTimeout;
 
     void remove(const std::string& xid);
     DtxWorkRecord* createWork(const std::string& xid);
 
 public:
-    DtxManager(sys::Timer&);
+    DtxManager(sys::Timer&, uint32_t _dtxDefaultTimeout=0);
     ~DtxManager();
-    void start(const std::string& xid, DtxBuffer::shared_ptr work);
-    void join(const std::string& xid, DtxBuffer::shared_ptr work);
-    void recover(const std::string& xid, std::auto_ptr<TPCTransactionContext> txn, DtxBuffer::shared_ptr work);
+    void start(const std::string& xid, boost::intrusive_ptr<DtxBuffer> work);
+    void join(const std::string& xid, boost::intrusive_ptr<DtxBuffer> work);
+    void recover(const std::string& xid, std::auto_ptr<TPCTransactionContext> txn, boost::intrusive_ptr<DtxBuffer> work);
     bool prepare(const std::string& xid);
     bool commit(const std::string& xid, bool onePhase);
     void rollback(const std::string& xid);
@@ -68,11 +64,6 @@ public:
     void setStore(TransactionalStore* store);
     void setTimer(sys::Timer& t) { timer = &t; }
 
-    // Used by cluster for replication.
-    template<class F> void each(F f) const {
-        for (WorkMap::const_iterator i = work.begin(); i != work.end(); ++i)
-            f(*ptr_map_ptr(i));
-    }
     DtxWorkRecord* getWork(const std::string& xid);
     bool exists(const std::string& xid);
     static std::string convert(const framing::Xid& xid);

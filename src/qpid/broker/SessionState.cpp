@@ -20,14 +20,14 @@
  */
 #include "qpid/broker/SessionState.h"
 #include "qpid/broker/Broker.h"
-#include "qpid/broker/ConnectionState.h"
+#include "qpid/broker/DeliverableMessage.h"
 #include "qpid/broker/DeliveryRecord.h"
 #include "qpid/broker/SessionManager.h"
 #include "qpid/broker/SessionHandler.h"
-#include "qpid/sys/ClusterSafe.h"
 #include "qpid/framing/AMQContentBody.h"
 #include "qpid/framing/AMQHeaderBody.h"
 #include "qpid/framing/AMQMethodBody.h"
+#include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/framing/ServerInvoker.h"
 #include "qpid/log/Statement.h"
@@ -52,16 +52,14 @@ namespace _qmf = qmf::org::apache::qpid::broker;
 
 SessionState::SessionState(
     Broker& b, SessionHandler& h, const SessionId& id,
-    const SessionState::Configuration& config, bool delayManagement)
+    const SessionState::Configuration& config)
     : qpid::SessionState(id, config),
       broker(b), handler(&h),
-      semanticState(*this, *this),
+      semanticState(*this),
       adapter(semanticState),
-      msgBuilder(&broker.getStore()),
-      mgmtObject(0),
       asyncCommandCompleter(new AsyncCommandCompleter(this))
 {
-    if (!delayManagement) addManagementObject();
+    addManagementObject();
     attach(h);
 }
 
@@ -71,8 +69,8 @@ void SessionState::addManagementObject() {
     if (parent != 0) {
         ManagementAgent* agent = getBroker().getManagementAgent();
         if (agent != 0) {
-            mgmtObject = new _qmf::Session
-                (agent, this, parent, getId().getName());
+            mgmtObject = _qmf::Session::shared_ptr(new _qmf::Session
+                (agent, this, parent, getId().getName()));
             mgmtObject->set_attached (0);
             mgmtObject->set_detachedLifespan (0);
             mgmtObject->clr_expireTime();
@@ -81,7 +79,27 @@ void SessionState::addManagementObject() {
     }
 }
 
+void SessionState::startTx() {
+    if (mgmtObject) { mgmtObject->inc_TxnStarts(); }
+}
+
+void SessionState::commitTx() {
+    if (mgmtObject) {
+        mgmtObject->inc_TxnCommits();
+        mgmtObject->inc_TxnCount();
+    }
+}
+
+void SessionState::rollbackTx() {
+    if (mgmtObject) {
+        mgmtObject->inc_TxnRejects();
+        mgmtObject->inc_TxnCount();
+    }
+}
+
 SessionState::~SessionState() {
+    if (mgmtObject != 0)
+        mgmtObject->debugStats("destroying");
     asyncCommandCompleter->cancel();
     semanticState.closed();
     if (mgmtObject != 0)
@@ -98,12 +116,12 @@ uint16_t SessionState::getChannel() const {
     return handler->getChannel();
 }
 
-ConnectionState& SessionState::getConnection() {
+amqp_0_10::Connection& SessionState::getConnection() {
     assert(isAttached());
     return handler->getConnection();
 }
 
-bool SessionState::isLocal(const ConnectionToken* t) const
+bool SessionState::isLocal(const OwnershipToken* t) const
 {
     return isAttached() && &(handler->getConnection()) == t;
 }
@@ -134,24 +152,9 @@ void SessionState::attach(SessionHandler& h) {
     asyncCommandCompleter->attached();
 }
 
-void SessionState::abort() {
-    if (isAttached())
-        getConnection().outputTasks.abort();
-}
-
-void SessionState::activateOutput() {
-    if (isAttached())
-        getConnection().outputTasks.activateOutput();
-}
-
-void SessionState::giveReadCredit(int32_t credit) {
-    if (isAttached())
-        getConnection().outputTasks.giveReadCredit(credit);
-}
-
-ManagementObject* SessionState::GetManagementObject (void) const
+ManagementObject::shared_ptr SessionState::GetManagementObject(void) const
 {
-    return (ManagementObject*) mgmtObject;
+    return mgmtObject;
 }
 
 Manageable::status_t SessionState::ManagementMethod (uint32_t methodId,
@@ -188,27 +191,22 @@ Manageable::status_t SessionState::ManagementMethod (uint32_t methodId,
     return status;
 }
 
-void SessionState::handleCommand(framing::AMQMethodBody* method, const SequenceNumber& id) {
-    currentCommandComplete = true;      // assumed, can be overridden by invoker method (this sucks).
-    Invoker::Result invocation = invoke(adapter, *method);
-    if (currentCommandComplete) receiverCompleted(id);
-
-    if (!invocation.wasHandled()) {
+void SessionState::handleCommand(framing::AMQMethodBody* method) {
+    Invoker::Result result = invoke(adapter, *method);
+    if (!result.wasHandled())
         throw NotImplementedException(QPID_MSG("Not implemented: " << *method));
-    } else if (invocation.hasResult()) {
-        getProxy().getExecution().result(id, invocation.getResult());
-    }
-
-    if (method->isSync() && currentCommandComplete) {
-        sendAcceptAndCompletion();
-    }
+    if (currentCommand.isCompleteSync())
+        completeCommand(
+            currentCommand.getId(), false/*needAccept*/, currentCommand.isSyncRequired(),
+            result.getResult());
 }
 
-void SessionState::handleContent(AMQFrame& frame, const SequenceNumber& id)
+
+void SessionState::handleContent(AMQFrame& frame)
 {
     if (frame.getBof() && frame.getBos()) //start of frameset
-        msgBuilder.start(id);
-    intrusive_ptr<Message> msg(msgBuilder.getMessage());
+        msgBuilder.start(currentCommand.getId());
+    intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> msg(msgBuilder.getMessage());
     msgBuilder.handle(frame);
     if (frame.getEof() && frame.getEos()) {//end of frameset
         if (frame.getBof()) {
@@ -218,13 +216,16 @@ void SessionState::handleContent(AMQFrame& frame, const SequenceNumber& id)
             header.setEof(false);
             msg->getFrames().append(header);
         }
+        DeliverableMessage deliverable(Message(msg, msg), semanticState.getTxBuffer());
         if (broker.isTimestamping())
             msg->setTimestamp();
-        msg->setPublisher(&getConnection());
-        msg->getIngressCompletion().begin();
-        semanticState.handle(msg);
-        msgBuilder.end();
+        deliverable.getMessage().setPublisher(getConnection());
+
+
         IncompleteIngressMsgXfer xfer(this, msg);
+        msg->getIngressCompletion().begin();
+        semanticState.route(deliverable.getMessage(), deliverable);
+        msgBuilder.end();
         msg->getIngressCompletion().end(xfer);  // allows msg to complete xfer
     }
 }
@@ -238,28 +239,27 @@ void SessionState::sendAcceptAndCompletion()
     sendCompletion();
 }
 
-/** Invoked when the given inbound message is finished being processed
- * by all interested parties (eg. it is done being enqueued to all queues,
- * its credit has been accounted for, etc).  At this point, msg is considered
- * by this receiver as 'completed' (as defined by AMQP 0_10)
+/** Invoked when the given command is finished being processed by all interested
+ * parties (eg. it is done being enqueued to all queues, its credit has been
+ * accounted for, etc).  At this point the command is considered by this
+ * receiver as 'completed' (as defined by AMQP 0_10)
  */
-void SessionState::completeRcvMsg(SequenceNumber id,
-                                  bool requiresAccept,
-                                  bool requiresSync)
+void SessionState::completeCommand(SequenceNumber id,
+                                   bool requiresAccept,
+                                   bool requiresSync,
+                                   const std::string& result=std::string())
 {
-    // Mark this as a cluster-unsafe scope since it can be called in
-    // journal threads or connection threads as part of asynchronous
-    // command completion.
-    sys::ClusterUnsafeScope cus;
-
     bool callSendCompletion = false;
     receiverCompleted(id);
     if (requiresAccept)
-        // will cause msg's seq to appear in the next message.accept we send.
+        // will cause cmd's seq to appear in the next message.accept we send.
         accepted.add(id);
 
+    if (!result.empty())
+        getProxy().getExecution().result(id, result);
+
     // Are there any outstanding Execution.Sync commands pending the
-    // completion of this msg?  If so, complete them.
+    // completion of this cmd?  If so, complete them.
     while (!pendingExecutionSyncs.empty() &&
            receiverGetIncomplete().front() >= pendingExecutionSyncs.front()) {
         const SequenceNumber id = pendingExecutionSyncs.front();
@@ -276,14 +276,15 @@ void SessionState::completeRcvMsg(SequenceNumber id,
 }
 
 void SessionState::handleIn(AMQFrame& frame) {
-    SequenceNumber commandId = receiverGetCurrent();
     //TODO: make command handling more uniform, regardless of whether
     //commands carry content.
     AMQMethodBody* m = frame.getMethod();
+    currentCommand = CurrentCommand(receiverGetCurrent(), m && m->isSync());
+
     if (m == 0 || m->isContentBearing()) {
-        handleContent(frame, commandId);
+        handleContent(frame);
     } else if (frame.getBof() && frame.getEof()) {
-        handleCommand(frame.getMethod(), commandId);
+        handleCommand(frame.getMethod());
     } else {
         throw InternalErrorException("Cannot handle multi-frame command segments yet");
     }
@@ -294,18 +295,28 @@ void SessionState::handleOut(AMQFrame& frame) {
     handler->out(frame);
 }
 
-void SessionState::deliver(DeliveryRecord& msg, bool sync)
+DeliveryId SessionState::deliver(const qpid::broker::amqp_0_10::MessageTransfer& message,
+                                 const std::string& destination, bool isRedelivered, uint64_t ttl,
+                                 qpid::framing::message::AcceptMode acceptMode, qpid::framing::message::AcquireMode acquireMode,
+                                 const qpid::types::Variant::Map& annotations, bool sync)
 {
     uint32_t maxFrameSize = getConnection().getFrameMax();
     assert(senderGetCommandPoint().offset == 0);
     SequenceNumber commandId = senderGetCommandPoint().command;
-    msg.deliver(getProxy().getHandler(), commandId, maxFrameSize);
+
+    framing::AMQFrame method((framing::MessageTransferBody(framing::ProtocolVersion(), destination, acceptMode, acquireMode)));
+    method.setEof(false);
+    getProxy().getHandler().handle(method);
+    message.sendHeader(getProxy().getHandler(), maxFrameSize, isRedelivered, ttl, annotations);
+    message.sendContent(getProxy().getHandler(), maxFrameSize);
+
     assert(senderGetCommandPoint() == SessionPoint(commandId+1, 0)); // Delivery has moved sendPoint.
     if (sync) {
         AMQP_ClientProxy::Execution& p(getProxy().getExecution());
         Proxy::ScopedSync s(p);
         p.sync();
     }
+    return commandId;
 }
 
 void SessionState::sendCompletion() {
@@ -326,29 +337,22 @@ void SessionState::readyToSend() {
 Broker& SessionState::getBroker() { return broker; }
 
 // Session resume is not fully implemented so it is useless to set a
-// non-0 timeout. Moreover it creates problems in a cluster because
-// dead sessions are kept and interfere with failover.
+// non-0 timeout.
 void SessionState::setTimeout(uint32_t) { }
-
-framing::AMQP_ClientProxy& SessionState::getClusterOrderProxy() {
-    return handler->getClusterOrderProxy();
-}
-
 
 // Current received command is an execution.sync command.
 // Complete this command only when all preceding commands have completed.
 // (called via the invoker() in handleCommand() above)
 void SessionState::addPendingExecutionSync()
 {
-    SequenceNumber syncCommandId = receiverGetCurrent();
+    SequenceNumber syncCommandId = currentCommand.getId();
     if (receiverGetIncomplete().front() < syncCommandId) {
-        currentCommandComplete = false;
+        currentCommand.setCompleteSync(false);
         pendingExecutionSyncs.push(syncCommandId);
         asyncCommandCompleter->flushPendingMessages();
         QPID_LOG(debug, getId() << ": delaying completion of execution.sync " << syncCommandId);
     }
 }
-
 
 /** factory for creating a reference-counted IncompleteIngressMsgXfer object
  * which will be attached to a message that will be completed asynchronously.
@@ -385,33 +389,24 @@ void SessionState::IncompleteIngressMsgXfer::completed(bool sync)
          */
         session = 0;
         QPID_LOG(debug, ": async completion callback scheduled for msg seq=" << id);
-        completerContext->scheduleMsgCompletion(id, requiresAccept, requiresSync);
+        completerContext->scheduleCommandCompletion(id, requiresAccept, requiresSync);
     } else {
         // this path runs directly from the ac->end() call in handleContent() above,
         // so *session is definately valid.
         if (session->isAttached()) {
             QPID_LOG(debug, ": receive completed for msg seq=" << id);
-            session->completeRcvMsg(id, requiresAccept, requiresSync);
+            session->completeCommand(id, requiresAccept, requiresSync);
         }
     }
-    completerContext = boost::intrusive_ptr<AsyncCommandCompleter>();
-}
-
-
-/** Scheduled from an asynchronous command's completed callback to run on
- * the IO thread.
- */
-void SessionState::AsyncCommandCompleter::schedule(boost::intrusive_ptr<AsyncCommandCompleter> ctxt)
-{
-    ctxt->completeCommands();
+    completerContext = 0;
 }
 
 
 /** Track an ingress message that is pending completion */
-void SessionState::AsyncCommandCompleter::addPendingMessage(boost::intrusive_ptr<Message> msg)
+void SessionState::AsyncCommandCompleter::addPendingMessage(boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> msg)
 {
     qpid::sys::ScopedLock<qpid::sys::Mutex> l(completerLock);
-    std::pair<SequenceNumber, boost::intrusive_ptr<Message> > item(msg->getCommandId(), msg);
+    std::pair<SequenceNumber, boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> > item(msg->getCommandId(), msg);
     bool unique = pendingMsgs.insert(item).second;
     if (!unique) {
       assert(false);
@@ -430,13 +425,13 @@ void SessionState::AsyncCommandCompleter::deletePendingMessage(SequenceNumber id
 /** done when an execution.sync arrives */
 void SessionState::AsyncCommandCompleter::flushPendingMessages()
 {
-    std::map<SequenceNumber, boost::intrusive_ptr<Message> > copy;
+    std::map<SequenceNumber, boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> > copy;
     {
         qpid::sys::ScopedLock<qpid::sys::Mutex> l(completerLock);
         pendingMsgs.swap(copy);    // we've only tracked these in case a flush is needed, so nuke 'em now.
     }
     // drop lock, so it is safe to call "flush()"
-    for (std::map<SequenceNumber, boost::intrusive_ptr<Message> >::iterator i = copy.begin();
+    for (std::map<SequenceNumber, boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> >::iterator i = copy.begin();
          i != copy.end(); ++i) {
         i->second->flush();
     }
@@ -446,22 +441,27 @@ void SessionState::AsyncCommandCompleter::flushPendingMessages()
 /** mark an ingress Message.Transfer command as completed.
  * This method must be thread safe - it may run on any thread.
  */
-void SessionState::AsyncCommandCompleter::scheduleMsgCompletion(SequenceNumber cmd,
-                                                                bool requiresAccept,
-                                                                bool requiresSync)
+void SessionState::AsyncCommandCompleter::scheduleCommandCompletion(
+    SequenceNumber cmd,
+    bool requiresAccept,
+    bool requiresSync)
 {
     qpid::sys::ScopedLock<qpid::sys::Mutex> l(completerLock);
 
     if (session && isAttached) {
-        MessageInfo msg(cmd, requiresAccept, requiresSync);
-        completedMsgs.push_back(msg);
-        if (completedMsgs.size() == 1) {
-            session->getConnection().requestIOProcessing(boost::bind(&schedule,
-                                                                     session->asyncCommandCompleter));
+        CommandInfo info(cmd, requiresAccept, requiresSync);
+        completedCmds.push_back(info);
+        if (completedCmds.size() == 1) {
+            session->getConnection().requestIOProcessing(
+                boost::bind(&AsyncCommandCompleter::completeCommands,
+                            session->asyncCommandCompleter));
         }
     }
 }
 
+void SessionState::AsyncCommandCompleter::schedule(boost::function<void()> f) {
+    if (session && isAttached) session->getConnection().requestIOProcessing(f);
+}
 
 /** Cause the session to complete all completed commands.
  * Executes on the IO thread.
@@ -472,12 +472,13 @@ void SessionState::AsyncCommandCompleter::completeCommands()
 
     // when session is destroyed, it clears the session pointer via cancel().
     if (session && session->isAttached()) {
-        for (std::vector<MessageInfo>::iterator msg = completedMsgs.begin();
-             msg != completedMsgs.end(); ++msg) {
-            session->completeRcvMsg(msg->cmd, msg->requiresAccept, msg->requiresSync);
+        for (std::vector<CommandInfo>::iterator cmd = completedCmds.begin();
+             cmd != completedCmds.end(); ++cmd) {
+            session->completeCommand(
+                cmd->cmd, cmd->requiresAccept, cmd->requiresSync);
         }
     }
-    completedMsgs.clear();
+    completedCmds.clear();
 }
 
 

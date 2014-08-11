@@ -46,11 +46,6 @@ using namespace qpid::framing;
 using boost::format;
 using boost::str;
 
-struct TCPConnector::Buff : public AsynchIO::BufferBase {
-    Buff(size_t size) : AsynchIO::BufferBase(new char[size], size) {}
-    ~Buff() { delete [] bytes;}
-};
-
 // Static constructor which registers connector here
 namespace {
     Connector* create(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
@@ -77,12 +72,13 @@ TCPConnector::TCPConnector(Poller::shared_ptr p,
       closed(true),
       shutdownHandler(0),
       input(0),
+      socket(createSocket()),
       connector(0),
       aio(0),
       poller(p)
 {
     QPID_LOG(debug, "TCPConnector created for " << version);
-    settings.configureSocket(socket);
+    settings.configureSocket(*socket);
 }
 
 TCPConnector::~TCPConnector() {
@@ -93,7 +89,7 @@ void TCPConnector::connect(const std::string& host, const std::string& port) {
     Mutex::ScopedLock l(lock);
     assert(closed);
     connector = AsynchConnector::create(
-        socket,
+        *socket,
         host, port,
         boost::bind(&TCPConnector::connected, this, _1),
         boost::bind(&TCPConnector::connectFailed, this, _3));
@@ -104,7 +100,7 @@ void TCPConnector::connect(const std::string& host, const std::string& port) {
 
 void TCPConnector::connected(const Socket&) {
     connector = 0;
-    aio = AsynchIO::create(socket,
+    aio = AsynchIO::create(*socket,
                        boost::bind(&TCPConnector::readbuff, this, _1, _2),
                        boost::bind(&TCPConnector::eof, this, _1),
                        boost::bind(&TCPConnector::disconnected, this, _1),
@@ -118,11 +114,10 @@ void TCPConnector::connected(const Socket&) {
 
 void TCPConnector::start(sys::AsynchIO* aio_) {
     aio = aio_;
-    for (int i = 0; i < 4; i++) {
-        aio->queueReadBuffer(new Buff(maxFrameSize));
-    }
 
-    identifier = str(format("[%1%]") % socket.getFullAddress());
+    aio->createBuffers(maxFrameSize);
+
+    identifier = str(format("[%1%]") % socket->getFullAddress());
 }
 
 void TCPConnector::initAmqp() {
@@ -133,7 +128,7 @@ void TCPConnector::initAmqp() {
 void TCPConnector::connectFailed(const std::string& msg) {
     connector = 0;
     QPID_LOG(warning, "Connect failed: " << msg);
-    socket.close();
+    socket->close();
     if (!closed)
         closed = true;
     if (shutdownHandler)
@@ -156,16 +151,20 @@ void TCPConnector::socketClosed(AsynchIO&, const Socket&) {
         shutdownHandler->shutdown();
 }
 
+void TCPConnector::connectAborted() {
+    connector->stop();
+    connectFailed("Connection timedout");
+}
+
 void TCPConnector::abort() {
     // Can't abort a closed connection
     if (!closed) {
         if (aio) {
             // Established connection
-            aio->requestCallback(boost::bind(&TCPConnector::eof, this, _1));
+            aio->requestCallback(boost::bind(&TCPConnector::disconnected, this, _1));
         } else if (connector) {
             // We're still connecting
-            connector->stop();
-            connectFailed("Connection timedout");
+            connector->requestCallback(boost::bind(&TCPConnector::connectAborted, this));
         }
     }
 }
@@ -178,19 +177,11 @@ void TCPConnector::setShutdownHandler(ShutdownHandler* handler){
     shutdownHandler = handler;
 }
 
-OutputHandler* TCPConnector::getOutputHandler() {
-    return this; 
-}
-
-sys::ShutdownHandler* TCPConnector::getShutdownHandler() const {
-    return shutdownHandler;
-}
-
 const std::string& TCPConnector::getIdentifier() const { 
     return identifier;
 }
 
-void TCPConnector::send(AMQFrame& frame) {
+void TCPConnector::handle(AMQFrame& frame) {
     bool notifyWrite = false;
     {
     Mutex::ScopedLock l(lock);
@@ -226,15 +217,19 @@ void TCPConnector::writebuff(AsynchIO& /*aio*/)
         return;
 
     Codec* codec = securityLayer.get() ? (Codec*) securityLayer.get() : (Codec*) this;
-    if (codec->canEncode()) {
-        std::auto_ptr<AsynchIO::BufferBase> buffer = std::auto_ptr<AsynchIO::BufferBase>(aio->getQueuedBuffer());
-        if (!buffer.get()) buffer = std::auto_ptr<AsynchIO::BufferBase>(new Buff(maxFrameSize));
+
+    if (!codec->canEncode()) {
+        return;
+    }
+
+    AsynchIO::BufferBase* buffer = aio->getQueuedBuffer();
+    if (buffer) {
 
         size_t encoded = codec->encode(buffer->bytes, buffer->byteCount);
 
         buffer->dataStart = 0;
         buffer->dataCount = encoded;
-        aio->queueWrite(buffer.release());
+        aio->queueWrite(buffer);
     }
 }
 
@@ -247,9 +242,9 @@ bool TCPConnector::canEncode()
 }
 
 // Called in IO thread.
-size_t TCPConnector::encode(const char* buffer, size_t size)
+size_t TCPConnector::encode(char* buffer, size_t size)
 {
-    framing::Buffer out(const_cast<char*>(buffer), size);
+    framing::Buffer out(buffer, size);
     size_t bytesWritten(0);
     {
         Mutex::ScopedLock l(lock);
@@ -266,7 +261,7 @@ size_t TCPConnector::encode(const char* buffer, size_t size)
     return bytesWritten;
 }
 
-bool TCPConnector::readbuff(AsynchIO& aio, AsynchIO::BufferBase* buff) 
+void TCPConnector::readbuff(AsynchIO& aio, AsynchIO::BufferBase* buff)
 {
     Codec* codec = securityLayer.get() ? (Codec*) securityLayer.get() : (Codec*) this;
     int32_t decoded = codec->decode(buff->bytes+buff->dataStart, buff->dataCount);
@@ -281,10 +276,9 @@ bool TCPConnector::readbuff(AsynchIO& aio, AsynchIO::BufferBase* buff)
         // Give whole buffer back to aio subsystem
         aio.queueReadBuffer(buff);
     }
-    return true;
 }
 
-size_t TCPConnector::decode(const char* buffer, size_t size) 
+size_t TCPConnector::decode(const char* buffer, size_t size)
 {
     framing::Buffer in(const_cast<char*>(buffer), size);
     if (!initiated) {
@@ -295,8 +289,10 @@ size_t TCPConnector::decode(const char* buffer, size_t size)
                 throw Exception(QPID_MSG("Unsupported version: " << protocolInit
                                          << " supported version " << version));
             }
+            initiated = true;
+        } else {
+            return size - in.available();
         }
-        initiated = true;
     }
     AMQFrame frame;
     while(frame.decode(in)){
@@ -308,6 +304,7 @@ size_t TCPConnector::decode(const char* buffer, size_t size)
 
 void TCPConnector::writeDataBlock(const AMQDataBlock& data) {
     AsynchIO::BufferBase* buff = aio->getQueuedBuffer();
+    assert(buff);
     framing::Buffer out(buff->bytes, buff->byteCount);
     data.encode(out);
     buff->dataCount = data.encodedSize();
@@ -320,7 +317,7 @@ void TCPConnector::eof(AsynchIO&) {
 
 void TCPConnector::disconnected(AsynchIO&) {
     close();
-    socketClosed(*aio, socket);
+    socketClosed(*aio, *socket);
 }
 
 void TCPConnector::activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer> sl)

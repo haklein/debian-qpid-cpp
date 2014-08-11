@@ -20,18 +20,21 @@
  */
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/Message.h"
 #include "qpid/broker/Queue.h"
+#include "qpid/broker/QueueSettings.h"
 #include "qpid/Exception.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/broker/SessionState.h"
-#include "qpid/sys/ClusterSafe.h"
 
 #include "qmf/org/apache/qpid/broker/Queue.h"
 
 #include <sstream>
+
+#include <boost/enable_shared_from_this.hpp>
 
 using namespace qpid::broker;
 using namespace qpid::framing;
@@ -43,77 +46,34 @@ namespace {
     template <typename T>
     void validateFlowConfig(T max, T& stop, T& resume, const std::string& type, const std::string& queue)
     {
-        if (resume > stop) {
-            throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_resume_" << type
+        if (stop) {
+            if (resume > stop) {
+                throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_resume_" << type
                                                     << "=" << resume
-                                                    << " must be less than qpid.flow_stop_" << type
+                                                    << " must be less or equal to qpid.flow_stop_" << type
                                                     << "=" << stop));
-        }
-        if (resume == 0) resume = stop;
-        if (max != 0 && (max < stop)) {
-            throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_stop_" << type
+            }
+            if (resume == 0) resume = stop;
+            if (max != 0 && (max < stop)) {
+                throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_stop_" << type
                                                     << "=" << stop
                                                     << " must be less than qpid.max_" << type
                                                     << "=" << max));
+            }
         }
-    }
-
-    /** extract a capacity value as passed in an argument map
-     */
-    uint64_t getCapacity(const FieldTable& settings, const std::string& key, uint64_t defaultValue)
-    {
-        FieldTable::ValuePtr v = settings.get(key);
-
-        int64_t result = 0;
-
-        if (!v) return defaultValue;
-        if (v->getType() == 0x23) {
-            QPID_LOG(debug, "Value for " << key << " specified as float: " << v->get<float>());
-        } else if (v->getType() == 0x33) {
-            QPID_LOG(debug, "Value for " << key << " specified as double: " << v->get<double>());
-        } else if (v->convertsTo<int64_t>()) {
-            result = v->get<int64_t>();
-            QPID_LOG(debug, "Got integer value for " << key << ": " << result);
-            if (result >= 0) return result;
-        } else if (v->convertsTo<std::string>()) {
-            std::string s(v->get<std::string>());
-            QPID_LOG(debug, "Got string value for " << key << ": " << s);
-            std::istringstream convert(s);
-            if (convert >> result && result >= 0) return result;
-        }
-
-        QPID_LOG(warning, "Cannot convert " << key << " to unsigned integer, using default (" << defaultValue << ")");
-        return defaultValue;
     }
 }
 
 
 
-QueueFlowLimit::QueueFlowLimit(Queue *_queue,
+QueueFlowLimit::QueueFlowLimit(const std::string& _queueName,
                                uint32_t _flowStopCount, uint32_t _flowResumeCount,
                                uint64_t _flowStopSize,  uint64_t _flowResumeSize)
-    : StatefulQueueObserver(std::string("QueueFlowLimit")), queue(_queue), queueName("<unknown>"),
+    : queue(0), queueName(_queueName),
       flowStopCount(_flowStopCount), flowResumeCount(_flowResumeCount),
       flowStopSize(_flowStopSize), flowResumeSize(_flowResumeSize),
-      flowStopped(false), count(0), size(0), queueMgmtObj(0), broker(0)
+      flowStopped(false), count(0), size(0), broker(0)
 {
-    uint32_t maxCount(0);
-    uint64_t maxSize(0);
-
-    if (queue) {
-        queueName = _queue->getName();
-        if (queue->getPolicy()) {
-            maxSize = _queue->getPolicy()->getMaxSize();
-            maxCount = _queue->getPolicy()->getMaxCount();
-        }
-        broker = queue->getBroker();
-        queueMgmtObj = dynamic_cast<_qmfBroker::Queue*> (queue->GetManagementObject());
-        if (queueMgmtObj) {
-            queueMgmtObj->set_flowStopped(isFlowControlActive());
-        }
-    }
-    validateFlowConfig( maxCount, flowStopCount, flowResumeCount, "count", queueName );
-    validateFlowConfig( maxSize, flowStopSize, flowResumeSize, "size", queueName );
     QPID_LOG(info, "Queue \"" << queueName << "\": Flow limit created: flowStopCount=" << flowStopCount
              << ", flowResumeCount=" << flowResumeCount
              << ", flowStopSize=" << flowStopSize << ", flowResumeSize=" << flowResumeSize );
@@ -125,23 +85,23 @@ QueueFlowLimit::~QueueFlowLimit()
     sys::Mutex::ScopedLock l(indexLock);
     if (!index.empty()) {
         // we're gone - release all pending msgs
-        for (std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.begin();
+        for (std::map<framing::SequenceNumber, Message >::iterator itr = index.begin();
              itr != index.end(); ++itr)
             if (itr->second)
                 try {
-                    itr->second->getIngressCompletion().finishCompleter();
+                    itr->second.getPersistentContext()->getIngressCompletion().finishCompleter();
                 } catch (...) {}    // ignore - not safe for a destructor to throw.
         index.clear();
     }
 }
 
 
-void QueueFlowLimit::enqueued(const QueuedMessage& msg)
+void QueueFlowLimit::enqueued(const Message& msg)
 {
     sys::Mutex::ScopedLock l(indexLock);
 
     ++count;
-    size += msg.payload->contentSize();
+    size += msg.getMessageSize();
 
     if (!flowStopped) {
         if (flowStopCount && count > flowStopCount) {
@@ -158,15 +118,10 @@ void QueueFlowLimit::enqueued(const QueuedMessage& msg)
     }
 
     if (flowStopped || !index.empty()) {
-        // ignore flow control if we are populating the queue due to cluster replication:
-        if (broker && broker->isClusterUpdatee()) {
-            QPID_LOG(trace, "Queue \"" << queueName << "\": ignoring flow control for msg pos=" << msg.position);
-            return;
-        }
-        QPID_LOG(trace, "Queue \"" << queueName << "\": setting flow control for msg pos=" << msg.position);
-        msg.payload->getIngressCompletion().startCompleter();    // don't complete until flow resumes
+        QPID_LOG(trace, "Queue \"" << queueName << "\": setting flow control for msg pos=" << msg.getSequence());
+        msg.getPersistentContext()->getIngressCompletion().startCompleter();    // don't complete until flow resumes
         bool unique;
-        unique = index.insert(std::pair<framing::SequenceNumber, boost::intrusive_ptr<Message> >(msg.position, msg.payload)).second;
+        unique = index.insert(std::pair<framing::SequenceNumber, Message >(msg.getSequence(), msg)).second;
         // Like this to avoid tripping up unused variable warning when NDEBUG set
         if (!unique) assert(unique);
     }
@@ -174,7 +129,7 @@ void QueueFlowLimit::enqueued(const QueuedMessage& msg)
 
 
 
-void QueueFlowLimit::dequeued(const QueuedMessage& msg)
+void QueueFlowLimit::dequeued(const Message& msg)
 {
     sys::Mutex::ScopedLock l(indexLock);
 
@@ -184,7 +139,7 @@ void QueueFlowLimit::dequeued(const QueuedMessage& msg)
         throw Exception(QPID_MSG("Flow limit count underflow on dequeue. Queue=" << queueName));
     }
 
-    uint64_t _size = msg.payload->contentSize();
+    uint64_t _size = msg.getMessageSize();
     if (_size <= size) {
         size -= _size;
     } else {
@@ -203,16 +158,16 @@ void QueueFlowLimit::dequeued(const QueuedMessage& msg)
     if (!index.empty()) {
         if (!flowStopped) {
             // flow enabled - release all pending msgs
-            for (std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.begin();
+            for (std::map<framing::SequenceNumber, Message >::iterator itr = index.begin();
                  itr != index.end(); ++itr)
                 if (itr->second)
-                    itr->second->getIngressCompletion().finishCompleter();
+                    itr->second.getPersistentContext()->getIngressCompletion().finishCompleter();
             index.clear();
         } else {
             // even if flow controlled, we must release this msg as it is being dequeued
-            std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.find(msg.position);
+            std::map<framing::SequenceNumber, Message >::iterator itr = index.find(msg.getSequence());
             if (itr != index.end()) {       // this msg is flow controlled, release it:
-                msg.payload->getIngressCompletion().finishCompleter();
+                msg.getPersistentContext()->getIngressCompletion().finishCompleter();
                 index.erase(itr);
             }
         }
@@ -279,124 +234,66 @@ void QueueFlowLimit::setDefaults(uint64_t maxQueueSize, uint flowStopRatio, uint
 }
 
 
-void QueueFlowLimit::observe(Queue& queue, const qpid::framing::FieldTable& settings)
+void QueueFlowLimit::observe(Queue& queue)
 {
-    QueueFlowLimit *ptr = createLimit( &queue, settings );
-    if (ptr) {
-        boost::shared_ptr<QueueFlowLimit> observer(ptr);
-        queue.addObserver(observer);
-    }
-}
-
-/** returns ptr to a QueueFlowLimit, else 0 if no limit */
-QueueFlowLimit *QueueFlowLimit::createLimit(Queue *queue, const qpid::framing::FieldTable& settings)
-{
-    std::string type(QueuePolicy::getType(settings));
-
-    if (type == QueuePolicy::RING || type == QueuePolicy::RING_STRICT) {
-        // The size of a RING queue is limited by design - no need for flow control.
-        return 0;
-    }
-
-    if (settings.get(flowStopCountKey) || settings.get(flowStopSizeKey) ||
-        settings.get(flowResumeCountKey) || settings.get(flowResumeSizeKey)) {
-        // user provided (some) flow settings manually...
-        uint32_t flowStopCount = getCapacity(settings, flowStopCountKey, 0);
-        uint32_t flowResumeCount = getCapacity(settings, flowResumeCountKey, 0);
-        uint64_t flowStopSize = getCapacity(settings, flowStopSizeKey, 0);
-        uint64_t flowResumeSize = getCapacity(settings, flowResumeSizeKey, 0);
-        if (flowStopCount == 0 && flowStopSize == 0) {   // disable flow control
-            return 0;
-        }
-        return new QueueFlowLimit(queue, flowStopCount, flowResumeCount, flowStopSize, flowResumeSize);
-    }
-
-    if (defaultFlowStopRatio) {   // broker has a default ratio setup...
-        uint64_t maxByteCount = getCapacity(settings, QueuePolicy::maxSizeKey, defaultMaxSize);
-        uint64_t flowStopSize = (uint64_t)(maxByteCount * (defaultFlowStopRatio/100.0) + 0.5);
-        uint64_t flowResumeSize = (uint64_t)(maxByteCount * (defaultFlowResumeRatio/100.0));
-        uint32_t maxMsgCount = getCapacity(settings, QueuePolicy::maxCountKey, 0);  // no size by default
-        uint32_t flowStopCount = (uint32_t)(maxMsgCount * (defaultFlowStopRatio/100.0) + 0.5);
-        uint32_t flowResumeCount = (uint32_t)(maxMsgCount * (defaultFlowResumeRatio/100.0));
-
-        return new QueueFlowLimit(queue, flowStopCount, flowResumeCount, flowStopSize, flowResumeSize);
-    }
-    return 0;
-}
-
-/* Cluster replication */
-
-namespace {
-    /** pack a set of sequence number ranges into a framing::Array */
-    void buildSeqRangeArray(qpid::framing::Array *seqs,
-                            const qpid::framing::SequenceNumber& first,
-                            const qpid::framing::SequenceNumber& last)
-    {
-        seqs->push_back(qpid::framing::Array::ValuePtr(new Unsigned32Value(first)));
-        seqs->push_back(qpid::framing::Array::ValuePtr(new Unsigned32Value(last)));
-    }
-}
-
-/** Runs on UPDATER to snapshot current state */
-void QueueFlowLimit::getState(qpid::framing::FieldTable& state ) const
-{
-    sys::Mutex::ScopedLock l(indexLock);
-    state.clear();
-
-    framing::SequenceSet ss;
-    if (!index.empty()) {
-        /* replicate the set of messages pending flow control */
-        for (std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::const_iterator itr = index.begin();
-             itr != index.end(); ++itr) {
-            ss.add(itr->first);
-        }
-        framing::Array seqs(TYPE_CODE_UINT32);
-        typedef boost::function<void(framing::SequenceNumber, framing::SequenceNumber)> arrayBuilder;
-        ss.for_each((arrayBuilder)boost::bind(&buildSeqRangeArray, &seqs, _1, _2));
-        state.setArray("pendingMsgSeqs", seqs);
-    }
-    QPID_LOG(debug, "Queue \"" << queueName << "\": flow limit replicating pending msgs, range=" << ss);
-}
-
-
-/** called on UPDATEE to set state from snapshot */
-void QueueFlowLimit::setState(const qpid::framing::FieldTable& state)
-{
-    sys::Mutex::ScopedLock l(indexLock);
-    index.clear();
-
-    framing::SequenceSet fcmsg;
-    framing::Array seqArray(TYPE_CODE_UINT32);
-    if (state.getArray("pendingMsgSeqs", seqArray)) {
-        assert((seqArray.count() & 0x01) == 0); // must be even since they are sequence ranges
-        framing::Array::const_iterator i = seqArray.begin();
-        while (i != seqArray.end()) {
-            framing::SequenceNumber first((*i)->getIntegerValue<uint32_t, 4>());
-            ++i;
-            framing::SequenceNumber last((*i)->getIntegerValue<uint32_t, 4>());
-            ++i;
-            fcmsg.add(first, last);
-            for (SequenceNumber seq = first; seq <= last; ++seq) {
-                QueuedMessage msg;
-                queue->find(seq, msg);   // fyi: may not be found if msg is acquired & unacked
-                bool unique;
-                unique = index.insert(std::pair<framing::SequenceNumber, boost::intrusive_ptr<Message> >(seq, msg.payload)).second;
-                // Like this to avoid tripping up unused variable warning when NDEBUG set
-                if (!unique) assert(unique);
-            }
-        }
-    }
-
-    flowStopped = index.size() != 0;
+    /* set up management stuff */
+    broker = queue.getBroker();
+    queueMgmtObj = boost::dynamic_pointer_cast<_qmfBroker::Queue> (queue.GetManagementObject());
     if (queueMgmtObj) {
         queueMgmtObj->set_flowStopped(isFlowControlActive());
     }
-    QPID_LOG(debug, "Queue \"" << queueName << "\": flow limit replicated the pending msgs, range=" << fcmsg)
+
+    /* set up the observer */
+    queue.getObservers().add(shared_from_this());
 }
 
+/** returns ptr to a QueueFlowLimit, else 0 if no limit */
+boost::shared_ptr<QueueFlowLimit> QueueFlowLimit::createLimit(const std::string& queueName, const QueueSettings& settings)
+{
+    if (settings.dropMessagesAtLimit) {
+        // The size of a RING queue is limited by design - no need for flow control.
+        return boost::shared_ptr<QueueFlowLimit>();
+    }
+    if ((!settings.flowStop.hasCount()) && (!settings.flowStop.hasSize()) && (settings.flowResume.hasCount() || settings.flowResume.hasSize()))
+        QPID_LOG(warning, "queue " << queueName << ": user-configured flow limits are ignored as no stop limits provided");
+
+    uint32_t flowStopCount(0), flowResumeCount(0), maxMsgCount(settings.maxDepth.hasCount() ? settings.maxDepth.getCount() : 0);
+    uint64_t flowStopSize(0), flowResumeSize(0), maxByteCount(settings.maxDepth.hasSize() ? settings.maxDepth.getSize() : defaultMaxSize);
+
+    // pre-fill by defaults, if exist
+    if (defaultFlowStopRatio) {   // broker has a default ratio setup...
+        flowStopSize = (uint64_t)(maxByteCount * (defaultFlowStopRatio/100.0) + 0.5);
+        flowStopCount = (uint32_t)(maxMsgCount * (defaultFlowStopRatio/100.0) + 0.5);
+    }
+
+    if (defaultFlowResumeRatio) {   // broker has a default ratio setup...
+        flowResumeSize = (uint64_t)(maxByteCount * (defaultFlowResumeRatio/100.0));
+	flowResumeCount = (uint32_t)(maxMsgCount * (defaultFlowResumeRatio/100.0));
+    }
+
+    // update by user-specified thresholds
+    if (settings.flowStop.hasCount())
+        flowStopCount = settings.flowStop.getCount();
+    if (settings.flowStop.hasSize())
+        flowStopSize = settings.flowStop.getSize();
+    if (settings.flowResume.hasCount())
+        flowResumeCount = settings.flowResume.getCount();
+    if (settings.flowResume.hasSize())
+        flowResumeSize = settings.flowResume.getSize();
+
+    if (flowStopCount || flowStopSize) {
+	validateFlowConfig(maxMsgCount, flowStopCount, flowResumeCount, "count", queueName );
+        validateFlowConfig(maxByteCount, flowStopSize, flowResumeSize, "size", queueName );
+        return boost::shared_ptr<QueueFlowLimit>(new QueueFlowLimit(queueName, flowStopCount, flowResumeCount, flowStopSize, flowResumeSize));
+    }
+    else
+        //don't have a non-zero value for either the count or the
+        //size to stop at, so no flow limit applicable
+        return boost::shared_ptr<QueueFlowLimit>();
+}
 
 namespace qpid {
-    namespace broker {
+namespace broker {
 
 std::ostream& operator<<(std::ostream& out, const QueueFlowLimit& f)
 {
@@ -405,6 +302,6 @@ std::ostream& operator<<(std::ostream& out, const QueueFlowLimit& f)
     return out;
 }
 
-    }
+}
 }
 

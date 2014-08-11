@@ -22,6 +22,7 @@
  *
  */
 
+#include "qpid/RefCounted.h"
 #include <boost/intrusive_ptr.hpp>
 
 #include "qpid/broker/BrokerImportExport.h"
@@ -77,7 +78,7 @@ namespace broker {
  * assuming no need for synchronization with Completer threads.
  */
 
-class AsyncCompletion
+class AsyncCompletion : public virtual RefCounted
 {
  public:
 
@@ -90,7 +91,13 @@ class AsyncCompletion
      */
     class Callback : public RefCounted
     {
-  public:
+      public:
+        // Normally RefCounted objects cannot be copied.
+        // Allow Callback objects to be copied (by subclasses implementing clone())
+        // The copy has an initial refcount of 0
+        Callback(const Callback&) : RefCounted() {}
+        Callback() {}
+
         virtual void completed(bool) = 0;
         virtual boost::intrusive_ptr<Callback> clone() = 0;
     };

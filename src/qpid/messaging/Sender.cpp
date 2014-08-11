@@ -19,6 +19,7 @@
  *
  */
 #include "qpid/messaging/Sender.h"
+#include "qpid/messaging/Address.h"
 #include "qpid/messaging/Message.h"
 #include "qpid/messaging/SenderImpl.h"
 #include "qpid/messaging/Session.h"
@@ -26,6 +27,10 @@
 
 namespace qpid {
 namespace messaging {
+
+// Explicitly instantiate Handle superclass
+template class Handle<SenderImpl>;
+
 typedef PrivateImplRef<qpid::messaging::Sender> PI;
 
 Sender::Sender(SenderImpl* impl) { PI::ctor(*this, impl); }
@@ -40,5 +45,5 @@ uint32_t Sender::getUnsettled() { return impl->getUnsettled(); }
 uint32_t Sender::getAvailable() { return getCapacity() - getUnsettled(); }
 const std::string& Sender::getName() const { return impl->getName(); }
 Session Sender::getSession() const { return impl->getSession(); }
-
+Address Sender::getAddress() const { return impl->getAddress(); }
 }} // namespace qpid::messaging

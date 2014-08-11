@@ -20,9 +20,11 @@
  *
  */
 
-#include "qpid/SaslFactory.h"
 #include "qpid/broker/ConnectionHandler.h"
-#include "qpid/broker/Connection.h"
+
+#include "qpid/SaslFactory.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
 #include "qpid/broker/SecureConnection.h"
 #include "qpid/Url.h"
 #include "qpid/framing/AllInvoker.h"
@@ -30,8 +32,12 @@
 #include "qpid/framing/enum.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/log/Statement.h"
+#include "qpid/management/ManagementAgent.h"
+#include "qpid/sys/ConnectionOutputHandler.h"
 #include "qpid/sys/SecurityLayer.h"
+#include "qpid/sys/Time.h"
 #include "qpid/broker/AclModule.h"
+#include "qpid/amqp_0_10/Codecs.h"
 #include "qmf/org/apache/qpid/broker/EventClientConnectFail.h"
 
 using namespace qpid;
@@ -81,7 +87,6 @@ bool ConnectionHandler::handle(const framing::AMQMethodBody& method)
 void ConnectionHandler::handle(framing::AMQFrame& frame)
 {
     AMQMethodBody* method=frame.getBody()->getMethod();
-    Connection::ErrorListener* errorListener = handler->connection.getErrorListener();
     try{
         if (method && handle(*method)) {
             // This is a connection control frame, nothing more to do.
@@ -93,10 +98,8 @@ void ConnectionHandler::handle(framing::AMQFrame& frame)
                 "Connection not yet open, invalid frame received.");
         }
     }catch(ConnectionException& e){
-        if (errorListener) errorListener->connectionError(e.what());
         handler->proxy.close(e.code, e.what());
     }catch(std::exception& e){
-        if (errorListener) errorListener->connectionError(e.what());
         handler->proxy.close(541/*internal error*/, e.what());
     }
 }
@@ -106,10 +109,10 @@ void ConnectionHandler::setSecureConnection(SecureConnection* secured)
     handler->secured = secured;
 }
 
-ConnectionHandler::ConnectionHandler(Connection& connection, bool isClient)  :
+ConnectionHandler::ConnectionHandler(qpid::broker::amqp_0_10::Connection& connection, bool isClient)  :
     handler(new Handler(connection, isClient)) {}
 
-ConnectionHandler::Handler::Handler(Connection& c, bool isClient) :
+ConnectionHandler::Handler::Handler(qpid::broker::amqp_0_10::Connection& c, bool isClient) :
     proxy(c.getOutput()),
     connection(c), serverMode(!isClient), secured(0),
     isOpen(false)
@@ -148,49 +151,50 @@ void ConnectionHandler::Handler::startOk(const framing::FieldTable& /*clientProp
 
 void ConnectionHandler::Handler::startOk(const ConnectionStartOkBody& body)
 {
-    try {
-        authenticator->start(body.getMechanism(), body.hasResponse() ? &body.getResponse() : 0);
-    } catch (std::exception& /*e*/) {
-        management::ManagementAgent* agent = connection.getAgent();
-        if (agent) {
-            string error;
-            string uid;
-            authenticator->getError(error);
-            authenticator->getUid(uid);
-            agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error));
-        }
-        throw;
-    }
     const framing::FieldTable& clientProperties = body.getClientProperties();
-    connection.setClientProperties(clientProperties);
+    qmf::org::apache::qpid::broker::Connection::shared_ptr mgmtObject = connection.getMgmtObject();
+    types::Variant::Map properties;
+    qpid::amqp_0_10::translate(clientProperties, properties);
 
-    connection.setFederationLink(clientProperties.get(QPID_FED_LINK));
-    if (clientProperties.isSet(QPID_FED_TAG)) {
-        connection.setFederationPeerTag(clientProperties.getAsString(QPID_FED_TAG));
-    }
-    if (connection.isFederationLink()) {
-        AclModule* acl =  connection.getBroker().getAcl();
-        FieldTable properties;
-    	if (acl && !acl->authorise(connection.getUserId(),acl::ACT_CREATE,acl::OBJ_LINK,"")){
-            proxy.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
-                        QPID_MSG("ACL denied " << connection.getUserId()
-                                 << " creating a federation link"));
-            return;
-        }
-        QPID_LOG(info, "Connection is a federation link");
-    }
-
-    if (connection.getMgmtObject() != 0) {
+    if (mgmtObject != 0) {
         string procName = clientProperties.getAsString(CLIENT_PROCESS_NAME);
         uint32_t pid = clientProperties.getAsInt(CLIENT_PID);
         uint32_t ppid = clientProperties.getAsInt(CLIENT_PPID);
 
+        mgmtObject->set_remoteProperties(properties);
         if (!procName.empty())
-            connection.getMgmtObject()->set_remoteProcessName(procName);
+            mgmtObject->set_remoteProcessName(procName);
         if (pid != 0)
-            connection.getMgmtObject()->set_remotePid(pid);
+            mgmtObject->set_remotePid(pid);
         if (ppid != 0)
-            connection.getMgmtObject()->set_remoteParentPid(ppid);
+            mgmtObject->set_remoteParentPid(ppid);
+    }
+    try {
+        authenticator->start(body.getMechanism(), body.hasResponse() ? &body.getResponse() : 0);
+    } catch (std::exception& /*e*/) {
+        management::ManagementAgent* agent = connection.getAgent();
+        bool logEnabled;
+        QPID_LOG_TEST_CAT(debug, model, logEnabled);
+        if (logEnabled || agent)
+        {
+            string error;
+            string uid;
+            authenticator->getError(error);
+            authenticator->getUid(uid);
+            if (agent && mgmtObject) {
+                agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error,
+                                                               mgmtObject->get_remoteProperties()));
+            }
+            QPID_LOG_CAT(debug, model, "Failed connection. rhost:" << connection.getMgmtId()
+                << " user:" << uid
+                << " reason:" << error );
+        }
+        throw;
+    }
+
+    connection.setClientProperties(properties);
+    if (clientProperties.isSet(QPID_FED_TAG)) {
+        connection.setFederationPeerTag(clientProperties.getAsString(QPID_FED_TAG));
     }
 }
 
@@ -200,12 +204,21 @@ void ConnectionHandler::Handler::secureOk(const string& response)
         authenticator->step(response);
     } catch (std::exception& /*e*/) {
         management::ManagementAgent* agent = connection.getAgent();
-        if (agent) {
+        bool logEnabled;
+        QPID_LOG_TEST_CAT(debug, model, logEnabled);
+        if (logEnabled || agent)
+        {
             string error;
             string uid;
             authenticator->getError(error);
             authenticator->getUid(uid);
-            agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error));
+            if (agent && connection.getMgmtObject()) {
+                agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error,
+                                                               connection.getMgmtObject()->get_remoteProperties()));
+            }
+            QPID_LOG_CAT(debug, model, "Failed connection. rhost:" << connection.getMgmtId()
+                << " user:" << uid
+                << " reason:" << error );
         }
         throw;
     }
@@ -221,7 +234,28 @@ void ConnectionHandler::Handler::tuneOk(uint16_t /*channelmax*/,
 void ConnectionHandler::Handler::open(const string& /*virtualHost*/,
                                       const framing::Array& /*capabilities*/, bool /*insist*/)
 {
-    std::vector<Url> urls = connection.broker.getKnownBrokers();
+    if (connection.isFederationLink()) {
+        AclModule* acl =  connection.getBroker().getAcl();
+        if (acl && acl->userAclRules()) {
+            if (!acl->authorise(connection.getUserId(),acl::ACT_CREATE,acl::OBJ_LINK,"")){
+                proxy.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                            QPID_MSG("ACL denied " << connection.getUserId()
+                                        << " creating a federation link"));
+                return;
+            }
+        } else {
+            Broker::Options& conf = connection.getBroker().getOptions();
+            if (conf.auth) {
+                proxy.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                            QPID_MSG("User " << connection.getUserId()
+                                << " federation connection denied. Systems with authentication "
+                                   "enabled must specify ACL create link rules."));
+                return;
+            }
+        }
+        QPID_LOG(info, "Connection is a federation link");
+    }
+    std::vector<Url> urls = connection.getBroker().getKnownBrokers();
     framing::Array array(0x95); // str16 array
     for (std::vector<Url>::iterator i = urls.begin(); i < urls.end(); ++i)
         array.add(boost::shared_ptr<Str16Value>(new Str16Value(i->str())));
@@ -283,7 +317,7 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
                                                   service,
                                                   host,
                                                   0,   // TODO -- mgoulish Fri Sep 24 2010
-                                                  256,  
+                                                  256,
                                                   false ); // disallow interaction
     }
     std::string supportedMechanismsList;
@@ -375,7 +409,9 @@ void ConnectionHandler::Handler::tune(uint16_t channelMax,
     // this method is only ever called when this Connection
     // is a federation link where this Broker is acting as
     // a client to another Broker
-    uint16_t hb = std::min(connection.getBroker().getOptions().linkHeartbeatInterval, heartbeatMax);
+    sys::Duration interval = connection.getBroker().getOptions().linkHeartbeatInterval;
+    uint16_t intervalSec = static_cast<uint16_t>(interval/sys::TIME_SEC);
+    uint16_t hb = std::min(intervalSec, heartbeatMax);
     connection.setHeartbeat(hb);
     connection.startLinkHeartbeatTimeoutTask();
 

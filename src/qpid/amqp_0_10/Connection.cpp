@@ -74,14 +74,14 @@ bool Connection::isClosed() const {
     return pushClosed && popClosed;
 }
 
-size_t  Connection::encode(const char* buffer, size_t size) {
+size_t  Connection::encode(char* buffer, size_t size) {
     {   // Swap frameQueue data into workQueue to avoid holding lock while we encode.
         Mutex::ScopedLock l(frameQueueLock);
         if (popClosed) return 0; // Can't pop any more frames.
         assert(workQueue.empty());
         workQueue.swap(frameQueue);
     }
-    framing::Buffer out(const_cast<char*>(buffer), size);
+    framing::Buffer out(buffer, size);
     if (!isClient && !initialized) {
         framing::ProtocolInitiation pi(getVersion());
         pi.encode(out);
@@ -118,8 +118,8 @@ size_t  Connection::encode(const char* buffer, size_t size) {
 }
 
 void Connection::abort() { output.abort(); }
+void Connection::connectionEstablished() { output.connectionEstablished(); }
 void Connection::activateOutput() { output.activateOutput(); }
-void Connection::giveReadCredit(int32_t credit) { output.giveReadCredit(credit); }
 
 void  Connection::close() {
     // No more frames can be pushed onto the queue.
@@ -132,7 +132,7 @@ void  Connection::closed() {
     connection->closed();
 }
 
-void Connection::send(framing::AMQFrame& f) {
+void Connection::handle(framing::AMQFrame& f) {
     {
         Mutex::ScopedLock l(frameQueueLock);
 	if (!pushClosed)
@@ -144,15 +144,6 @@ void Connection::send(framing::AMQFrame& f) {
 
 framing::ProtocolVersion Connection::getVersion() const {
     return version;
-}
-
-void Connection::setVersion(const framing::ProtocolVersion& v)  {
-    version = v;
-}
-
-size_t Connection::getBuffered() const {
-    Mutex::ScopedLock l(frameQueueLock);
-    return buffered;
 }
 
 }} // namespace qpid::amqp_0_10

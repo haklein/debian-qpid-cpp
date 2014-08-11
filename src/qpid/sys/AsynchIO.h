@@ -21,8 +21,9 @@
  *
  */
 
-#include "qpid/sys/IntegerTypes.h"
 #include "qpid/CommonImportExport.h"
+
+#include "qpid/sys/IntegerTypes.h"
 
 #include <string.h>
 
@@ -31,7 +32,8 @@
 
 namespace qpid {
 namespace sys {
-    
+
+struct SecuritySettings;
 class Socket;
 class Poller;
 
@@ -56,6 +58,7 @@ class AsynchConnector {
 public:
     typedef boost::function1<void, const Socket&> ConnectedCallback;
     typedef boost::function3<void, const Socket&, int, const std::string&> FailedCallback;
+    typedef boost::function1<void, AsynchConnector&> RequestCallback;
 
     // Call create() to allocate a new AsynchConnector object with the
     // specified poller, addressing, and callbacks.
@@ -70,14 +73,15 @@ public:
                                    FailedCallback failCb);
     virtual void start(boost::shared_ptr<Poller> poller) = 0;
     virtual void stop() {};
+    virtual void requestCallback(RequestCallback) = 0;
 protected:
     AsynchConnector() {}
     virtual ~AsynchConnector() {}
 };
 
 struct AsynchIOBufferBase {
-    char* const bytes;
-    const int32_t byteCount;
+    char* bytes;
+    int32_t byteCount;
     int32_t dataStart;
     int32_t dataCount;
     
@@ -134,19 +138,31 @@ public:
                             BuffersEmptyCallback eCb = 0,
                             IdleCallback iCb = 0);
 public:
+    /*
+     * Size of IO buffers - this is the maximum possible frame size + 1
+     */
+    const static uint32_t MaxBufferSize = 65536;
+
+    /*
+     * Number of IO buffers allocated - I think the code can only use 2 -
+     * 1 for reading and 1 for writing, allocate 4 for safety
+     */
+    const static uint32_t BufferCount = 4;
+
     virtual void queueForDeletion() = 0;
 
     virtual void start(boost::shared_ptr<Poller> poller) = 0;
+    virtual void createBuffers(uint32_t size = MaxBufferSize) = 0;
     virtual void queueReadBuffer(BufferBase* buff) = 0;
     virtual void unread(BufferBase* buff) = 0;
     virtual void queueWrite(BufferBase* buff) = 0;
     virtual void notifyPendingWrite() = 0;
     virtual void queueWriteClose() = 0;
     virtual bool writeQueueEmpty() = 0;
-    virtual void startReading() = 0;
-    virtual void stopReading() = 0;
     virtual void requestCallback(RequestCallback) = 0;
     virtual BufferBase* getQueuedBuffer() = 0;
+
+    virtual SecuritySettings getSecuritySettings() = 0;
 
 protected:
     // Derived class manages lifetime; must be constructed using the

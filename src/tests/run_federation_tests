@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -25,7 +25,7 @@ source ./test_env.sh
 #set -x
 trap stop_brokers INT TERM QUIT
 
-if [ -f ../.libs/xml.so ] ; then
+if [ -f ../xml.so ] ; then
     MODULES="--load-module xml" # Load the XML exchange and run XML exchange federation tests
     SKIPTESTS=
 else
@@ -33,7 +33,7 @@ else
     SKIPTESTS='-i *_xml'    # note: single quotes prevent expansion of *
 fi
 
-QPIDD_CMD="../qpidd --daemon --port 0 --no-data-dir $MODULES --auth no --log-enable=info+ --log-enable=debug+:Bridge --log-to-file"
+QPIDD_CMD="../qpidd --daemon --port 0 --interface 127.0.0.1 --no-data-dir $MODULES --auth no --log-enable=info+ --log-enable=debug+:Bridge --log-to-file"
 start_brokers() {
     rm -f fed_local.log fed_remote.log fed_b1.log fed_b2.log
     LOCAL_PORT=$($QPIDD_CMD fed_local.log --federation-tag LOCAL)

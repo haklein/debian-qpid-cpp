@@ -48,7 +48,7 @@ class ReceiverImpl : public qpid::messaging::ReceiverImpl
     enum State {UNRESOLVED, STOPPED, STARTED, CANCELLED};
 
     ReceiverImpl(SessionImpl& parent, const std::string& name,
-                 const qpid::messaging::Address& address);
+                 const qpid::messaging::Address& address, bool autoDecode);
 
     void init(qpid::client::AsyncSession session, AddressResolution& resolver);
     bool get(qpid::messaging::Message& message, qpid::messaging::Duration timeout);
@@ -66,6 +66,7 @@ class ReceiverImpl : public qpid::messaging::ReceiverImpl
     void received(qpid::messaging::Message& message);
     qpid::messaging::Session getSession() const;
     bool isClosed() const;
+    qpid::messaging::Address getAddress() const;
 
   private:
     mutable sys::Mutex lock;
@@ -73,6 +74,7 @@ class ReceiverImpl : public qpid::messaging::ReceiverImpl
     const std::string destination;
     const qpid::messaging::Address address;
     const uint32_t byteCredit;
+    const bool autoDecode;
     State state;
 
     std::auto_ptr<MessageSource> source;

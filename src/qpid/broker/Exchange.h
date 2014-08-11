@@ -25,6 +25,7 @@
 #include <boost/shared_ptr.hpp>
 #include "qpid/broker/BrokerImportExport.h"
 #include "qpid/broker/Deliverable.h"
+#include "qpid/broker/Message.h"
 #include "qpid/broker/MessageStore.h"
 #include "qpid/broker/PersistableExchange.h"
 #include "qpid/framing/FieldTable.h"
@@ -33,6 +34,8 @@
 #include "qmf/org/apache/qpid/broker/Exchange.h"
 #include "qmf/org/apache/qpid/broker/Binding.h"
 #include "qmf/org/apache/qpid/broker/Broker.h"
+#include <map>
+#include <boost/function.hpp>
 
 namespace qpid {
 namespace broker {
@@ -51,21 +54,25 @@ public:
         const std::string         key;
         const framing::FieldTable args;
         std::string               origin;
-        qmf::org::apache::qpid::broker::Binding* mgmtBinding;
+        qmf::org::apache::qpid::broker::Binding::shared_ptr mgmtBinding;
 
         Binding(const std::string& key, boost::shared_ptr<Queue> queue, Exchange* parent = 0,
                 framing::FieldTable args = framing::FieldTable(), const std::string& origin = std::string());
         ~Binding();
         void startManagement();
-        management::ManagementObject* GetManagementObject() const;
+        management::ManagementObject::shared_ptr GetManagementObject() const;
     };
 
 private:
     const std::string name;
     const bool durable;
+    const bool autodelete;
     std::string alternateName;
     boost::shared_ptr<Exchange> alternate;
+    mutable qpid::sys::Mutex usersLock;
     uint32_t alternateUsers;
+    uint32_t otherUsers;
+    std::map<std::string, boost::function0<void> > deletionListeners;
     mutable uint64_t persistenceId;
 
 protected:
@@ -74,7 +81,7 @@ protected:
     mutable qpid::sys::Mutex sequenceLock;
     int64_t sequenceNo;
     bool ive;
-    boost::intrusive_ptr<Message> lastMsg;
+    Message lastMsg;
 
     class PreRoute{
     public:
@@ -88,7 +95,8 @@ protected:
     typedef boost::shared_ptr<      std::vector<boost::shared_ptr<qpid::broker::Exchange::Binding> > > BindingList;
     void doRoute(Deliverable& msg, ConstBindingList b);
     void routeIVE();
-
+    void checkAutodelete();
+    virtual bool hasBindings() = 0;
 
     struct MatchQueue {
         const boost::shared_ptr<Queue> queue;
@@ -158,28 +166,34 @@ protected:
         }
     };
 
-    qmf::org::apache::qpid::broker::Exchange* mgmtExchange;
-    qmf::org::apache::qpid::broker::Broker* brokerMgmtObject;
+    qmf::org::apache::qpid::broker::Exchange::shared_ptr mgmtExchange;
+    qmf::org::apache::qpid::broker::Broker::shared_ptr brokerMgmtObject;
 
 public:
     typedef boost::shared_ptr<Exchange> shared_ptr;
 
     QPID_BROKER_EXTERN explicit Exchange(const std::string& name, management::Manageable* parent = 0,
                                          Broker* broker = 0);
-    QPID_BROKER_EXTERN Exchange(const std::string& _name, bool _durable, const qpid::framing::FieldTable& _args,
+    QPID_BROKER_EXTERN Exchange(const std::string& _name, bool _durable, bool autodelete, const qpid::framing::FieldTable& _args,
                                 management::Manageable* parent = 0, Broker* broker = 0);
     QPID_BROKER_INLINE_EXTERN virtual ~Exchange();
 
     const std::string& getName() const { return name; }
     bool isDurable() { return durable; }
-    qpid::framing::FieldTable& getArgs() { return args; }
+    QPID_BROKER_EXTERN bool isAutoDelete() const;
+    QPID_BROKER_EXTERN const qpid::framing::FieldTable& getArgs() const { return args; }
+    QPID_BROKER_EXTERN void setArgs(const framing::FieldTable&);
 
     QPID_BROKER_EXTERN Exchange::shared_ptr getAlternate() { return alternate; }
     QPID_BROKER_EXTERN void setAlternate(Exchange::shared_ptr _alternate);
 
-    void incAlternateUsers() { alternateUsers++; }
-    void decAlternateUsers() { alternateUsers--; }
-    bool inUseAsAlternate() { return alternateUsers > 0; }
+    QPID_BROKER_EXTERN void incAlternateUsers();
+    QPID_BROKER_EXTERN void decAlternateUsers();
+    QPID_BROKER_EXTERN bool inUseAsAlternate();
+
+    QPID_BROKER_EXTERN void incOtherUsers();
+    QPID_BROKER_EXTERN void decOtherUsers(bool isControllingLink);
+    QPID_BROKER_EXTERN bool inUse() const;
 
     virtual std::string getType() const = 0;
 
@@ -196,7 +210,7 @@ public:
     virtual bool bind(boost::shared_ptr<Queue> queue, const std::string& routingKey, const qpid::framing::FieldTable* args) = 0;
     virtual bool unbind(boost::shared_ptr<Queue> queue, const std::string& routingKey, const qpid::framing::FieldTable* args) = 0;
     virtual bool isBound(boost::shared_ptr<Queue> queue, const std::string* const routingKey, const qpid::framing::FieldTable* const args) = 0;
-    QPID_BROKER_EXTERN virtual void setProperties(const boost::intrusive_ptr<Message>&);
+    //QPID_BROKER_EXTERN virtual void setProperties(Message&);
     virtual void route(Deliverable& msg) = 0;
 
     //PersistableExchange:
@@ -208,7 +222,7 @@ public:
     static QPID_BROKER_EXTERN Exchange::shared_ptr decode(ExchangeRegistry& exchanges, framing::Buffer& buffer);
 
     // Manageable entry points
-    QPID_BROKER_EXTERN management::ManagementObject* GetManagementObject(void) const;
+    QPID_BROKER_EXTERN management::ManagementObject::shared_ptr GetManagementObject(void) const;
 
     // Federation hooks
     class DynamicBridge {
@@ -231,8 +245,11 @@ public:
 
     bool routeWithAlternate(Deliverable& message);
 
-    void destroy() { destroyed = true; }
-    bool isDestroyed() const { return destroyed; }
+    QPID_BROKER_EXTERN void destroy();
+    QPID_BROKER_EXTERN bool isDestroyed() const;
+
+    QPID_BROKER_EXTERN void setDeletionListener(const std::string& key, boost::function0<void> listener);
+    QPID_BROKER_EXTERN void unsetDeletionListener(const std::string& key);
 
 protected:
     qpid::sys::Mutex bridgeLock;

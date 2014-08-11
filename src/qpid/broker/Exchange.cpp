@@ -25,6 +25,7 @@
 #include "qpid/broker/ExchangeRegistry.h"
 #include "qpid/broker/FedOps.h"
 #include "qpid/broker/Queue.h"
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
 #include "qpid/framing/MessageProperties.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/log/Statement.h"
@@ -62,10 +63,10 @@ Exchange::PreRoute::PreRoute(Deliverable& msg, Exchange* _p):parent(_p) {
 
         if (parent->sequence){
             parent->sequenceNo++;
-            msg.getMessage().insertCustomProperty(qpidMsgSequence,parent->sequenceNo);
+            msg.getMessage().addAnnotation(qpidMsgSequence,parent->sequenceNo);
         }
         if (parent->ive) {
-            parent->lastMsg =  &( msg.getMessage());
+            parent->lastMsg = msg.getMessage();
         }
     }
 }
@@ -111,12 +112,6 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
     int count = 0;
 
     if (b.get()) {
-        // Block the content release if the message is transient AND there is more than one binding
-        if (!msg.getMessage().isPersistent() && b->size() > 1) {
-            msg.getMessage().blockContentRelease();
-        }
-
-
         ExInfo error(getName()); // Save exception to throw at the end.
         for(std::vector<Binding::shared_ptr>::const_iterator i = b->begin(); i != b->end(); i++, count++) {
             try {
@@ -140,7 +135,7 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
     if (mgmtExchange != 0)
     {
         qmf::org::apache::qpid::broker::Exchange::PerThreadStats *eStats = mgmtExchange->getStatistics();
-        uint64_t contentSize = msg.contentSize();
+        uint64_t contentSize = msg.getMessage().getMessageSize();
 
         eStats->msgReceives += 1;
         eStats->byteReceives += contentSize;
@@ -157,66 +152,66 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
             eStats->msgRoutes += count;
             eStats->byteRoutes += count * contentSize;
         }
+
+        mgmtExchange->statisticsUpdated();
     }
 }
 
 void Exchange::routeIVE(){
-    if (ive && lastMsg.get()){
-        DeliverableMessage dmsg(lastMsg);
+    if (ive && lastMsg){
+        DeliverableMessage dmsg(lastMsg, 0);
         route(dmsg);
     }
 }
 
 
 Exchange::Exchange (const string& _name, Manageable* parent, Broker* b) :
-    name(_name), durable(false), alternateUsers(0), persistenceId(0), sequence(false),
-    sequenceNo(0), ive(false), mgmtExchange(0), brokerMgmtObject(0), broker(b), destroyed(false)
+    name(_name), durable(false), autodelete(false), alternateUsers(0), otherUsers(0), persistenceId(0), sequence(false),
+    sequenceNo(0), ive(false), broker(b), destroyed(false)
 {
     if (parent != 0 && broker != 0)
     {
         ManagementAgent* agent = broker->getManagementAgent();
         if (agent != 0)
         {
-            mgmtExchange = new _qmf::Exchange (agent, this, parent, _name);
+            mgmtExchange = _qmf::Exchange::shared_ptr(new _qmf::Exchange (agent, this, parent, _name));
             mgmtExchange->set_durable(durable);
-            mgmtExchange->set_autoDelete(false);
+            mgmtExchange->set_autoDelete(autodelete);
             agent->addObject(mgmtExchange, 0, durable);
             if (broker)
-                brokerMgmtObject = (qmf::org::apache::qpid::broker::Broker*) broker->GetManagementObject();
+                brokerMgmtObject = boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(broker->GetManagementObject());
         }
     }
 }
 
-Exchange::Exchange(const string& _name, bool _durable, const qpid::framing::FieldTable& _args,
+Exchange::Exchange(const string& _name, bool _durable, bool _autodelete, const qpid::framing::FieldTable& _args,
                    Manageable* parent, Broker* b)
-    : name(_name), durable(_durable), alternateUsers(0), persistenceId(0),
-      args(_args), sequence(false), sequenceNo(0), ive(false), mgmtExchange(0), brokerMgmtObject(0), broker(b), destroyed(false)
+    : name(_name), durable(_durable), autodelete(_autodelete), alternateUsers(0), otherUsers(0), persistenceId(0),
+      args(_args), sequence(false), sequenceNo(0), ive(false), broker(b), destroyed(false)
 {
     if (parent != 0 && broker != 0)
     {
         ManagementAgent* agent = broker->getManagementAgent();
         if (agent != 0)
         {
-            mgmtExchange = new _qmf::Exchange (agent, this, parent, _name);
+            mgmtExchange = _qmf::Exchange::shared_ptr(new _qmf::Exchange (agent, this, parent, _name));
             mgmtExchange->set_durable(durable);
-            mgmtExchange->set_autoDelete(false);
+            mgmtExchange->set_autoDelete(autodelete);
             mgmtExchange->set_arguments(ManagementAgent::toMap(args));
             agent->addObject(mgmtExchange, 0, durable);
             if (broker)
-                brokerMgmtObject = (qmf::org::apache::qpid::broker::Broker*) broker->GetManagementObject();
+                brokerMgmtObject = boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(broker->GetManagementObject());
         }
     }
 
-    sequence = _args.get(qpidMsgSequence);
+    sequence = !!_args.get(qpidMsgSequence);
     if (sequence) {
         QPID_LOG(debug, "Configured exchange " <<  _name  << " with Msg sequencing");
         args.setInt64(std::string(qpidSequenceCounter), sequenceNo);
     }
 
-    ive = _args.get(qpidIVE);
+    ive = !!_args.get(qpidIVE);
     if (ive) {
-        if (broker && broker->isInCluster())
-            throw framing::NotImplementedException("Cannot use Initial Value Exchanges in a cluster");
         QPID_LOG(debug, "Configured exchange " <<  _name  << " with Initial Value");
     }
 }
@@ -230,6 +225,7 @@ Exchange::~Exchange ()
 void Exchange::setAlternate(Exchange::shared_ptr _alternate)
 {
     alternate = _alternate;
+    alternate->incAlternateUsers();
     if (mgmtExchange != 0) {
         if (alternate.get() != 0)
             mgmtExchange->set_altExchange(alternate->GetManagementObject()->getObjectId());
@@ -259,7 +255,7 @@ Exchange::shared_ptr Exchange::decode(ExchangeRegistry& exchanges, Buffer& buffe
         buffer.getShortString(altName);
 
     try {
-        Exchange::shared_ptr exch = exchanges.declare(name, type, durable, args).first;
+        Exchange::shared_ptr exch = exchanges.declare(name, type, durable, false, args).first;
         exch->sequenceNo = args.getAsInt64(qpidSequenceCounter);
         exch->alternateName.assign(altName);
         return exch;
@@ -299,9 +295,9 @@ void Exchange::recoveryComplete(ExchangeRegistry& exchanges)
     }
 }
 
-ManagementObject* Exchange::GetManagementObject (void) const
+ManagementObject::shared_ptr Exchange::GetManagementObject (void) const
 {
-    return (ManagementObject*) mgmtExchange;
+    return mgmtExchange;
 }
 
 void Exchange::registerDynamicBridge(DynamicBridge* db)
@@ -350,16 +346,17 @@ void Exchange::propagateFedOp(const string& routingKey, const string& tags, cons
 
 Exchange::Binding::Binding(const string& _key, Queue::shared_ptr _queue, Exchange* _parent,
                            FieldTable _args, const string& _origin)
-    : parent(_parent), queue(_queue), key(_key), args(_args), origin(_origin), mgmtBinding(0)
+    : parent(_parent), queue(_queue), key(_key), args(_args), origin(_origin)
 {
 }
 
 Exchange::Binding::~Binding ()
 {
     if (mgmtBinding != 0) {
-        ManagementObject* mo = queue->GetManagementObject();
+        mgmtBinding->debugStats("destroying");
+        _qmf::Queue::shared_ptr mo = boost::dynamic_pointer_cast<_qmf::Queue>(queue->GetManagementObject());
         if (mo != 0)
-            static_cast<_qmf::Queue*>(mo)->dec_bindingCount();
+            mo->dec_bindingCount();
         mgmtBinding->resourceDestroy ();
     }
 }
@@ -372,25 +369,25 @@ void Exchange::Binding::startManagement()
         if (broker != 0) {
             ManagementAgent* agent = broker->getManagementAgent();
             if (agent != 0) {
-                ManagementObject* mo = queue->GetManagementObject();
+                _qmf::Queue::shared_ptr mo = boost::dynamic_pointer_cast<_qmf::Queue>(queue->GetManagementObject());
                 if (mo != 0) {
                     management::ObjectId queueId = mo->getObjectId();
 
-                    mgmtBinding = new _qmf::Binding
-                        (agent, this, (Manageable*) parent, queueId, key, ManagementAgent::toMap(args));
+                    mgmtBinding = _qmf::Binding::shared_ptr(new _qmf::Binding
+                        (agent, this, (Manageable*) parent, queueId, key, ManagementAgent::toMap(args)));
                     if (!origin.empty())
                         mgmtBinding->set_origin(origin);
                     agent->addObject(mgmtBinding);
-                    static_cast<_qmf::Queue*>(mo)->inc_bindingCount();
+                    mo->inc_bindingCount();
                 }
             }
         }
     }
 }
 
-ManagementObject* Exchange::Binding::GetManagementObject () const
+ManagementObject::shared_ptr Exchange::Binding::GetManagementObject () const
 {
-    return (ManagementObject*) mgmtBinding;
+    return mgmtBinding;
 }
 
 Exchange::MatchQueue::MatchQueue(Queue::shared_ptr q) : queue(q) {}
@@ -400,9 +397,9 @@ bool Exchange::MatchQueue::operator()(Exchange::Binding::shared_ptr b)
     return b->queue == queue;
 }
 
-void Exchange::setProperties(const boost::intrusive_ptr<Message>& msg) {
-    msg->setExchange(getName());
-}
+//void Exchange::setProperties(Message& msg) {
+//    qpid::broker::amqp_0_10::MessageTransfer::setExchange(msg, getName());
+//}
 
 bool Exchange::routeWithAlternate(Deliverable& msg)
 {
@@ -411,6 +408,92 @@ bool Exchange::routeWithAlternate(Deliverable& msg)
         alternate->route(msg);
     }
     return msg.delivered;
+}
+
+void Exchange::setArgs(const framing::FieldTable& newArgs) {
+    args = newArgs;
+    if (mgmtExchange) mgmtExchange->set_arguments(ManagementAgent::toMap(args));
+}
+
+void Exchange::checkAutodelete()
+{
+    if (autodelete && !inUse() && broker) {
+        broker->getExchanges().destroy(name);
+    }
+}
+void Exchange::incAlternateUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    alternateUsers++;
+}
+
+void Exchange::decAlternateUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    alternateUsers--;
+}
+
+bool Exchange::inUseAsAlternate()
+{
+    Mutex::ScopedLock l(usersLock);
+    return alternateUsers > 0;
+}
+
+void Exchange::incOtherUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    otherUsers++;
+}
+void Exchange::decOtherUsers(bool isControllingLink=false)
+{
+    Mutex::ScopedLock l(usersLock);
+    assert(otherUsers);
+    if (otherUsers) otherUsers--;
+    if (autodelete) {
+        if (isControllingLink) {
+            if (broker) broker->getExchanges().destroy(name);
+        } else if (!inUse() && !hasBindings()) {
+            checkAutodelete();
+        }
+    }
+}
+bool Exchange::inUse() const
+{
+    Mutex::ScopedLock l(usersLock);
+    return alternateUsers > 0 || otherUsers > 0;
+}
+void Exchange::setDeletionListener(const std::string& key, boost::function0<void> listener)
+{
+    Mutex::ScopedLock l(usersLock);
+    if (listener) deletionListeners[key] = listener;
+}
+void Exchange::unsetDeletionListener(const std::string& key)
+{
+    Mutex::ScopedLock l(usersLock);
+    deletionListeners.erase(key);
+}
+
+void Exchange::destroy()
+{
+    std::map<std::string, boost::function0<void> > copy;
+    {
+        Mutex::ScopedLock l(usersLock);
+        destroyed = true;
+        deletionListeners.swap(copy);
+    }
+    for (std::map<std::string, boost::function0<void> >::iterator i = copy.begin(); i != copy.end(); ++i) {
+        QPID_LOG(debug, "Exchange::destroy() notifying " << i->first);
+        if (i->second) i->second();
+    }
+}
+bool Exchange::isDestroyed() const
+{
+    Mutex::ScopedLock l(usersLock);
+    return destroyed;
+}
+bool Exchange::isAutoDelete() const
+{
+    return autodelete;
 }
 
 }}

@@ -207,7 +207,7 @@ Receiver SessionImpl::createReceiverImpl(const qpid::messaging::Address& address
     ScopedLock l(lock);
     std::string name = address.getName();
     getFreeKey(name, receivers);
-    Receiver receiver(new ReceiverImpl(*this, name, address));
+    Receiver receiver(new ReceiverImpl(*this, name, address, connection->getAutoDecode()));
     getImplPtr<Receiver, ReceiverImpl>(receiver)->init(session, resolver);
     receivers[name] = receiver;
     return receiver;
@@ -276,12 +276,18 @@ struct IncomingMessageHandler : IncomingMessages::Handler
 {
     typedef boost::function1<bool, IncomingMessages::MessageTransfer&> Callback;
     Callback callback;
+    ReceiverImpl* receiver;
 
-    IncomingMessageHandler(Callback c) : callback(c) {}
+    IncomingMessageHandler(Callback c) : callback(c), receiver(0) {}
 
     bool accept(IncomingMessages::MessageTransfer& transfer)
     {
         return callback(transfer);
+    }
+
+    bool isClosed()
+    {
+        return receiver && receiver->isClosed();
     }
 };
 
@@ -332,6 +338,7 @@ bool SessionImpl::getIncoming(IncomingMessages::Handler& handler, qpid::messagin
 bool SessionImpl::get(ReceiverImpl& receiver, qpid::messaging::Message& message, qpid::messaging::Duration timeout)
 {
     IncomingMessageHandler handler(boost::bind(&SessionImpl::accept, this, &receiver, &message, _1));
+    handler.receiver = &receiver;
     return getIncoming(handler, timeout);
 }
 
@@ -361,6 +368,8 @@ bool SessionImpl::nextReceiver(qpid::messaging::Receiver& receiver, qpid::messag
             throw qpid::messaging::UnauthorizedAccess(e.what());
         } catch (const qpid::SessionException& e) {
             throw qpid::messaging::SessionError(e.what());
+        } catch (const qpid::ClosedException&) {
+            throw qpid::messaging::SessionClosed();
         } catch (const qpid::ConnectionException& e) {
             throw qpid::messaging::ConnectionError(e.what());
         } catch (const qpid::ChannelException& e) {
@@ -471,13 +480,11 @@ void SessionImpl::rollbackImpl()
 
 void SessionImpl::acknowledgeImpl()
 {
-    ScopedLock l(lock);
     if (!transactional) incoming.accept();
 }
 
 void SessionImpl::acknowledgeImpl(qpid::messaging::Message& m, bool cumulative)
 {
-    ScopedLock l(lock);
     if (!transactional) incoming.accept(MessageImplAccess::get(m).getInternalId(), cumulative);
 }
 
@@ -492,15 +499,18 @@ void SessionImpl::releaseImpl(qpid::messaging::Message& m)
 {
     SequenceSet set;
     set.add(MessageImplAccess::get(m).getInternalId());
-    session.messageRelease(set);
+    session.messageRelease(set, true);
 }
 
 void SessionImpl::receiverCancelled(const std::string& name)
 {
-    ScopedLock l(lock);
-    receivers.erase(name);
-    session.sync();
-    incoming.releasePending(name);
+    {
+        ScopedLock l(lock);
+        receivers.erase(name);
+        session.sync();
+        incoming.releasePending(name);
+    }
+    incoming.wakeup();
 }
 
 void SessionImpl::releasePending(const std::string& name)
