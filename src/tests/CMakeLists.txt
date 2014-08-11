@@ -17,9 +17,6 @@
 # under the License.
 #
 
-# Enable dashboard reporting.
-include (CTest)
-
 # Make sure that everything get built before the tests
 # Need to create a var with all the necessary top level targets
 
@@ -29,36 +26,6 @@ if (QPID_LINK_BOOST_DYNAMIC)
 endif (QPID_LINK_BOOST_DYNAMIC)
 
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
-
-include (FindPythonInterp)
-
-# Create the environment scripts for tests
-set (abs_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
-set (abs_builddir ${CMAKE_CURRENT_BINARY_DIR})
-set (abs_top_srcdir ${CMAKE_SOURCE_DIR})
-set (abs_top_builddir ${CMAKE_BINARY_DIR})
-set (builddir_lib_suffix "")
-
-if (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  configure_file (${CMAKE_CURRENT_SOURCE_DIR}/test_env.ps1.in
-    ${CMAKE_CURRENT_BINARY_DIR}/test_env.ps1)
-else (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  configure_file (${CMAKE_CURRENT_SOURCE_DIR}/test_env.sh.in
-    ${CMAKE_CURRENT_BINARY_DIR}/test_env.sh)
-endif (CMAKE_SYSTEM_NAME STREQUAL Windows)
-
-
-# If valgrind is selected in the configuration step, set up the path to it
-# for CTest.
-if (ENABLE_VALGRIND)
-  set (MEMORYCHECK_COMMAND ${VALGRIND})
-  set (MEMORYCHECK_COMMAND_OPTIONS "--gen-suppressions=all
---leak-check=full
---demangle=yes
---suppressions=${CMAKE_CURRENT_SOURCE_DIR}/.valgrind.supp
---num-callers=25
---log-file=ctest_valgrind.vglog")
-endif (ENABLE_VALGRIND)
 
 # Using the Boost DLLs triggers warning 4275 on Visual Studio
 # (non dll-interface class used as base for dll-interface class).
@@ -70,14 +37,15 @@ if (MSVC)
   add_definitions( /wd4275 /wd4503 /D_CRT_SECURE_NO_WARNINGS)
 endif (MSVC)
 
-# Like this to work with cmake 2.4 on Unix
-set (qpid_test_boost_libs 
-     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${Boost_SYSTEM_LIBRARY})
-
 # Macro to make it easier to remember where the tests are built
 macro(remember_location testname)
   set (${testname}_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/${testname}${CMAKE_EXECUTABLE_SUFFIX})
 endmacro(remember_location)
+
+# If we're using GCC allow variadic macros (even though they're c99 not c++01)
+if (CMAKE_COMPILER_IS_GNUCXX)
+  add_definitions(-Wno-variadic-macros)
+endif (CMAKE_COMPILER_IS_GNUCXX)
 
 # Windows uses some process-startup calls to ensure that errors, etc. don't
 # result in error boxes being thrown up. Since it's expected that most test
@@ -91,207 +59,84 @@ if (CMAKE_SYSTEM_NAME STREQUAL Windows)
   endif (NOT QPID_WINDOWS_DEFAULT_TEST_OUTPUTS)
 endif (CMAKE_SYSTEM_NAME STREQUAL Windows)
 
-#
-# Unit test program
-#
-# Unit tests are built as a single program to reduce valgrind overhead
-# when running the tests. If you want to build a subset of the tests run
-# ccmake and set unit_tests_to_build to the set you want to build.
-
-set(unit_tests_to_build
-    exception_test
-    RefCounted
-    SessionState
-    logging
-    AsyncCompletion
-    Url
-    Uuid
-    Shlib
-    FieldValue
-    FieldTable
-    Array
-    QueueOptionsTest
-    InlineAllocator
-    InlineVector
-    ClientSessionTest
-    MessagingSessionTests
-    SequenceSet
-    StringUtils
-    RangeSet
-    AtomicValue
-    QueueTest
-    AccumulatedAckTest
-    DtxWorkRecordTest
-    DeliveryRecordTest
-    ExchangeTest
-    HeadersExchangeTest
-    MessageTest
-    QueueRegistryTest
-    QueuePolicyTest
-    QueueFlowLimitTest
-    FramingTest
-    HeaderTest
-    SequenceNumberTest
-    TimerTest
-    TopicExchangeTest
-    TxBufferTest
-    TxPublishTest
-    MessageBuilderTest
-    ManagementTest
-    MessageReplayTracker
-    ConsoleTest
-    QueueEvents
-    ProxyTest
-    RetryList
-    FrameDecoder
-    ReplicationTest
-    ClientMessageTest
-    PollableCondition
-    Variant
-    ClientMessage
-    SystemInfo
-    ${xml_tests}
-    CACHE STRING "Which unit tests to build"
-   )
-
-mark_as_advanced(unit_tests_to_build)
-
-add_executable (unit_test unit_test
-                ${unit_tests_to_build} ${platform_test_additions})
-target_link_libraries (unit_test
-                       ${qpid_test_boost_libs}
-                       qpidmessaging qpidbroker qmfconsole)
-remember_location(unit_test)
-
-add_library (shlibtest MODULE shlibtest.cpp)
-
-if (BUILD_CLUSTER)
-  include (cluster.cmake)
-endif (BUILD_CLUSTER)
-
-# FIXME aconway 2009-11-30: enable SSL
-#if SSL
-#include ssl.mk
-#endif
-
-#
-# Other test programs
-#
-add_executable (qpid-perftest qpid-perftest.cpp ${platform_test_additions})
-target_link_libraries (qpid-perftest qpidclient)
-#qpid_perftest_SOURCES=qpid-perftest.cpp test_tools.h TestOptions.h ConnectionOptions.h
-remember_location(qpid-perftest)
-
-add_executable (qpid-txtest qpid-txtest.cpp ${platform_test_additions})
-target_link_libraries (qpid-txtest qpidclient)
-#qpid_txtest_SOURCES=qpid-txtest.cpp  TestOptions.h ConnectionOptions.h
-remember_location(qpid-txtest)
-
-add_executable (qpid-latency-test qpid-latency-test.cpp ${platform_test_additions})
-target_link_libraries (qpid-latency-test qpidclient)
-#qpid_latencytest_SOURCES=qpid-latency-test.cpp TestOptions.h ConnectionOptions.h
-remember_location(qpid-latency-test)
-
-add_executable (echotest echotest.cpp ${platform_test_additions})
-target_link_libraries (echotest qpidclient)
-#echotest_SOURCES=echotest.cpp TestOptions.h ConnectionOptions.h
-remember_location(echotest)
-
-add_executable (qpid-client-test qpid-client-test.cpp ${platform_test_additions})
-target_link_libraries (qpid-client-test qpidclient)
-#qpid_client_test_SOURCES=qpid-client-test.cpp TestOptions.h ConnectionOptions.h
-remember_location(qpid-client-test)
-
-add_executable (qpid-topic-listener qpid-topic-listener.cpp ${platform_test_additions})
-target_link_libraries (qpid-topic-listener qpidclient)
-#qpid_topic_listener_SOURCES=qpid-topic-listener.cpp TestOptions.h ConnectionOptions.h
-remember_location(qpid-topic-listener)
-
-add_executable (qpid-topic-publisher qpid-topic-publisher.cpp ${platform_test_additions})
-target_link_libraries (qpid-topic-publisher qpidclient)
-#qpid_topic_publisher_SOURCES=qpid-topic-publisher.cpp TestOptions.h ConnectionOptions.h
-remember_location(qpid-topic-publisher)
-
-add_executable (publish publish.cpp ${platform_test_additions})
-target_link_libraries (publish qpidclient)
-#publish_SOURCES=publish.cpp TestOptions.h ConnectionOptions.h
-remember_location(publish)
-
-add_executable (consume consume.cpp ${platform_test_additions})
-target_link_libraries (consume qpidclient)
-#consume_SOURCES=consume.cpp  TestOptions.h ConnectionOptions.h
-remember_location(consume)
-
-add_executable (header_test header_test.cpp ${platform_test_additions})
-target_link_libraries (header_test qpidclient)
-#header_test_SOURCES=header_test.cpp TestOptions.h ConnectionOptions.h
-remember_location(header_test)
-
-add_executable (declare_queues declare_queues.cpp ${platform_test_additions})
-target_link_libraries (declare_queues qpidclient)
-remember_location(declare_queues)
-
-add_executable (replaying_sender replaying_sender.cpp ${platform_test_additions})
-target_link_libraries (replaying_sender qpidclient)
-remember_location(replaying_sender)
-
-add_executable (resuming_receiver resuming_receiver.cpp ${platform_test_additions})
-target_link_libraries (resuming_receiver qpidclient)
-remember_location(resuming_receiver)
-
-add_executable (txshift txshift.cpp ${platform_test_additions})
-target_link_libraries (txshift qpidclient)
-#txshift_SOURCES=txshift.cpp  TestOptions.h ConnectionOptions.h
-remember_location(txshift)
-
-add_executable (txjob txjob.cpp ${platform_test_additions})
-target_link_libraries (txjob qpidclient)
-#txjob_SOURCES=txjob.cpp  TestOptions.h ConnectionOptions.h
-remember_location(txjob)
-
-add_executable (receiver receiver.cpp ${platform_test_additions})
-target_link_libraries (receiver qpidclient)
-#receiver_SOURCES=receiver.cpp  TestOptions.h ConnectionOptions.h
-remember_location(receiver)
-
-add_executable (sender sender.cpp Statistics.cpp ${platform_test_additions})
-target_link_libraries (sender qpidmessaging)
-#sender_SOURCES=sender.cpp  TestOptions.h ConnectionOptions.h
-remember_location(sender)
-
+# Some generally useful utilities that just happen to be built in the test area
 add_executable (qpid-receive qpid-receive.cpp Statistics.cpp ${platform_test_additions})
-target_link_libraries (qpid-receive qpidmessaging)
+target_link_libraries (qpid-receive qpidmessaging qpidtypes qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
 remember_location(qpid-receive)
 
 add_executable (qpid-send qpid-send.cpp Statistics.cpp ${platform_test_additions})
-target_link_libraries (qpid-send qpidmessaging)
+target_link_libraries (qpid-send qpidmessaging qpidtypes qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
 remember_location(qpid-send)
 
+install (TARGETS
+         qpid-receive qpid-send
+         RUNTIME DESTINATION ${QPID_INSTALL_BINDIR})
+
+add_executable (qpid-perftest qpid-perftest.cpp ${platform_test_additions})
+target_link_libraries (qpid-perftest qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(qpid-perftest)
+
+add_executable (qpid-latency-test qpid-latency-test.cpp ${platform_test_additions})
+target_link_libraries (qpid-latency-test qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(qpid-latency-test)
+
+add_executable (qpid-client-test qpid-client-test.cpp ${platform_test_additions})
+target_link_libraries (qpid-client-test qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(qpid-client-test)
+
 add_executable (qpid-ping qpid-ping.cpp ${platform_test_additions})
-target_link_libraries (qpid-ping qpidclient)
+target_link_libraries (qpid-ping qpidmessaging qpidtypes qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
 remember_location(qpid-ping)
 
-add_executable (datagen datagen.cpp ${platform_test_additions})
-target_link_libraries (datagen qpidclient)
-remember_location(datagen)
+add_executable (qpid-topic-listener qpid-topic-listener.cpp ${platform_test_additions})
+target_link_libraries (qpid-topic-listener qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(qpid-topic-listener)
 
-add_executable (msg_group_test msg_group_test.cpp ${platform_test_additions})
-target_link_libraries (msg_group_test qpidmessaging)
-remember_location(msg_group_test)
+add_executable (qpid-topic-publisher qpid-topic-publisher.cpp ${platform_test_additions})
+target_link_libraries (qpid-topic-publisher qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(qpid-topic-publisher)
 
+add_executable (receiver receiver.cpp ${platform_test_additions})
+target_link_libraries (receiver qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(receiver)
 
-# qpid-perftest and qpid-latency-test are generally useful so install them
-install (TARGETS qpid-perftest qpid-latency-test RUNTIME
-         DESTINATION ${QPID_INSTALL_BINDIR})
+# This is bizarre - using both messaging and client libraries
+add_executable (sender sender.cpp Statistics.cpp ${platform_test_additions})
+target_link_libraries (sender qpidmessaging qpidtypes qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(sender)
 
-# This should ideally be done as part of the test run, but I don't know a way
-# to get these arguments and the working directory set like Makefile.am does,
-# and have that run during the test pass.
-if (PYTHON_EXECUTABLE)
-  set (python_bld ${CMAKE_CURRENT_BINARY_DIR}/python)
-  execute_process(COMMAND ${PYTHON_EXECUTABLE} setup.py install --prefix=${pythoon_bld} --install-lib=${python_bld} --install-scripts=${python_bld}/commands
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../python)
-endif (PYTHON_EXECUTABLE)
+add_executable (qpid-txtest qpid-txtest.cpp ${platform_test_additions})
+target_link_libraries (qpid-txtest qpidclient qpidcommon qpidtypes "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+#qpid_txtest_SOURCES=qpid-txtest.cpp  TestOptions.h ConnectionOptions.h
+remember_location(qpid-txtest)
+
+install (TARGETS
+         qpid-perftest qpid-latency-test qpid-client-test
+         qpid-ping
+         qpid-topic-listener qpid-topic-publisher receiver sender
+         qpid-txtest
+         RUNTIME DESTINATION ${QPID_INSTALL_TESTDIR})
+
+# Only build test code if testing is turned on
+if (BUILD_TESTING)
+
+# Create the environment scripts for tests
+set (abs_srcdir ${CMAKE_CURRENT_SOURCE_DIR})
+set (abs_builddir ${CMAKE_CURRENT_BINARY_DIR})
+set (abs_top_srcdir ${CMAKE_SOURCE_DIR})
+set (abs_top_builddir ${CMAKE_BINARY_DIR})
+set (builddir_lib_suffix "")
+
+if (CMAKE_SYSTEM_NAME STREQUAL Windows)
+  configure_file (${CMAKE_CURRENT_SOURCE_DIR}/test_env.ps1.in
+    ${CMAKE_CURRENT_BINARY_DIR}/test_env.ps1 @ONLY)
+else (CMAKE_SYSTEM_NAME STREQUAL Windows)
+  configure_file (${CMAKE_CURRENT_SOURCE_DIR}/test_env.sh.in
+    ${CMAKE_CURRENT_BINARY_DIR}/test_env.sh @ONLY)
+endif (CMAKE_SYSTEM_NAME STREQUAL Windows)
+
+# Copy qpidd-p0 script to build directory so tests can find it.
+configure_file (${CMAKE_CURRENT_SOURCE_DIR}/qpidd-p0 ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 
 if (CMAKE_SYSTEM_NAME STREQUAL Windows)
   set (ENV{OUTDIR} ${EXECUTABLE_OUTPUT_PATH})
@@ -299,48 +144,246 @@ if (CMAKE_SYSTEM_NAME STREQUAL Windows)
   set (shell "powershell")
 endif (CMAKE_SYSTEM_NAME STREQUAL Windows)
 
-set(test_wrap ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_test${test_script_suffix})
+set(test_wrap ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_test${test_script_suffix} --build-dir=${CMAKE_BINARY_DIR})
+set(python_wrap ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_test${test_script_suffix} --build-dir=${CMAKE_BINARY_DIR} --python)
 
-add_test (unit_test ${test_wrap} ${unit_test_LOCATION})
-add_test (start_broker ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/start_broker${test_script_suffix})
-add_test (qpid-client-test ${test_wrap} ${qpid-client-test_LOCATION})
-add_test (quick_perftest ${test_wrap} ${qpid-perftest_LOCATION} --summary --count 100)
-add_test (quick_topictest ${test_wrap} ${CMAKE_CURRENT_SOURCE_DIR}/quick_topictest${test_script_suffix})
-add_test (quick_txtest ${test_wrap} ${qpid-txtest_LOCATION} --queues 4 --tx-count 10 --quiet)
-if (PYTHON_EXECUTABLE)
-  add_test (run_header_test ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_header_test${test_script_suffix})
-  add_test (python_tests ${test_wrap} ${CMAKE_CURRENT_SOURCE_DIR}/python_tests${test_script_suffix})
-endif (PYTHON_EXECUTABLE)
-add_test (stop_broker ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/stop_broker${test_script_suffix})
-if (PYTHON_EXECUTABLE)
-  add_test (ha_tests ${test_wrap} ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/ha_tests.py)
-  add_test (ipv6_test ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/ipv6_test${test_script_suffix})
-  add_test (federation_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_federation_tests${test_script_suffix})
+if (BUILD_TESTING_UNITTESTS)
+
+#
+# Unit test program
+#
+# Unit tests are built as a single program to reduce valgrind overhead
+# when running the tests. If you want to build a subset of the tests run
+# ccmake and set unit_tests_to_build to the set you want to build.
+
+# Like this to work with cmake 2.4 on Unix
+set (qpid_test_boost_libs
+     ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${Boost_SYSTEM_LIBRARY})
+
+set(all_unit_tests
+    AccumulatedAckTest
+    Array
+    AsyncCompletion
+    AtomicValue
+    ClientMessage
+    ClientMessageTest
+    ClientSessionTest
+    DeliveryRecordTest
+    DtxWorkRecordTest
+    exception_test
+    ExchangeTest
+    FieldTable
+    FieldValue
+    FrameDecoder
+    FramingTest
+    HeadersExchangeTest
+    HeaderTest
+    InlineAllocator
+    InlineVector
+    logging
+    ManagementTest
+    MessageReplayTracker
+    MessageTest
+    MessagingLogger
+    MessagingSessionTests
+    PollableCondition
+    ProxyTest
+    QueueDepth
+    QueueFlowLimitTest
+    QueueOptionsTest
+    QueuePolicyTest
+    QueueRegistryTest
+    QueueTest
+    RangeSet
+    RefCounted
+    RetryList
+    Selector
+    SequenceNumberTest
+    SequenceSet
+    SessionState
+    Shlib
+    StringUtils
+    SystemInfo
+    TimerTest
+    TopicExchangeTest
+    TxBufferTest
+    TransactionObserverTest
+    Url
+    Uuid
+    Variant
+    ${xml_tests}
+   )
+
+set(unit_tests_to_build
+    ""
+    CACHE STRING "Which unit tests to build"
+   )
+
+mark_as_advanced(unit_tests_to_build)
+
+# If no unit_test specifically set then use all unit tests
+if (unit_tests_to_build)
+set(actual_unit_tests ${unit_tests_to_build})
+else()
+set(actual_unit_tests ${all_unit_tests})
+endif()
+
+add_executable (unit_test unit_test
+                ${actual_unit_tests} ${platform_test_additions})
+target_link_libraries (unit_test
+                       ${qpid_test_boost_libs}
+                       qpidmessaging qpidtypes qpidbroker qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+set_target_properties (unit_test PROPERTIES COMPILE_DEFINITIONS _IN_QPID_BROKER)
+remember_location(unit_test)
+
+add_test (unit_test ${test_wrap} --boost-test -- ${unit_test_LOCATION})
+
+endif (BUILD_TESTING_UNITTESTS)
+
+add_library (shlibtest MODULE shlibtest.cpp)
+
+if (BUILD_SASL)
+    add_custom_command(
+        OUTPUT sasl_config/qpidd.conf sasl_config/qpidd.sasldb
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/sasl_test_setup.sh)
+
+    add_custom_target(
+        sasl_config ALL
+        DEPENDS sasl_config/qpidd.conf sasl_config/qpidd.sasldb)
+endif (BUILD_SASL)
+
+#
+# Other test programs
+#
+add_executable (echotest echotest.cpp ${platform_test_additions})
+target_link_libraries (echotest qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(echotest)
+
+add_executable (publish publish.cpp ${platform_test_additions})
+target_link_libraries (publish qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(publish)
+
+add_executable (consume consume.cpp ${platform_test_additions})
+target_link_libraries (consume qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(consume)
+
+add_executable (header_test header_test.cpp ${platform_test_additions})
+target_link_libraries (header_test qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(header_test)
+
+add_executable (declare_queues declare_queues.cpp ${platform_test_additions})
+target_link_libraries (declare_queues qpidclient qpidcommon)
+remember_location(declare_queues)
+
+add_executable (replaying_sender replaying_sender.cpp ${platform_test_additions})
+target_link_libraries (replaying_sender qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(replaying_sender)
+
+add_executable (resuming_receiver resuming_receiver.cpp ${platform_test_additions})
+target_link_libraries (resuming_receiver qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(resuming_receiver)
+
+add_executable (txshift txshift.cpp ${platform_test_additions})
+target_link_libraries (txshift qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(txshift)
+
+add_executable (txjob txjob.cpp ${platform_test_additions})
+target_link_libraries (txjob qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(txjob)
+
+add_executable (datagen datagen.cpp ${platform_test_additions})
+target_link_libraries (datagen qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(datagen)
+
+add_executable (msg_group_test msg_group_test.cpp ${platform_test_additions})
+target_link_libraries (msg_group_test qpidmessaging qpidtypes qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(msg_group_test)
+
+add_executable (ha_test_max_queues ha_test_max_queues.cpp ${platform_test_additions})
+target_link_libraries (ha_test_max_queues qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+remember_location(ha_test_max_queues)
+
+if (BUILD_SASL)
+    add_executable (sasl_version sasl_version.cpp ${platform_test_additions})
+    remember_location(sasl_version)
+endif (BUILD_SASL)
+
+set (python_src ${CMAKE_SOURCE_DIR}/../python)
+if (EXISTS ${python_src})
+    set (python_bld ${CMAKE_CURRENT_BINARY_DIR}/python)
+    # This will not pick up added or deleted python files
+    # In that case you need to rerun CMake
+    file(GLOB_RECURSE python_files ${python_src}/*.py)
+
+    add_custom_command(
+	OUTPUT ${python_bld}
+	DEPENDS ${python_files}
+	COMMAND ${PYTHON_EXECUTABLE}
+	    setup.py
+	    build --build-base=${python_bld}/build
+	    install --prefix=${python_bld} --install-lib=${python_bld} --install-scripts=${python_bld}/commands
+	WORKING_DIRECTORY ${python_src}
+    )
+
+    add_custom_target(
+	python_bld ALL
+	DEPENDS ${python_bld}
+    )
+endif (EXISTS ${python_src})
+
+if (BUILD_SASL)
+    add_test (sasl_fed ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_fed${test_script_suffix})
+    add_test (sasl_fed_ex_dynamic ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_fed_ex${test_script_suffix} dynamic)
+    add_test (sasl_fed_ex_link ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_fed_ex${test_script_suffix} link)
+    add_test (sasl_fed_ex_queue ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_fed_ex${test_script_suffix} queue)
+    add_test (sasl_fed_ex_route ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_fed_ex${test_script_suffix} route)
+    add_test (sasl_no_dir ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/sasl_no_dir${test_script_suffix})
+    if (BUILD_SSL)
+        add_test(ssl_test ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/ssl_test${test_script_suffix})
+    endif (BUILD_SSL)
+endif (BUILD_SASL)
+add_test (qpid-client-test ${test_wrap} --start-broker -- ${qpid-client-test_LOCATION})
+add_test (quick_perftest ${test_wrap} --start-broker -- ${qpid-perftest_LOCATION} --summary --count 100)
+add_test (quick_topictest ${test_wrap} --start-broker -- ${CMAKE_CURRENT_SOURCE_DIR}/quick_topictest${test_script_suffix})
+add_test (quick_txtest ${test_wrap} --start-broker -- ${qpid-txtest_LOCATION} --queues 4 --tx-count 10 --quiet)
+add_test (msg_group_tests ${test_wrap} --start-broker -- ${CMAKE_CURRENT_SOURCE_DIR}/run_msg_group_tests${test_script_suffix})
+add_test (run_header_test ${test_wrap} --start-broker -- ${CMAKE_CURRENT_SOURCE_DIR}/run_header_test${test_script_suffix})
+add_test (python_tests ${test_wrap} --start-broker -- ${CMAKE_CURRENT_SOURCE_DIR}/python_tests${test_script_suffix})
+if (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
+  # paged queue not yet implemented for windows
+  add_test (paged_queue_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_paged_queue_tests${test_script_suffix})
+endif (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
+add_test (ha_tests ${python_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/ha_tests.py)
+add_test (qpidd_qmfv2_tests ${python_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/qpidd_qmfv2_tests.py)
+if (BUILD_AMQP)
+  add_test (interlink_tests ${python_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/interlink_tests.py)
+endif (BUILD_AMQP)
+add_test (swig_python_tests ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/swig_python_tests${test_script_suffix})
+add_test (ipv6_test ${test_wrap} -- ${CMAKE_CURRENT_SOURCE_DIR}/ipv6_test${test_script_suffix})
+add_test (federation_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_federation_tests${test_script_suffix})
+add_test (federation_sys_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_federation_sys_tests${test_script_suffix})
+add_test (queue_flow_limit_tests
+          ${test_wrap}
+          --start-broker "--broker-options=--default-flow-stop-threshold=80 --default-flow-resume-threshold=70"
+          -- ${CMAKE_CURRENT_SOURCE_DIR}/run_queue_flow_limit_tests${test_script_suffix})
 if (BUILD_ACL)
   add_test (acl_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_acl_tests${test_script_suffix})
 endif (BUILD_ACL)
+add_test (cli_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_tests${test_script_suffix})
 add_test (dynamic_log_level_test ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_log_level_test${test_script_suffix})
+add_test (dynamic_log_hires_timestamp ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_log_hires_timestamp${test_script_suffix})
 if (BUILD_MSSQL)
   add_test (store_tests ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_store_tests${test_script_suffix} MSSQL)
 endif (BUILD_MSSQL)
 if (BUILD_MSCLFS)
   add_test (store_tests_clfs ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_store_tests${test_script_suffix} MSSQL-CLFS)
 endif (BUILD_MSCLFS)
-endif (PYTHON_EXECUTABLE)
+add_test (queue_redirect ${shell} ${CMAKE_CURRENT_SOURCE_DIR}/run_queue_redirect${test_script_suffix})
 
 add_library(test_store MODULE test_store.cpp)
 target_link_libraries (test_store qpidbroker qpidcommon)
-set_target_properties (test_store PROPERTIES PREFIX "")
-
+set_target_properties (test_store PROPERTIES PREFIX "" COMPILE_DEFINITIONS _IN_QPID_BROKER)
 
 add_library (dlclose_noop MODULE dlclose_noop.c)
-#libdlclose_noop_la_LDFLAGS = -module -rpath $(abs_builddir)
 
-#CLEANFILES+=valgrind.out *.log *.vglog* dummy_test $(unit_wrappers)
-#
-## Longer running stability tests, not run by default check: target.
-## Not run under valgrind, too slow
-#LONG_TESTS=fanout_perftest shared_perftest multiq_perftest topic_perftest run_failover_soak
-#EXTRA_DIST+=$(LONG_TESTS) run_perftest
-#check-long:
-#	$(MAKE) check TESTS="start_broker $(LONG_TESTS) stop_broker" VALGRIND=
+endif (BUILD_TESTING)

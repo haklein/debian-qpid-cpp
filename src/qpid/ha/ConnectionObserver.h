@@ -29,6 +29,8 @@
 #include "boost/shared_ptr.hpp"
 
 namespace qpid {
+struct Address;
+
 namespace ha {
 class BrokerInfo;
 class HaBroker;
@@ -50,13 +52,17 @@ class ConnectionObserver : public broker::ConnectionObserver
 
     static const std::string ADMIN_TAG;
     static const std::string BACKUP_TAG;
+    static const std::string ADDRESS_TAG;
 
-    static bool getBrokerInfo(const broker::Connection& connection, BrokerInfo& info);
+    static bool getBrokerInfo(const broker::Connection& connection, BrokerInfo&);
+    static bool getAddress(const broker::Connection& connection, Address&);
 
     ConnectionObserver(HaBroker& haBroker, const types::Uuid& self);
 
-    void setObserver(const ObserverPtr&);
+    void setObserver(const ObserverPtr&, const std::string& logPrefix);
     ObserverPtr getObserver();
+
+    void reset();
 
     void opened(broker::Connection& connection);
     void closed(broker::Connection& connection);

@@ -16,7 +16,10 @@
  *
  */
 #include "qpid/broker/SessionAdapter.h"
-#include "qpid/broker/Connection.h"
+
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+#include "qpid/broker/DtxTimeout.h"
 #include "qpid/broker/Queue.h"
 #include "qpid/Exception.h"
 #include "qpid/framing/reply_exceptions.h"
@@ -66,9 +69,8 @@ static const std::string _FALSE("false");
 
 void SessionAdapter::ExchangeHandlerImpl::declare(const string& exchange, const string& type,
                                                   const string& alternateExchange,
-                                                  bool passive, bool durable, bool /*autoDelete*/, const FieldTable& args){
+                                                  bool passive, bool durable, bool autodelete, const FieldTable& args){
 
-    //TODO: implement autoDelete
     Exchange::shared_ptr alternate;
     if (!alternateExchange.empty()) {
         alternate = getBroker().getExchanges().get(alternateExchange);
@@ -80,6 +82,7 @@ void SessionAdapter::ExchangeHandlerImpl::declare(const string& exchange, const 
             params.insert(make_pair(acl::PROP_TYPE, type));
             params.insert(make_pair(acl::PROP_ALTERNATE, alternateExchange));
             params.insert(make_pair(acl::PROP_DURABLE, durable ? _TRUE : _FALSE));
+            params.insert(make_pair(acl::PROP_AUTODELETE, autodelete ? _TRUE : _FALSE));
             if (!acl->authorise(getConnection().getUserId(),acl::ACT_ACCESS,acl::OBJ_EXCHANGE,exchange,&params) )
                 throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied exchange access request from " << getConnection().getUserId()));
         }
@@ -92,23 +95,19 @@ void SessionAdapter::ExchangeHandlerImpl::declare(const string& exchange, const 
         }
         try{
             std::pair<Exchange::shared_ptr, bool> response =
-                getBroker().createExchange(exchange, type, durable, alternateExchange, args,
-                                           getConnection().getUserId(), getConnection().getUrl());
+                getBroker().createExchange(exchange, type, durable, autodelete, alternateExchange, args,
+                                           getConnection().getUserId(), getConnection().getMgmtId());
             if (!response.second) {
                 //exchange already there, not created
                 checkType(response.first, type);
                 checkAlternate(response.first, alternate);
-                ManagementAgent* agent = getBroker().getManagementAgent();
-                if (agent)
-                    agent->raiseEvent(_qmf::EventExchangeDeclare(getConnection().getUrl(),
-                                                                 getConnection().getUserId(),
-                                                                 exchange,
-                                                                 type,
-                                                                 alternateExchange,
-                                                                 durable,
-                                                                 false,
-                                                                 ManagementAgent::toMap(args),
-                                                                 "existing"));
+                QPID_LOG_CAT(debug, model, "Create exchange. name:" << exchange
+                    << " user:" << getConnection().getUserId()
+                    << " rhost:" << getConnection().getMgmtId()
+                    << " type:" << type
+                    << " alternateExchange:" << alternateExchange
+                    << " durable:" << (durable ? "T" : "F")
+                    << " autodelete:" << (autodelete ? "T" : "F"));
             }
         }catch(UnknownExchangeTypeException& /*e*/){
             throw NotFoundException(QPID_MSG("Exchange type not implemented: " << type));
@@ -136,7 +135,7 @@ void SessionAdapter::ExchangeHandlerImpl::checkAlternate(Exchange::shared_ptr ex
 void SessionAdapter::ExchangeHandlerImpl::delete_(const string& name, bool /*ifUnused*/)
 {
     //TODO: implement if-unused
-    getBroker().deleteExchange(name, getConnection().getUserId(), getConnection().getUrl());
+    getBroker().deleteExchange(name, getConnection().getUserId(), getConnection().getMgmtId());
 }
 
 ExchangeQueryResult SessionAdapter::ExchangeHandlerImpl::query(const string& name)
@@ -157,16 +156,18 @@ void SessionAdapter::ExchangeHandlerImpl::bind(const string& queueName,
                                                const string& exchangeName, const string& routingKey,
                                                const FieldTable& arguments)
 {
-    getBroker().bind(queueName, exchangeName, routingKey, arguments,
-                     getConnection().getUserId(), getConnection().getUrl());
+    getBroker().bind(queueName, exchangeName, routingKey, arguments, &session,
+                     getConnection().getUserId(), getConnection().getMgmtId());
+    state.addBinding(queueName, exchangeName, routingKey, arguments);
 }
 
 void SessionAdapter::ExchangeHandlerImpl::unbind(const string& queueName,
                                                  const string& exchangeName,
                                                  const string& routingKey)
 {
-    getBroker().unbind(queueName, exchangeName, routingKey,
-                       getConnection().getUserId(), getConnection().getUrl());
+    state.removeBinding(queueName, exchangeName, routingKey);
+    getBroker().unbind(queueName, exchangeName, routingKey, &session,
+                       getConnection().getUserId(), getConnection().getMgmtId());
 }
 
 ExchangeBoundResult SessionAdapter::ExchangeHandlerImpl::bound(const std::string& exchangeName,
@@ -209,7 +210,7 @@ ExchangeBoundResult SessionAdapter::ExchangeHandlerImpl::bound(const std::string
 SessionAdapter::QueueHandlerImpl::QueueHandlerImpl(SemanticState& session)
     : HandlerHelper(session), broker(getBroker()),
       //record connection id and userid for deleting exclsuive queues after session has ended:
-      connectionId(getConnection().getUrl()), userId(getConnection().getUserId())
+      connectionId(getConnection().getMgmtId()), userId(getConnection().getUserId())
 {}
 
 
@@ -227,14 +228,11 @@ void SessionAdapter::QueueHandlerImpl::destroyExclusiveQueues()
     while (!exclusiveQueues.empty()) {
         Queue::shared_ptr q(exclusiveQueues.front());
         q->releaseExclusiveOwnership();
-        if (q->canAutoDelete()) {
-            Queue::tryAutoDelete(broker, q, connectionId, userId);
-        }
         exclusiveQueues.erase(exclusiveQueues.begin());
     }
 }
 
-bool SessionAdapter::QueueHandlerImpl::isLocal(const ConnectionToken* t) const
+bool SessionAdapter::QueueHandlerImpl::isLocal(const OwnershipToken* t) const
 {
     return session.isLocal(t);
 }
@@ -258,7 +256,7 @@ QueueQueryResult SessionAdapter::QueueHandlerImpl::query(const string& name)
                                 queue->isDurable(),
                                 queue->hasExclusiveOwner(),
                                 queue->isAutoDelete(),
-                                queue->getSettings(),
+                                queue->getEncodableSettings(),
                                 queue->getMessageCount(),
                                 queue->getConsumerCount());
     } else {
@@ -288,30 +286,40 @@ void SessionAdapter::QueueHandlerImpl::declare(const string& name, const string&
         queue = getQueue(name);
         //TODO: check alternate-exchange is as expected
     } else {
+        QueueSettings settings(durable, autoDelete);
+        try {
+            settings.populate(arguments, settings.storeSettings);
+        } catch (const qpid::types::Exception& e) {
+            throw InvalidArgumentException(e.what());
+        }
+        // Identify queues that won't survive a failover.
+        settings.isTemporary = exclusive && autoDelete && !settings.autoDeleteDelay;
+
         std::pair<Queue::shared_ptr, bool> queue_created =
-            getBroker().createQueue(name, durable,
-                                    autoDelete,
+            getBroker().createQueue(name, settings,
                                     exclusive ? &session : 0,
                                     alternateExchange,
-                                    arguments,
                                     getConnection().getUserId(),
-                                    getConnection().getUrl());
+                                    getConnection().getMgmtId());
         queue = queue_created.first;
         assert(queue);
         if (queue_created.second) { // This is a new queue
             //handle automatic cleanup:
-            if (exclusive) {
+            if (exclusive && queue->setExclusiveOwner(&session)) {
                 exclusiveQueues.push_back(queue);
             }
         } else {
             if (exclusive && queue->setExclusiveOwner(&session)) {
                 exclusiveQueues.push_back(queue);
             }
-            ManagementAgent* agent = getBroker().getManagementAgent();
-            if (agent)
-                agent->raiseEvent(_qmf::EventQueueDeclare(getConnection().getUrl(), getConnection().getUserId(),
-                                                          name, durable, exclusive, autoDelete, alternateExchange, ManagementAgent::toMap(arguments),
-                                                          "existing"));
+            QPID_LOG_CAT(debug, model, "Create queue. name:" << name
+                << " user:" << getConnection().getUserId()
+                << " rhost:" << getConnection().getMgmtId()
+                << " durable:" << (durable ? "T" : "F")
+                << " exclusive:" << (exclusive ? "T" : "F")
+                << " autodelete:" << (autoDelete ? "T" : "F")
+                << " alternateExchange:" << alternateExchange
+            );
         }
 
     }
@@ -353,7 +361,7 @@ void SessionAdapter::QueueHandlerImpl::checkDelete(Queue::shared_ptr queue, bool
 
 void SessionAdapter::QueueHandlerImpl::delete_(const string& queue, bool ifUnused, bool ifEmpty)
 {
-    getBroker().deleteQueue(queue, getConnection().getUserId(), getConnection().getUrl(),
+    getBroker().deleteQueue(queue, getConnection().getUserId(), getConnection().getMgmtId(),
                             boost::bind(&SessionAdapter::QueueHandlerImpl::checkDelete, this, _1, ifUnused, ifEmpty));
 }
 
@@ -403,6 +411,11 @@ SessionAdapter::MessageHandlerImpl::subscribe(const string& queueName,
     if(!destination.empty() && state.exists(destination))
         throw NotAllowedException(QPID_MSG("Consumer tags must be unique"));
 
+    if (queue->getSettings().isBrowseOnly && acquireMode == 0) {
+        QPID_LOG(info, "Overriding request to consume from browse-only queue " << queue->getName());
+        acquireMode = 1;
+    }
+
     // We allow browsing (acquireMode == 1) of exclusive queues, this is required by HA.
     if (queue->hasExclusiveOwner() && !queue->isExclusiveOwner(&session) && acquireMode == 0)
         throw ResourceLockedException(QPID_MSG("Cannot subscribe to exclusive queue "
@@ -414,8 +427,14 @@ SessionAdapter::MessageHandlerImpl::subscribe(const string& queueName,
 
     ManagementAgent* agent = getBroker().getManagementAgent();
     if (agent)
-        agent->raiseEvent(_qmf::EventSubscribe(getConnection().getUrl(), getConnection().getUserId(),
+        agent->raiseEvent(_qmf::EventSubscribe(getConnection().getMgmtId(), getConnection().getUserId(),
                                                queueName, destination, exclusive, ManagementAgent::toMap(arguments)));
+    QPID_LOG_CAT(debug, model, "Create subscription. queue:" << queueName
+        << " destination:" << destination
+        << " user:" << getConnection().getUserId()
+        << " rhost:" << getConnection().getMgmtId()
+        << " exclusive:" << (exclusive ? "T" : "F")
+    );
 }
 
 void
@@ -427,7 +446,10 @@ SessionAdapter::MessageHandlerImpl::cancel(const string& destination )
 
     ManagementAgent* agent = getBroker().getManagementAgent();
     if (agent)
-        agent->raiseEvent(_qmf::EventUnsubscribe(getConnection().getUrl(), getConnection().getUserId(), destination));
+        agent->raiseEvent(_qmf::EventUnsubscribe(getConnection().getMgmtId(), getConnection().getUserId(), destination));
+    QPID_LOG_CAT(debug, model, "Delete subscription. destination:" << destination
+        << " user:" << getConnection().getUserId()
+        << " rhost:" << getConnection().getMgmtId() );
 }
 
 void
@@ -514,16 +536,17 @@ void SessionAdapter::ExecutionHandlerImpl::result(const SequenceNumber& /*comman
     //TODO: but currently never used client->server
 }
 
-void SessionAdapter::ExecutionHandlerImpl::exception(uint16_t /*errorCode*/,
+void SessionAdapter::ExecutionHandlerImpl::exception(uint16_t errorCode,
                                                      const SequenceNumber& /*commandId*/,
                                                      uint8_t /*classCode*/,
                                                      uint8_t /*commandCode*/,
                                                      uint8_t /*fieldIndex*/,
-                                                     const std::string& /*description*/,
+                                                     const std::string& description,
                                                      const framing::FieldTable& /*errorInfo*/)
 {
-    //TODO: again, not really used client->server but may be important
-    //for inter-broker links
+    broker::SessionHandler* s = state.getSessionState().getHandler();
+    if (s) s->incomingExecutionException(
+        framing::execution::ErrorCode(errorCode), description);
 }
 
 
@@ -655,6 +678,8 @@ DtxGetTimeoutResult SessionAdapter::DtxHandlerImpl::getTimeout(const Xid& xid)
 void SessionAdapter::DtxHandlerImpl::setTimeout(const Xid& xid,
                                                 uint32_t timeout)
 {
+    if ((timeout > getBroker().getOptions().dtxMaxTimeout) && (getBroker().getOptions().dtxMaxTimeout > 0))
+        throw InvalidArgumentException(QPID_MSG("xid " << xid << " has timeout " << timeout << " bigger than maximum allowed " << getBroker().getOptions().dtxMaxTimeout));
     getBroker().getDtxManager().setTimeout(DtxManager::convert(xid), timeout);
 }
 
@@ -664,9 +689,7 @@ Queue::shared_ptr SessionAdapter::HandlerHelper::getQueue(const string& name) co
     if (name.empty()) {
         throw framing::IllegalArgumentException(QPID_MSG("No queue name specified."));
     } else {
-        queue = session.getBroker().getQueues().find(name);
-        if (!queue)
-            throw framing::NotFoundException(QPID_MSG("Queue not found: "<<name));
+        queue = session.getBroker().getQueues().get(name);
     }
     return queue;
 }

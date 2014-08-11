@@ -19,21 +19,23 @@
  *
  */
 #include "qpid/broker/SecureConnectionFactory.h"
-#include "qpid/framing/ProtocolVersion.h"
+
 #include "qpid/amqp_0_10/Connection.h"
-#include "qpid/broker/Connection.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
 #include "qpid/broker/SecureConnection.h"
-#include "qpid/sys/SecuritySettings.h"
+#include "qpid/framing/ProtocolVersion.h"
 #include "qpid/log/Statement.h"
+#include "qpid/sys/SecuritySettings.h"
 
 namespace qpid {
 namespace broker {
 
 using framing::ProtocolVersion;
 using qpid::sys::SecuritySettings;
-typedef std::auto_ptr<amqp_0_10::Connection> CodecPtr;
+typedef std::auto_ptr<qpid::amqp_0_10::Connection> CodecPtr;
 typedef std::auto_ptr<SecureConnection> SecureConnectionPtr;
-typedef std::auto_ptr<Connection> ConnectionPtr;
+typedef std::auto_ptr<qpid::broker::amqp_0_10::Connection> ConnectionPtr;
 typedef std::auto_ptr<sys::ConnectionInputHandler> InputPtr;
 
 SecureConnectionFactory::SecureConnectionFactory(Broker& b) : broker(b) {}
@@ -42,13 +44,9 @@ sys::ConnectionCodec*
 SecureConnectionFactory::create(ProtocolVersion v, sys::OutputControl& out, const std::string& id,
                                 const SecuritySettings& external) {
     if (v == ProtocolVersion(0, 10)) {
-        SecureConnectionPtr sc(new SecureConnection());
-        CodecPtr c(new amqp_0_10::Connection(out, id, false));
-        ConnectionPtr i(new broker::Connection(c.get(), broker, id, external, false));
-        i->setSecureConnection(sc.get());
-        c->setInputHandler(InputPtr(i.release()));
-        sc->setCodec(std::auto_ptr<sys::ConnectionCodec>(c));
-        return sc.release();
+        return create_0_10(out, id, external, false);
+    } else {
+        return broker.getProtocolRegistry().create(v, out, id, external);
     }
     return 0;
 }
@@ -57,9 +55,16 @@ sys::ConnectionCodec*
 SecureConnectionFactory::create(sys::OutputControl& out, const std::string& id,
                                 const SecuritySettings& external) {
     // used to create connections from one broker to another
+    return create_0_10(out, id, external, true);
+}
+
+sys::ConnectionCodec*
+SecureConnectionFactory::create_0_10(sys::OutputControl& out, const std::string& id,
+                                const SecuritySettings& external, bool brokerActsAsClient)
+{
     SecureConnectionPtr sc(new SecureConnection());
-    CodecPtr c(new amqp_0_10::Connection(out, id, true));
-    ConnectionPtr i(new broker::Connection(c.get(), broker, id, external, true ));
+    CodecPtr c(new qpid::amqp_0_10::Connection(out, id, brokerActsAsClient));
+    ConnectionPtr i(new broker::amqp_0_10::Connection(c.get(), broker, id, external, brokerActsAsClient));
     i->setSecureConnection(sc.get());
     c->setInputHandler(InputPtr(i.release()));
     sc->setCodec(std::auto_ptr<sys::ConnectionCodec>(c));

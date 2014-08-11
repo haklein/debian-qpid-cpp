@@ -65,13 +65,13 @@ class XmlExchange : public virtual Exchange {
 
     qpid::sys::RWlock lock;
 
-    bool matches(Query& query, Deliverable& msg, const qpid::framing::FieldTable* args, bool parse_message_content);
+    bool matches(Query& query, Deliverable& msg, bool parse_message_content);
 
   public:
     static const std::string typeName;
 
     XmlExchange(const std::string& name, management::Manageable* parent = 0, Broker* broker = 0);
-    XmlExchange(const std::string& _name, bool _durable,
+    XmlExchange(const std::string& _name, bool _durable, bool autodelete,
 		const qpid::framing::FieldTable& _args, management::Manageable* parent = 0, Broker* broker = 0);
 
     virtual std::string getType() const { return typeName; }
@@ -107,6 +107,10 @@ class XmlExchange : public virtual Exchange {
         bool operator()(XmlBinding::shared_ptr b);
     };
 
+  protected:
+    bool hasBindings();
+  private:
+    bool unbindLH(Queue::shared_ptr queue, const std::string& routingKey, const qpid::framing::FieldTable* args);
 };
 
 

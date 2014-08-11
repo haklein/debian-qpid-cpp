@@ -17,8 +17,7 @@
 # under the License.
 #
 
-# Support library for tests that start multiple brokers, e.g. cluster
-# or federation
+# Support library for tests that start multiple brokers, e.g. HA or federation
 
 import os, signal, string, tempfile, subprocess, socket, threading, time, imp, re
 import qpid, traceback, signal
@@ -29,7 +28,10 @@ from unittest import TestCase
 from copy import copy
 from threading import Thread, Lock, Condition
 from logging import getLogger
-import qmf.console
+
+try: import qmf.console
+except: print "Cannot import module qmf.console, skipping tests"; exit(0);
+
 
 log = getLogger("qpid.brokertest")
 
@@ -76,7 +78,7 @@ def error_line(filename, n=1):
     except: return ""
     return ":\n" + "".join(result)
 
-def retry(function, timeout=10, delay=.01, max_delay=1):
+def retry(function, timeout=10, delay=.001, max_delay=1):
     """Call function until it returns a true value or timeout expires.
     Double the delay for each retry up to max_delay.
     Returns what function returns if true, None if timeout expires."""
@@ -132,20 +134,14 @@ class Popen(subprocess.Popen):
         self.pname = "%s-%d" % (os.path.split(self.cmd[0])[1], self.id)
         if stdout == FILE: stdout = open(self.outfile("out"), "w")
         if stderr == FILE: stderr = open(self.outfile("err"), "w")
-        try:
-            subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
-                                      stdin=stdin, stdout=stdout, stderr=stderr,
-                                      close_fds=True)
-        except ValueError: # Windows can't do close_fds
-            subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
-                                      stdin=stdin, stdout=stdout, stderr=stderr)
-
+        subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
+                                  stdin=stdin, stdout=stdout, stderr=stderr)
         f = open(self.outfile("cmd"), "w")
         try: f.write("%s\n%d"%(self.cmd_str(), self.pid))
         finally: f.close()
         log.debug("Started process %s: %s" % (self.pname, " ".join(self.cmd)))
 
-    def __str__(self): return "Popen<%s>"%(self.pname)
+    def __repr__(self): return "Popen<%s>"%(self.pname)
 
     def outfile(self, ext): return "%s.%s" % (self.pname, ext)
 
@@ -178,6 +174,7 @@ class Popen(subprocess.Popen):
         finally:
             self.wait()                 # Clean up the process.
 
+
     def communicate(self, input=None):
         ret = subprocess.Popen.communicate(self, input)
         self.cleanup()
@@ -203,8 +200,10 @@ class Popen(subprocess.Popen):
         self.wait()
 
     def kill(self):
-        try:
-            subprocess.Popen.kill(self)
+        # Set to EXPECT_UNKNOWN, EXPECT_EXIT_FAIL creates a race condition
+        # if the process exits normally concurrent with the call to kill.
+        self.expect = EXPECT_UNKNOWN
+        try: subprocess.Popen.kill(self)
         except AttributeError:          # No terminate method
             try:
                 os.kill( self.pid , signal.SIGKILL)
@@ -243,22 +242,18 @@ class Broker(Popen):
     _broker_count = 0
     _log_count = 0
 
-    def __str__(self): return "Broker<%s %s :%d>"%(self.log, self.pname, self.port())
-
-    def find_log(self):
-        self.log = "%03d:%s.log" % (Broker._log_count, self.name)
-        Broker._log_count += 1
+    def __repr__(self): return "<Broker:%s:%d>"%(self.log, self.port())
 
     def get_log(self):
         return os.path.abspath(self.log)
 
-    def __init__(self, test, args=[], name=None, expect=EXPECT_RUNNING, port=0, log_level=None, wait=None, show_cmd=False):
+    def __init__(self, test, args=[], test_store=False, name=None, expect=EXPECT_RUNNING, port=0, wait=None, show_cmd=False):
         """Start a broker daemon. name determines the data-dir and log
         file names."""
 
         self.test = test
         self._port=port
-        if BrokerTest.store_lib:
+        if BrokerTest.store_lib and not test_store:
             args = args + ['--load-module', BrokerTest.store_lib]
             if BrokerTest.sql_store_lib:
                 args = args + ['--load-module', BrokerTest.sql_store_lib]
@@ -266,7 +261,7 @@ class Broker(Popen):
             if BrokerTest.sql_clfs_store_lib:
                 args = args + ['--load-module', BrokerTest.sql_clfs_store_lib]
                 args = args + ['--catalog', BrokerTest.sql_catalog]
-        cmd = [BrokerTest.qpidd_exec, "--port", port, "--no-module-dir"] + args
+        cmd = [BrokerTest.qpidd_exec, "--port", port, "--interface", "127.0.0.1", "--no-module-dir"] + args
         if not "--auth" in args: cmd.append("--auth=no")
         if wait != None:
             cmd += ["--wait", str(wait)]
@@ -274,10 +269,20 @@ class Broker(Popen):
         else:
             self.name = "broker%d" % Broker._broker_count
             Broker._broker_count += 1
-        self.find_log()
+
+        self.log = "%03d:%s.log" % (Broker._log_count, self.name)
+        self.store_log = "%03d:%s.store.log" % (Broker._log_count, self.name)
+        Broker._log_count += 1
+
         cmd += ["--log-to-file", self.log]
         cmd += ["--log-to-stderr=no"]
-        cmd += ["--log-enable=%s"%(log_level or "info+") ]
+
+        # Add default --log-enable arguments unless args already has --log arguments.
+        if not [l for l in args if l.startswith("--log")]:
+            args += ["--log-enable=info+"]
+
+        if test_store: cmd += ["--load-module", BrokerTest.test_store_lib,
+                               "--test-store-events", self.store_log]
 
         self.datadir = self.name
         cmd += ["--data-dir", self.datadir]
@@ -286,7 +291,6 @@ class Broker(Popen):
         test.cleanup_stop(self)
         self._host = "127.0.0.1"
         log.debug("Started broker %s (%s, %s)" % (self.name, self.pname, self.log))
-        self._log_ready = False
 
     def startQmf(self, handler=None):
         self.qmf_session = qmf.console.Session(handler)
@@ -306,9 +310,9 @@ class Broker(Popen):
     def unexpected(self,msg):
         raise BadProcessStatus("%s: %s (%s)" % (msg, self.name, self.pname))
 
-    def connect(self, **kwargs):
+    def connect(self, timeout=5, **kwargs):
         """New API connection to the broker."""
-        return messaging.Connection.establish(self.host_port(), **kwargs)
+        return messaging.Connection.establish(self.host_port(), timeout=timeout, **kwargs)
 
     def connect_old(self):
         """Old API connection to the broker."""
@@ -364,78 +368,31 @@ class Broker(Popen):
 
     def host_port(self): return "%s:%s" % (self.host(), self.port())
 
-    def log_contains(self, str, timeout=1):
-        """Wait for str to appear in the log file up to timeout. Return true if found"""
-        return retry(lambda: find_in_file(str, self.log), timeout)
-
-    def log_ready(self):
-        """Return true if the log file exists and contains a broker ready message"""
-        if not self._log_ready:
-            self._log_ready = find_in_file("notice Broker running", self.log)
-        return self._log_ready
-
     def ready(self, timeout=30, **kwargs):
         """Wait till broker is ready to serve clients"""
-        # First make sure the broker is listening by checking the log.
-        if not retry(self.log_ready, timeout=timeout):
-            raise Exception(
-                "Timed out waiting for broker %s%s"%(self.name, error_line(self.log,5)))
-        # Create a connection and a session. For a cluster broker this will
-        # return after cluster init has finished.
+        deadline = time.time()+timeout
+        while True:
+            try:
+                c = self.connect(timeout=timeout, **kwargs)
+                try:
+                    c.session()
+                    return      # All good
+                finally: c.close()
+            except Exception,e: # Retry up to timeout
+                if time.time() > deadline:
+                    raise RethrownException(
+                        "Broker %s not responding: (%s)%s"%(
+                            self.name,e,error_line(self.log, 5)))
+
+    def assert_log_clean(self, ignore=None):
+        log = open(self.get_log())
         try:
-            c = self.connect(**kwargs)
-            try: c.session()
-            finally: c.close()
-        except Exception,e: raise RethrownException(
-            "Broker %s not responding: (%s)%s"%(self.name,e,error_line(self.log, 5)))
-
-    def store_state(self):
-        f = open(os.path.join(self.datadir, "cluster", "store.status"))
-        try: uuids = f.readlines()
-        finally: f.close()
-        null_uuid="00000000-0000-0000-0000-000000000000\n"
-        if len(uuids) < 2: return "unknown" # we looked while the file was being updated.
-        if uuids[0] == null_uuid: return "empty"
-        if uuids[1] == null_uuid: return "dirty"
-        return "clean"
-
-class Cluster:
-    """A cluster of brokers in a test."""
-    # Client connection options for use in failover tests.
-    CONNECTION_OPTIONS = "reconnect:true,reconnect-timeout:10,reconnect-urls-replace:true"
-
-    _cluster_count = 0
-
-    def __init__(self, test, count=0, args=[], expect=EXPECT_RUNNING, wait=True, show_cmd=False):
-        self.test = test
-        self._brokers=[]
-        self.name = "cluster%d" % Cluster._cluster_count
-        Cluster._cluster_count += 1
-        # Use unique cluster name
-        self.args = copy(args)
-        self.args += [ "--cluster-name", "%s-%s:%d" % (self.name, socket.gethostname(), os.getpid()) ]
-        self.args += [ "--log-enable=info+", "--log-enable=debug+:cluster"]
-        assert BrokerTest.cluster_lib, "Cannot locate cluster plug-in"
-        self.args += [ "--load-module", BrokerTest.cluster_lib ]
-        self.start_n(count, expect=expect, wait=wait, show_cmd=show_cmd)
-
-    def start(self, name=None, expect=EXPECT_RUNNING, wait=True, args=[], port=0, show_cmd=False):
-        """Add a broker to the cluster. Returns the index of the new broker."""
-        if not name: name="%s-%d" % (self.name, len(self._brokers))
-        self._brokers.append(self.test.broker(self.args+args, name, expect, wait, port=port, show_cmd=show_cmd))
-        return self._brokers[-1]
-
-    def ready(self):
-        for b in self: b.ready()
-
-    def start_n(self, count, expect=EXPECT_RUNNING, wait=True, args=[], show_cmd=False):
-        for i in range(count): self.start(expect=expect, wait=wait, args=args, show_cmd=show_cmd)
-
-    # Behave like a list of brokers.
-    def __len__(self): return len(self._brokers)
-    def __getitem__(self,index): return self._brokers[index]
-    def __iter__(self): return self._brokers.__iter__()
-
+            error = re.compile("] error|] critical")
+            if ignore: ignore = re.compile(ignore)
+            else: ignore = re.compile("\000") # Won't match anything
+            for line in log.readlines():
+                assert not error.search(line) or ignore.search(line), "Errors in log file %s: %s"%(log, line)
+        finally: log.close()
 
 def browse(session, queue, timeout=0, transform=lambda m: m.content):
     """Return a list with the contents of each message on queue."""
@@ -457,7 +414,7 @@ def assert_browse(session, queue, expect_contents, timeout=0, transform=lambda m
     if msg: msg = "%s: %r != %r"%(msg, expect_contents, actual_contents)
     assert expect_contents == actual_contents, msg
 
-def assert_browse_retry(session, queue, expect_contents, timeout=1, delay=.01, transform=lambda m:m.content, msg="browse failed"):
+def assert_browse_retry(session, queue, expect_contents, timeout=1, delay=.001, transform=lambda m:m.content, msg="browse failed"):
     """Wait up to timeout for contents of queue to match expect_contents"""
     test = lambda: browse(session, queue, 0, transform=transform) == expect_contents
     retry(test, timeout, delay)
@@ -471,11 +428,15 @@ class BrokerTest(TestCase):
     Provides a well-known working directory for each test.
     """
 
+    def __init__(self, *args, **kwargs):
+        self.longMessage = True # Enable long messages for assert*(..., msg=xxx)
+        TestCase.__init__(self, *args, **kwargs)
+
     # Environment settings.
     qpidd_exec = os.path.abspath(checkenv("QPIDD_EXEC"))
-    cluster_lib = os.getenv("CLUSTER_LIB")
     ha_lib = os.getenv("HA_LIB")
     xml_lib = os.getenv("XML_LIB")
+    amqp_lib = os.getenv("AMQP_LIB")
     qpid_config_exec = os.getenv("QPID_CONFIG_EXEC")
     qpid_route_exec = os.getenv("QPID_ROUTE_EXEC")
     receiver_exec = os.getenv("RECEIVER_EXEC")
@@ -516,25 +477,20 @@ class BrokerTest(TestCase):
         self.cleanup_stop(p)
         return p
 
-    def broker(self, args=[], name=None, expect=EXPECT_RUNNING, wait=True, port=0, log_level=None, show_cmd=False):
+    def broker(self, args=[], name=None, expect=EXPECT_RUNNING, wait=True, port=0, show_cmd=False):
         """Create and return a broker ready for use"""
-        b = Broker(self, args=args, name=name, expect=expect, port=port, log_level=log_level, show_cmd=show_cmd)
+        b = Broker(self, args=args, name=name, expect=expect, port=port, show_cmd=show_cmd)
         if (wait):
             try: b.ready()
             except Exception, e:
                 raise RethrownException("Failed to start broker %s(%s): %s" % (b.name, b.log, e))
         return b
 
-    def cluster(self, count=0, args=[], expect=EXPECT_RUNNING, wait=True, show_cmd=False):
-        """Create and return a cluster ready for use"""
-        cluster = Cluster(self, count, args, expect=expect, wait=wait, show_cmd=show_cmd)
-        return cluster
-
     def browse(self, *args, **kwargs): browse(*args, **kwargs)
     def assert_browse(self, *args, **kwargs): assert_browse(*args, **kwargs)
     def assert_browse_retry(self, *args, **kwargs): assert_browse_retry(*args, **kwargs)
 
-def join(thread, timeout=10):
+def join(thread, timeout=30):
     thread.join(timeout)
     if thread.isAlive(): raise Exception("Timed out joining thread %s"%thread)
 
@@ -558,14 +514,17 @@ class StoppableThread(Thread):
         join(self)
         if self.error: raise self.error
 
+# Options for a client that wants to reconnect automatically.
+RECONNECT_OPTIONS="reconnect:true,reconnect-timeout:10,reconnect-urls-replace:true"
+
 class NumberedSender(Thread):
     """
     Thread to run a sender client and send numbered messages until stopped.
     """
 
     def __init__(self, broker, max_depth=None, queue="test-queue",
-                 connection_options=Cluster.CONNECTION_OPTIONS,
-                 failover_updates=True, url=None):
+                 connection_options=RECONNECT_OPTIONS,
+                 failover_updates=True, url=None, args=[]):
         """
         max_depth: enable flow control, ensure sent - received <= max_depth.
         Requires self.notify_received(n) to be called each time messages are received.
@@ -576,7 +535,7 @@ class NumberedSender(Thread):
                "--address", "%s;{create:always}"%queue,
                "--connection-options", "{%s}"%(connection_options),
                "--content-stdin"
-               ]
+               ] + args
         if failover_updates: cmd += ["--failover-updates"]
         self.sender = broker.test.popen(
             cmd, expect=EXPECT_RUNNING, stdin=PIPE)
@@ -585,6 +544,7 @@ class NumberedSender(Thread):
         self.received = 0
         self.stopped = False
         self.error = None
+        self.queue = queue
 
     def write_message(self, n):
         self.sender.stdin.write(str(n)+"\n")
@@ -602,7 +562,11 @@ class NumberedSender(Thread):
                     self.condition.release()
                 self.write_message(self.sent)
                 self.sent += 1
-        except Exception: self.error = RethrownException(self.sender.pname)
+        except Exception, e:
+            self.error = RethrownException(
+                "%s: (%s)%s"%(self.sender.pname,e,
+                              error_line(self.sender.outfile("err"))))
+
 
     def notify_received(self, count):
         """Called by receiver to enable flow control. count = messages received so far."""
@@ -627,8 +591,8 @@ class NumberedReceiver(Thread):
     sequentially numbered messages.
     """
     def __init__(self, broker, sender=None, queue="test-queue",
-                 connection_options=Cluster.CONNECTION_OPTIONS,
-                 failover_updates=True, url=None):
+                 connection_options=RECONNECT_OPTIONS,
+                 failover_updates=True, url=None, args=[]):
         """
         sender: enable flow control. Call sender.received(n) for each message received.
         """
@@ -641,6 +605,7 @@ class NumberedReceiver(Thread):
                "--forever"
                ]
         if failover_updates: cmd += [ "--failover-updates" ]
+        cmd += args
         self.receiver = self.test.popen(
             cmd, expect=EXPECT_RUNNING, stdout=PIPE)
         self.lock = Lock()
@@ -664,8 +629,10 @@ class NumberedReceiver(Thread):
                     if self.sender:
                         self.sender.notify_received(self.received)
                 m = self.read_message()
-        except Exception:
-            self.error = RethrownException(self.receiver.pname)
+        except Exception, e:
+            self.error = RethrownException(
+                "%s: (%s)%s"%(self.receiver.pname,e,
+                              error_line(self.receiver.outfile("err"))))
 
     def check(self):
         """Raise an exception if there has been an error"""
@@ -675,31 +642,6 @@ class NumberedReceiver(Thread):
         """Returns when termination message is received"""
         join(self)
         self.check()
-
-class ErrorGenerator(StoppableThread):
-    """
-    Thread that continuously generates errors by trying to consume from
-    a non-existent queue. For cluster regression tests, error handling
-    caused issues in the past.
-    """
-
-    def __init__(self, broker):
-        StoppableThread.__init__(self)
-        self.broker=broker
-        broker.test.cleanup_stop(self)
-        self.start()
-
-    def run(self):
-        c = self.broker.connect_old()
-        try:
-            while not self.stopped:
-                try:
-                    c.session(str(qpid.datatypes.uuid4())).message_subscribe(
-                        queue="non-existent-queue")
-                    assert(False)
-                except qpid.session.SessionException: pass
-                time.sleep(0.01)
-        except: pass                    # Normal if broker is killed.
 
 def import_script(path):
     """

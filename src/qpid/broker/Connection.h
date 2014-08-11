@@ -21,219 +21,35 @@
  * under the License.
  *
  */
-
-#include <memory>
-#include <sstream>
-#include <vector>
-#include <queue>
-
-#include "qpid/broker/BrokerImportExport.h"
-#include "qpid/broker/ConnectionHandler.h"
-#include "qpid/broker/ConnectionState.h"
-#include "qpid/broker/SessionHandler.h"
-#include "qmf/org/apache/qpid/broker/Connection.h"
-#include "qpid/Exception.h"
-#include "qpid/RefCounted.h"
-#include "qpid/framing/AMQFrame.h"
-#include "qpid/framing/AMQP_ClientProxy.h"
-#include "qpid/framing/AMQP_ServerOperations.h"
-#include "qpid/framing/ProtocolVersion.h"
-#include "qpid/management/ManagementAgent.h"
-#include "qpid/management/Manageable.h"
-#include "qpid/ptr_map.h"
-#include "qpid/sys/AggregateOutput.h"
-#include "qpid/sys/ConnectionInputHandler.h"
-#include "qpid/sys/ConnectionOutputHandler.h"
-#include "qpid/sys/SecuritySettings.h"
-#include "qpid/sys/Socket.h"
-#include "qpid/sys/TimeoutHandler.h"
-#include "qpid/sys/Mutex.h"
-
-#include <boost/ptr_container/ptr_map.hpp>
-#include <boost/bind.hpp>
-
-#include <algorithm>
+#include <map>
+#include <string>
 
 namespace qpid {
+namespace management {
+class ObjectId;
+}
+namespace types {
+class Variant;
+}
+
 namespace broker {
 
-class Broker;
-class LinkRegistry;
-class SecureConnection;
-struct ConnectionTimeoutTask;
+class OwnershipToken;
 
-class Connection : public sys::ConnectionInputHandler,
-                   public ConnectionState,
-                   public RefCounted
-{
-  public:
-    /**
-     * Listener that can be registered with a Connection to be informed of errors.
-     */
-    class ErrorListener
-    {
-      public:
-        virtual ~ErrorListener() {}
-        virtual void sessionError(uint16_t channel, const std::string&) = 0;
-        virtual void connectionError(const std::string&) = 0;
-    };
-
-    Connection(sys::ConnectionOutputHandler* out,
-               Broker& broker,
-               const std::string& mgmtId,
-               const qpid::sys::SecuritySettings&,
-               bool isLink = false,
-               uint64_t objectId = 0,
-               bool shadow=false,
-               bool delayManagement = false,
-               bool authenticated=true);
-
-    ~Connection ();
-
-    /** Get the SessionHandler for channel. Create if it does not already exist */
-    SessionHandler& getChannel(framing::ChannelId channel);
-
-    /** Close the connection. Waits for the client to respond with close-ok
-     * before actually destroying the connection.
-     */
-    QPID_BROKER_EXTERN void close(
-        framing::connection::CloseCode code, const std::string& text);
-
-    /** Abort the connection. Close abruptly and immediately. */
-    QPID_BROKER_EXTERN void abort();
-
-    // ConnectionInputHandler methods
-    void received(framing::AMQFrame& frame);
-    void idleOut();
-    void idleIn();
-    bool doOutput();
-    void closed();
-
-    void closeChannel(framing::ChannelId channel);
-
-    // Manageable entry points
-    management::ManagementObject* GetManagementObject (void) const;
-    management::Manageable::status_t
-        ManagementMethod (uint32_t methodId, management::Args& args, std::string&);
-
-    void requestIOProcessing (boost::function0<void>);
-    void recordFromServer (const framing::AMQFrame& frame);
-    void recordFromClient (const framing::AMQFrame& frame);
-
-    // gets for configured federation links
-    std::string getAuthMechanism();
-    std::string getAuthCredentials();
-    std::string getUsername();
-    std::string getPassword();
-    std::string getHost();
-    uint16_t    getPort();
-
-    void notifyConnectionForced(const std::string& text);
-    void setUserId(const std::string& uid);
-    void raiseConnectEvent();
-
-    // credentials for connected client
-    const std::string& getUserId() const { return ConnectionState::getUserId(); }
-    const std::string& getMgmtId() const { return mgmtId; }
-    management::ManagementAgent* getAgent() const { return agent; }
-    void setUserProxyAuth(bool b);
-    /** Connection does not delete the listener. 0 resets. */
-    void setErrorListener(ErrorListener* l) { errorListener=l; }
-    ErrorListener* getErrorListener() { return errorListener; }
-
-    void setHeartbeatInterval(uint16_t heartbeat);
-    void sendHeartbeat();
-    void restartTimeout();
-    
-    template <class F> void eachSessionHandler(F f) {
-        for (ChannelMap::iterator i = channels.begin(); i != channels.end(); ++i)
-            f(*ptr_map_ptr(i));
-    }
-
-    void sendClose();
-    void setSecureConnection(SecureConnection* secured);
-
-    /** True if this is a shadow connection in a cluster. */
-    bool isShadow() const { return shadow; }
-
-    /** True if this connection is authenticated */
-    bool isAuthenticated() const { return authenticated; }
-
-    // Used by cluster to update connection status
-    sys::AggregateOutput& getOutputTasks() { return outputTasks; }
-
-    /** Cluster delays adding management object in the constructor then calls this. */
-    void addManagementObject();
-
-    const qpid::sys::SecuritySettings& getExternalSecuritySettings() const
-    {
-        return securitySettings;
-    }
-
-    /** @return true if the initial connection negotiation is complete. */
-    bool isOpen();
-
-    bool isLink() { return link; }
-    void startLinkHeartbeatTimeoutTask();
-
-    // Used by cluster during catch-up, see cluster::OutputInterceptor
-    void doIoCallbacks();
-
-    void setClientProperties(const framing::FieldTable& cp) { clientProperties = cp; }
-    const framing::FieldTable& getClientProperties() const { return clientProperties; }
-
-  private:
-    typedef boost::ptr_map<framing::ChannelId, SessionHandler> ChannelMap;
-    typedef std::vector<boost::shared_ptr<Queue> >::iterator queue_iterator;
-
-    ChannelMap channels;
-    qpid::sys::SecuritySettings securitySettings;
-    bool shadow;
-    bool authenticated;
-    ConnectionHandler adapter;
-    const bool link;
-    bool mgmtClosing;
-    const std::string mgmtId;
-    sys::Mutex ioCallbackLock;
-    std::queue<boost::function0<void> > ioCallbacks;
-    qmf::org::apache::qpid::broker::Connection* mgmtObject;
-    LinkRegistry& links;
-    management::ManagementAgent* agent;
-    sys::Timer& timer;
-    boost::intrusive_ptr<sys::TimerTask> heartbeatTimer, linkHeartbeatTimer;
-    boost::intrusive_ptr<ConnectionTimeoutTask> timeoutTimer;
-    ErrorListener* errorListener;
-    uint64_t objectId;
-    framing::FieldTable clientProperties;
-
-    /**
-     * Chained ConnectionOutputHandler that allows outgoing frames to be
-     * tracked (for updating mgmt stats).
-     */
-    class OutboundFrameTracker : public sys::ConnectionOutputHandler
-    {
-      public:
-        OutboundFrameTracker(Connection&);
-        void close();
-        size_t getBuffered() const;
-        void abort();
-        void activateOutput();
-        void giveReadCredit(int32_t credit);
-        void send(framing::AMQFrame&);
-        void wrap(sys::ConnectionOutputHandlerPtr&);
-      private:
-        Connection& con;
-        sys::ConnectionOutputHandler* next;
-    };
-    OutboundFrameTracker outboundTracker;
-
-    void sent(const framing::AMQFrame& f);
-
-  public:
-
-    qmf::org::apache::qpid::broker::Connection* getMgmtObject() { return mgmtObject; }
+/**
+ * Protocol independent connection abstraction.
+ */
+class Connection {
+public:
+    virtual ~Connection() {}
+    virtual const OwnershipToken* getOwnership() const = 0;
+    virtual const management::ObjectId getObjectId() const = 0;
+    virtual const std::string& getUserId() const = 0;
+    virtual const std::string& getMgmtId() const = 0;
+    virtual const std::map<std::string, types::Variant>& getClientProperties() const = 0;
+    virtual bool isLink() const = 0;
+    virtual void abort() = 0;
 };
-
-}}
+}} // namespace qpid::broker
 
 #endif  /*!QPID_BROKER_CONNECTION_H*/

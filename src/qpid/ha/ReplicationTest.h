@@ -30,6 +30,7 @@ namespace qpid {
 
 namespace broker {
 class Queue;
+class Exchange;
 }
 
 namespace framing {
@@ -40,6 +41,13 @@ namespace ha {
 /**
  * Test whether something is replicated, taking into account the
  * default replication level.
+ *
+ * The primary uses a ReplicationTest with default based on configuration
+ * settings, and marks objects to be replicated with an explict replication
+ * argument.
+ *
+ * The backup uses a default of NONE, so it always accepts what the primary has
+ * marked on the object.
  */
 class ReplicationTest
 {
@@ -47,21 +55,24 @@ class ReplicationTest
     ReplicationTest(ReplicateLevel replicateDefault_) :
         replicateDefault(replicateDefault_) {}
 
-    // Return the simple replication level, accounting for defaults.
-    ReplicateLevel replicateLevel(const std::string& str);
-    ReplicateLevel replicateLevel(const framing::FieldTable& f);
-    ReplicateLevel replicateLevel(const types::Variant::Map& m);
+    // Get the replication level set on an object, or default if not set.
+    ReplicateLevel getLevel(const std::string& str) const;
+    ReplicateLevel getLevel(const framing::FieldTable& f) const;
+    ReplicateLevel getLevel(const types::Variant::Map& m) const;
+    ReplicateLevel getLevel(const broker::Queue&) const;
+    ReplicateLevel getLevel(const broker::Exchange&) const;
 
-    // Return true if replication for a queue is enabled at level or higher,
-    // taking account of default level and queue settings.
-    bool isReplicated(ReplicateLevel level,
-                      const types::Variant::Map& args, bool autodelete, bool exclusive);
-    bool isReplicated(ReplicateLevel level,
-                      const framing::FieldTable& args, bool autodelete, bool exclusive);
-    bool isReplicated(ReplicateLevel level, const broker::Queue&);
+    // Calculate level for objects that may not have replication set,
+    // including auto-delete/exclusive settings.
+    ReplicateLevel useLevel(const types::Variant::Map& args, bool autodelete, bool exclusive) const;
+    ReplicateLevel useLevel(const framing::FieldTable& args, bool autodelete, bool exclusive) const;
+    ReplicateLevel useLevel(const broker::Queue&) const;
+    ReplicateLevel useLevel(const broker::Exchange&) const;
+
   private:
     ReplicateLevel replicateDefault;
 };
+
 }} // namespace qpid::ha
 
 #endif  /*!QPID_HA_REPLICATIONTEST_H*/

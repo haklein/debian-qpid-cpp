@@ -33,27 +33,22 @@ namespace qpid {
 namespace ha {
 
 namespace {
-std::string SYSTEM_ID="system-id";
-std::string HOST_NAME="host-name";
-std::string PORT="port";
-std::string STATUS="status";
+const std::string SYSTEM_ID="system-id";
+const std::string PROTOCOL="protocol";
+const std::string HOST_NAME="host-name";
+const std::string PORT="port";
+const std::string STATUS="status";
 }
 
 using types::Uuid;
 using types::Variant;
 using framing::FieldTable;
 
-BrokerInfo::BrokerInfo(const std::string& host, uint16_t port_, const types::Uuid& id) :
-    hostName(host), port(port_), systemId(id)
-{
-    updateLogId();
-}
+BrokerInfo::BrokerInfo() : status(JOINING) {}
 
-void BrokerInfo::updateLogId() {
-    std::ostringstream o;
-    o << hostName << ":" << port;
-    logId = o.str();
-}
+BrokerInfo::BrokerInfo(const types::Uuid& id, BrokerStatus s, const Address& a)
+  : address(a), systemId(id), status(s)
+{}
 
 FieldTable BrokerInfo::asFieldTable() const {
     Variant::Map m = asMap();
@@ -65,8 +60,9 @@ FieldTable BrokerInfo::asFieldTable() const {
 Variant::Map BrokerInfo::asMap() const {
     Variant::Map m;
     m[SYSTEM_ID] = systemId;
-    m[HOST_NAME] = hostName;
-    m[PORT] = port;
+    m[PROTOCOL] = address.protocol;
+    m[HOST_NAME] = address.host;
+    m[PORT] = address.port;
     m[STATUS] = status;
     return m;
 }
@@ -84,19 +80,25 @@ const Variant& get(const Variant::Map& m, const std::string& k) {
         QPID_MSG("Missing field '" << k << "' in broker information"));
     return i->second;
 }
+const Address empty;
 }
 
 void BrokerInfo::assign(const Variant::Map& m) {
     systemId = get(m, SYSTEM_ID).asUuid();
-    hostName = get(m, HOST_NAME).asString();
-    port = get(m, PORT).asUint16();
+    address = Address(get(m, PROTOCOL).asString(),
+                      get(m, HOST_NAME).asString(),
+                      get(m, PORT).asUint16());
     status = BrokerStatus(get(m, STATUS).asUint8());
-    updateLogId();
+}
+
+std::ostream& BrokerInfo::printId(std::ostream& o) const {
+    o  << getSystemId().str().substr(0,8);
+    if (getAddress() != empty) o << "@" << getAddress();
+    return o;
 }
 
 std::ostream& operator<<(std::ostream& o, const BrokerInfo& b) {
-    return o << b.getHostName() << ":" << b.getPort() << "("
-             << printable(b.getStatus()) << ")";
+    return b.printId(o) << "(" << printable(b.getStatus()) << ")";
 }
 
 std::ostream& operator<<(std::ostream& o, const BrokerInfo::Set& infos) {

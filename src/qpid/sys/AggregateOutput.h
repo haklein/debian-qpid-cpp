@@ -22,12 +22,13 @@
 #define _AggregateOutput_
 
 #include "qpid/sys/Monitor.h"
-#include "qpid/sys/OutputControl.h"
 #include "qpid/sys/OutputTask.h"
+
 #include "qpid/CommonImportExport.h"
 
 #include <algorithm>
 #include <deque>
+#include <set>
 
 namespace qpid {
 namespace sys {
@@ -41,22 +42,20 @@ namespace sys {
  * doOutput is called in another.
  */
 
-class QPID_COMMON_CLASS_EXTERN AggregateOutput : public OutputTask, public OutputControl
+class QPID_COMMON_CLASS_EXTERN AggregateOutput : public OutputTask
 {
     typedef std::deque<OutputTask*> TaskList;
+    typedef std::set<OutputTask*> TaskSet;
 
     Monitor lock;
     TaskList tasks;
+    TaskSet taskSet;
     bool busy;
-    OutputControl& control;
 
   public:
-    QPID_COMMON_EXTERN AggregateOutput(OutputControl& c);
+    QPID_COMMON_EXTERN AggregateOutput();
 
     // These may be called concurrently with any function.
-    QPID_COMMON_EXTERN void abort();
-    QPID_COMMON_EXTERN void activateOutput();
-    QPID_COMMON_EXTERN void giveReadCredit(int32_t);
     QPID_COMMON_EXTERN void addOutputTask(OutputTask* t);
 
     // These functions must not be called concurrently with each other.

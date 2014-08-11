@@ -77,8 +77,15 @@ namespace acl {
         PROP_SCHEMAPACKAGE,
         PROP_SCHEMACLASS,
         PROP_POLICYTYPE,
+        PROP_PAGING,
+        PROP_MAXPAGES,
+        PROP_MAXPAGEFACTOR,
         PROP_MAXQUEUESIZE,
-        PROP_MAXQUEUECOUNT };
+        PROP_MAXQUEUECOUNT,
+        PROP_MAXFILESIZE,
+        PROP_MAXFILECOUNT,
+        PROPERTYSIZE           // PROPERTYSIZE must be last in list
+    };
 
     // Property used in ACL spec file
     // Note for properties common to file processing/rule storage and to
@@ -96,11 +103,20 @@ namespace acl {
         SPECPROP_SCHEMAPACKAGE   = PROP_SCHEMAPACKAGE,
         SPECPROP_SCHEMACLASS     = PROP_SCHEMACLASS,
         SPECPROP_POLICYTYPE      = PROP_POLICYTYPE,
+        SPECPROP_PAGING          = PROP_PAGING,
 
         SPECPROP_MAXQUEUESIZELOWERLIMIT,
         SPECPROP_MAXQUEUESIZEUPPERLIMIT,
         SPECPROP_MAXQUEUECOUNTLOWERLIMIT,
-        SPECPROP_MAXQUEUECOUNTUPPERLIMIT };
+        SPECPROP_MAXQUEUECOUNTUPPERLIMIT,
+        SPECPROP_MAXFILESIZELOWERLIMIT,
+        SPECPROP_MAXFILESIZEUPPERLIMIT,
+        SPECPROP_MAXFILECOUNTLOWERLIMIT,
+        SPECPROP_MAXFILECOUNTUPPERLIMIT,
+        SPECPROP_MAXPAGESLOWERLIMIT,
+        SPECPROP_MAXPAGESUPPERLIMIT,
+        SPECPROP_MAXPAGEFACTORLOWERLIMIT, 
+        SPECPROP_MAXPAGEFACTORUPPERLIMIT };
 
 // AclResult  shared between ACL spec and ACL authorise interface
     enum AclResult {
@@ -124,6 +140,10 @@ namespace broker {
         // doTransferAcl pervents time consuming ACL calls on a per-message basis.
         virtual bool doTransferAcl()=0;
 
+        virtual uint16_t getMaxConnectTotal()=0;
+
+        virtual bool userAclRules()=0;
+
         virtual bool authorise(
             const std::string&                    id,
             const acl::Action&                    action,
@@ -145,9 +165,10 @@ namespace broker {
          */
         virtual bool approveConnection (const Connection& connection)=0;
 
-        /** Change connection's counted userId
+        /** Approve queue creation by counting per-user.
          */
-        virtual void setUserId(const Connection& connection, const std::string& username)=0;
+        virtual bool approveCreateQueue(const std::string& userId, const std::string& queueName)=0;
+        virtual void recordDestroyQueue(const std::string& queueName)=0;
 
         virtual ~AclModule() {};
     };
@@ -218,8 +239,13 @@ namespace acl {
             if (str.compare("schemapackage") == 0) return PROP_SCHEMAPACKAGE;
             if (str.compare("schemaclass")   == 0) return PROP_SCHEMACLASS;
             if (str.compare("policytype")    == 0) return PROP_POLICYTYPE;
+            if (str.compare("paging")        == 0) return PROP_PAGING;
+            if (str.compare("maxpages")      == 0) return PROP_MAXPAGES;
+            if (str.compare("maxpagefactor") == 0) return PROP_MAXPAGEFACTOR;
             if (str.compare("maxqueuesize")  == 0) return PROP_MAXQUEUESIZE;
             if (str.compare("maxqueuecount") == 0) return PROP_MAXQUEUECOUNT;
+            if (str.compare("maxfilesize")   == 0) return PROP_MAXFILESIZE;
+            if (str.compare("maxfilecount")  == 0) return PROP_MAXFILECOUNT;
             throw qpid::Exception(str);
         }
         static inline std::string getPropertyStr(const Property p) {
@@ -236,8 +262,13 @@ namespace acl {
             case PROP_SCHEMAPACKAGE: return "schemapackage";
             case PROP_SCHEMACLASS:   return "schemaclass";
             case PROP_POLICYTYPE:    return "policytype";
+            case PROP_PAGING:        return "paging";
+            case PROP_MAXPAGES:      return "maxpages";
+            case PROP_MAXPAGEFACTOR: return "maxpagefactor";
             case PROP_MAXQUEUESIZE:  return "maxqueuesize";
             case PROP_MAXQUEUECOUNT: return "maxqueuecount";
+            case PROP_MAXFILESIZE:   return "maxfilesize";
+            case PROP_MAXFILECOUNT:  return "maxfilecount";
             default: assert(false); // should never get here
             }
             return "";
@@ -255,10 +286,19 @@ namespace acl {
             if (str.compare("schemapackage") == 0) return SPECPROP_SCHEMAPACKAGE;
             if (str.compare("schemaclass")   == 0) return SPECPROP_SCHEMACLASS;
             if (str.compare("policytype")    == 0) return SPECPROP_POLICYTYPE;
+            if (str.compare("paging")        == 0) return SPECPROP_PAGING;
             if (str.compare("queuemaxsizelowerlimit")   == 0) return SPECPROP_MAXQUEUESIZELOWERLIMIT;
             if (str.compare("queuemaxsizeupperlimit")   == 0) return SPECPROP_MAXQUEUESIZEUPPERLIMIT;
             if (str.compare("queuemaxcountlowerlimit")  == 0) return SPECPROP_MAXQUEUECOUNTLOWERLIMIT;
             if (str.compare("queuemaxcountupperlimit")  == 0) return SPECPROP_MAXQUEUECOUNTUPPERLIMIT;
+            if (str.compare("filemaxsizelowerlimit")    == 0) return SPECPROP_MAXFILESIZELOWERLIMIT;
+            if (str.compare("filemaxsizeupperlimit")    == 0) return SPECPROP_MAXFILESIZEUPPERLIMIT;
+            if (str.compare("filemaxcountlowerlimit")   == 0) return SPECPROP_MAXFILECOUNTLOWERLIMIT;
+            if (str.compare("filemaxcountupperlimit")   == 0) return SPECPROP_MAXFILECOUNTUPPERLIMIT;
+            if (str.compare("pageslowerlimit")          == 0) return SPECPROP_MAXPAGESLOWERLIMIT;
+            if (str.compare("pagesupperlimit")          == 0) return SPECPROP_MAXPAGESUPPERLIMIT;
+            if (str.compare("pagefactorlowerlimit")     == 0) return SPECPROP_MAXPAGEFACTORLOWERLIMIT;
+            if (str.compare("pagefactorupperlimit")     == 0) return SPECPROP_MAXPAGEFACTORUPPERLIMIT;
             // Allow old names in ACL file as aliases for newly-named properties
             if (str.compare("maxqueuesize")             == 0) return SPECPROP_MAXQUEUESIZEUPPERLIMIT;
             if (str.compare("maxqueuecount")            == 0) return SPECPROP_MAXQUEUECOUNTUPPERLIMIT;
@@ -278,10 +318,19 @@ namespace acl {
                 case SPECPROP_SCHEMAPACKAGE: return "schemapackage";
                 case SPECPROP_SCHEMACLASS:   return "schemaclass";
                 case SPECPROP_POLICYTYPE:    return "policytype";
+                case SPECPROP_PAGING:        return "paging";
                 case SPECPROP_MAXQUEUESIZELOWERLIMIT:  return "queuemaxsizelowerlimit";
                 case SPECPROP_MAXQUEUESIZEUPPERLIMIT:  return "queuemaxsizeupperlimit";
                 case SPECPROP_MAXQUEUECOUNTLOWERLIMIT: return "queuemaxcountlowerlimit";
                 case SPECPROP_MAXQUEUECOUNTUPPERLIMIT: return "queuemaxcountupperlimit";
+                case SPECPROP_MAXFILESIZELOWERLIMIT:   return "filemaxsizelowerlimit";
+                case SPECPROP_MAXFILESIZEUPPERLIMIT:   return "filemaxsizeupperlimit";
+                case SPECPROP_MAXFILECOUNTLOWERLIMIT:  return "filemaxcountlowerlimit";
+                case SPECPROP_MAXFILECOUNTUPPERLIMIT:  return "filemaxcountupperlimit";
+                case SPECPROP_MAXPAGESLOWERLIMIT:      return "pageslowerlimit";
+                case SPECPROP_MAXPAGESUPPERLIMIT:      return "pagesupperlimit";
+                case SPECPROP_MAXPAGEFACTORLOWERLIMIT: return "pagefactorlowerlimit";
+                case SPECPROP_MAXPAGEFACTORUPPERLIMIT: return "pagefactorupperlimit";
                 default: assert(false); // should never get here
             }
             return "";
@@ -358,6 +407,9 @@ namespace acl {
             p4->insert(PROP_EXCLUSIVE);
             p4->insert(PROP_AUTODELETE);
             p4->insert(PROP_POLICYTYPE);
+            p4->insert(PROP_PAGING);
+            p4->insert(PROP_MAXPAGES);
+            p4->insert(PROP_MAXPAGEFACTOR);
             p4->insert(PROP_MAXQUEUESIZE);
             p4->insert(PROP_MAXQUEUECOUNT);
 

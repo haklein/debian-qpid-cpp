@@ -24,8 +24,8 @@
 # This script configures a qpid\cpp developer build environment under Windows
 # to enable working with cpp\bindings\qpid\dotnet binding source code.
 #
-# * Supports multiple versions of Visual Studio (VS2008, VS2010) as CMake
-#   generator.
+# * Supports multiple versions of Visual Studio (VS2008, VS2010, VS2012) 
+#   as CMake generator.
 #
 # * Supports 32-bit and/or 64-bit development platforms.
 #
@@ -55,6 +55,10 @@
 #     - If a directory "looks like" is has already had CMake run in it
 #       then this script skips running CMake again.
 #
+# * User chooses to include Proton or not.
+#
+#     - Proton is included by having variable PROTON_ROOT reference the
+#       directory where proton was installed.
 #
 # Prerequisites
 #
@@ -143,15 +147,19 @@ $ErrorActionPreference='Stop'
 #
 $global:txtPath = '$env:PATH'
 $global:txtQR   = '$env:QPID_BUILD_ROOT'
+$global:txtPR   = '$env:PROTON_ROOT'
 $global:txtWH   = 'Write-Host'
 
 #############################
 # Visual Studio version selection dialog items and choice
 #
-[array]$global:VsVersionCmakeChoiceList = "Visual Studio 2010", "Visual Studio 2008"
+[array]$global:VsVersionCmakeChoiceList = "Visual Studio 2012", "Visual Studio 2010", "Visual Studio 2008"
 $global:vsVersion = ''
 $global:cmakeGenerator = ''
 $global:vsSubdir = ''
+$global:cmakeCompiler = ''
+$global:cmakeCommandLine32 = ''
+$global:cmakeCommandLine64 = ''
 
 #############################
 # Select-Folder
@@ -215,6 +223,37 @@ function SanityCheckBoostPath ($path=0)
 
 
 #############################
+# SanityCheckProtonInstallPath
+#   A path is a "proton install path" if it contains
+#   both bin and include subdirectories.
+#
+function SanityCheckProtonInstallPath ($path=0)
+{
+    $result = $true
+    $displayPath = ""
+
+    if ($path -ne $null) {
+        $displayPath = $path
+
+        $toTest = ('include', 'bin')
+        foreach ($pattern in $toTest) {
+            $target = Join-Path $path $pattern
+            if (!(Test-Path -path $target)) {
+                $result = $false
+            }
+        }
+    } else {
+        $result = $false
+    }
+
+    if (! $result) {
+        Write-Host "The path ""$displayPath"" does not appear to be a Proton install root path."
+    }
+    $result
+}
+
+
+#############################
 # SanityCheckBuildPath
 #   A path is a "build path" if it contains
 #   various subdirectories.
@@ -261,14 +300,16 @@ function WriteDotnetBindingSlnLauncherPs1
         [string] $nBits,
         [string] $outfileName,
         [string] $studioVersion,
-        [string] $studioSubdir
+        [string] $studioSubdir,
+        [string] $protonRoot
     )
 
     $out = @("#
 # Launch $slnName in $studioVersion $vsPlatform ($nBits-bit) environment
 #
-$global:txtPath  = ""$boostRoot\lib;$global:txtPath""
+$global:txtPath  = ""$protonRoot\bin;$boostRoot\lib;$global:txtPath""
 $global:txtQR    = ""$buildRoot""
+$global:txtPR    = ""$protonRoot""
 $global:txtWH      ""Launch $slnName in $studioVersion $vsPlatform ($nBits-bit) environment.""
 $cppDir\bindings\qpid\dotnet\$vsSubdir\$slnName
 ")
@@ -324,7 +365,9 @@ function WriteDotnetBindingEnvSetupBat
         [string] $nBits,
         [string] $outfileName,
         [string] $studioVersion,
-        [string] $studioSubdir
+        [string] $studioSubdir,
+		[string] $cmakeLine,
+        [string] $protonRoot
     )
 
     $out = @("@ECHO OFF
@@ -336,10 +379,13 @@ REM
 REM     > call $outfileName
 REM     >
 REM
+REM The solution was generated with cmake command line:
+REM $cmakeLine
 ECHO %PATH% | FINDSTR /I boost > NUL
 IF %ERRORLEVEL% EQU 0 ECHO WARNING: Boost is defined in your path multiple times!
-SET PATH=$boostRoot\lib;%PATH%
+SET PATH=$protonRoot\bin;$boostRoot\lib;%PATH%
 SET QPID_BUILD_ROOT=$buildRoot
+SET PROTON_ROOT=$protonRoot
 ECHO Environment set for $slnName $studioVersion $vsPlatform $nBits-bit development.
 ")
     Write-Host "        $buildRoot\$outfileName"
@@ -352,18 +398,26 @@ ECHO Environment set for $slnName $studioVersion $vsPlatform $nBits-bit developm
 function Return-DropDown {
     if ($DropDown.SelectedItem -ne $null) {
         $global:vsVersion = $DropDown.SelectedItem.ToString()
-        if ($global:vsVersion -eq 'Visual Studio 2010') {
-            $global:cmakeGenerator = "Visual Studio 10"
-            $global:vsSubdir = "msvc10"
+        if ($global:vsVersion -eq 'Visual Studio 2012') {
+            $global:cmakeGenerator = "Visual Studio 11"
+            $global:vsSubdir = "msvc11"
+			$global:cmakeCompiler = "-vc110"
         } else {
-            if ($global:vsVersion -eq 'Visual Studio 2008') {
-                $global:cmakeGenerator = "Visual Studio 9 2008"
-                $global:vsSubdir = "msvc9"
-            } else {
-                Write-Host "Visual Studio must be 2008 or 2010"
-                exit
-            }
-        }
+			if ($global:vsVersion -eq 'Visual Studio 2010') {
+				$global:cmakeGenerator = "Visual Studio 10"
+				$global:vsSubdir = "msvc10"
+				$global:cmakeCompiler = "-vc100"
+			} else {
+				if ($global:vsVersion -eq 'Visual Studio 2008') {
+					$global:cmakeGenerator = "Visual Studio 9 2008"
+					$global:vsSubdir = "msvc9"
+					$global:cmakeCompiler = "-vc90"
+				} else {
+					Write-Host "Visual Studio must be 2008, 2010, or 2012"
+					exit
+				}
+			}
+		}
         $Form.Close()
         Write-Host "Selected generator: $global:cmakeGenerator"
     }
@@ -378,7 +432,7 @@ function SelectVisualStudioVersion {
 
     $Form.width = 350
     $Form.height = 150
-    $Form.Text = ”Select Visual Studio Version”
+    $Form.Text = "Select Visual Studio Version"
 
     $DropDown          = new-object System.Windows.Forms.ComboBox
     $DropDown.Location = new-object System.Drawing.Size(120,10)
@@ -427,7 +481,7 @@ function SelectVisualStudioVersion {
 SelectVisualStudioVersion
 
 #############################
-# User dialog to get optional 32-bit boost and build paths
+# User dialog to get optional 32-bit boost, proton, and build paths
 #
 $boost32 = Select-Folder -message "Select 32-bit BOOST_ROOT folder for $global:vsVersion build. Press CANCEL to skip 32-bit processing."
 
@@ -441,6 +495,18 @@ if ($defined32) {
 
 $make32 = $false
 if ($defined32) {
+
+    $proton32folder = Select-Folder -message "Select 32-bit Proton install folder for $global:vsVersion build."
+
+    $found = ($proton32folder -ne $null) -and ($proton32folder -ne '')
+    if ($found) {
+		$found = SanityCheckProtonInstallPath $proton32folder
+    }
+    if ($found) {
+        $proton32cmake = """-DPROTON_ROOT=$proton32folder"""
+    } else {
+        $proton32cmake = ""
+    }
 
     $build32 = Select-Folder -message "Select 32-bit QPID_BUILD_ROOT folder for $global:vsVersion build." -path $projRoot
 
@@ -458,7 +524,7 @@ if ($defined32) {
 }
 
 #############################
-# User dialog to get optional 64-bit boost and build paths
+# User dialog to get optional 64-bit boost, proton,  and build paths
 #
 $boost64 = Select-Folder -message "Select 64-bit BOOST_ROOT folder for $global:vsVersion build. Press CANCEL to skip 64-bit processing."
 
@@ -472,6 +538,18 @@ if ($defined64) {
 
 $make64 = $false
 if ($defined64) {
+    $proton64folder = Select-Folder -message "Select 64-bit Proton install folder for $global:vsVersion build."
+
+    $found = ($proton64folder -ne $null) -and ($proton64folder -ne '')
+    if ($found) {
+		$found = SanityCheckProtonInstallPath $proton64folder
+    }
+    if ($found) {
+        $proton64cmake = """-DPROTON_ROOT=$proton64folder"""
+    } else {
+        $proton64cmake = ""
+    }
+
     $build64 = Select-Folder -message "Select 64-bit QPID_BUILD_ROOT folder for $global:vsVersion build." -path $projRoot
 
     $found = ($build64 -ne $null) -and ($build64 -ne '')
@@ -493,10 +571,10 @@ if ($defined64) {
 # 32-bit X86
 #
 if ($make32) {
-    $env:BOOST_ROOT = "$boost32"
     cd "$build32"
-    Write-Host "Running 32-bit CMake in $build32 ..."
-    CMake -G "$global:cmakeGenerator" "-DCMAKE_INSTALL_PREFIX=install_x86" $cppDir
+	$global:cmakeCommandLine32 = "CMake -G ""$global:cmakeGenerator"" ""-DBUILD_DOCS=No"" ""-DCMAKE_INSTALL_PREFIX=$build32/install"" ""-DBoost_COMPILER=$global:cmakeCompiler"" ""-DBOOST_ROOT=$boost32"" $proton32cmake $cppDir"
+    Write-Host "Running 32-bit CMake in $build32 : $global:cmakeCommandLine32"
+    CMake -G "$global:cmakeGenerator" "-DBUILD_DOCS=No" "-DCMAKE_INSTALL_PREFIX=$build32/install" "-DBoost_COMPILER=$global:cmakeCompiler" "-DBOOST_ROOT=$boost32" $proton32cmake $cppDir
 } else {
     Write-Host "Skipped 32-bit CMake."
 }
@@ -505,10 +583,12 @@ if ($make32) {
 # 64-bit X64
 #
 if ($make64) {
-    $env:BOOST_ROOT = "$boost64"
     cd "$build64"
     Write-Host "Running 64-bit CMake in $build64"
-    CMake -G "$global:cmakeGenerator Win64" "-DCMAKE_INSTALL_PREFIX=install_x64" $cppDir
+	$global:cmakeCommandLine64 = "CMake -G ""$global:cmakeGenerator Win64"" ""-DBUILD_DOCS=No"" ""-DCMAKE_INSTALL_PREFIX=$build64/install"" ""-DBoost_COMPILER=$global:cmakeCompiler"" ""-DBOOST_ROOT=$boost64"" $proton64cmake $cppDir"
+	Write-Host $global:cmakeCommandLine64
+    Write-Host ""
+    CMake -G "$global:cmakeGenerator Win64" "-DBUILD_DOCS=No" "-DCMAKE_INSTALL_PREFIX=$build64/install" "-DBoost_COMPILER=$global:cmakeCompiler" "-DBOOST_ROOT=$boost64" $proton64cmake $cppDir
 } else {
     Write-Host "Skipped 64-bit CMake."
 }
@@ -533,7 +613,8 @@ if ($defined32) {
                                            -nBits "32" `
                                      -outfileName "start-devenv-messaging-$global:vsSubdir-x86-32bit.ps1" `
                                    -studioVersion "$global:vsVersion" `
-                                    -studioSubdir "$global:vsSubdir"
+                                    -studioSubdir "$global:vsSubdir" `
+                                      -protonRoot "$proton32folder"
 
 
     ###########
@@ -560,7 +641,9 @@ if ($defined32) {
                                         -nBits "32" `
                                   -outfileName "setenv-messaging-$global:vsSubdir-x86-32bit.bat" `
                                 -studioVersion "$global:vsVersion" `
-                                 -studioSubdir "$global:vsSubdir"
+                                 -studioSubdir "$global:vsSubdir" `
+								    -cmakeLine "$global:cmakeCommandLine32" `
+                                   -protonRoot "$proton32folder"
 
 } else {
     Write-Host "Skipped writing 32-bit scripts."
@@ -598,7 +681,8 @@ if ($defined64) {
                                      -psScriptName "start-devenv-messaging-$global:vsSubdir-x64-64bit.ps1" `
                                       -outfileName "start-devenv-messaging-$global:vsSubdir-x64-64bit.bat" `
                                     -studioVersion "$global:vsVersion" `
-                                     -studioSubdir "$global:vsSubdir"
+                                     -studioSubdir "$global:vsSubdir" `
+                                       -protonRoot "$proton64folder"
 
     ###########
     # Batch script (that you CALL from a command prompt)
@@ -611,7 +695,9 @@ if ($defined64) {
                                         -nBits "64" `
                                   -outfileName "setenv-messaging-$global:vsSubdir-x64-64bit.bat" `
                                 -studioVersion "$global:vsVersion" `
-                                 -studioSubdir "$global:vsSubdir"
+                                 -studioSubdir "$global:vsSubdir" `
+								    -cmakeLine "$global:cmakeCommandLine64" `
+                                   -protonRoot "$proton64folder"
 
 } else {
     Write-Host "Skipped writing 64-bit scripts."

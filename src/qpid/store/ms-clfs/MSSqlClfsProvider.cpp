@@ -26,6 +26,7 @@
 #include <string>
 #include <windows.h>
 #include <clfsw32.h>
+#include <qpid/broker/Broker.h>
 #include <qpid/broker/RecoverableQueue.h>
 #include <qpid/log/Statement.h>
 #include <qpid/store/MessageStorePlugin.h>
@@ -33,7 +34,6 @@
 #include <qpid/store/StorageProvider.h>
 #include <qpid/sys/Mutex.h>
 #include <boost/foreach.hpp>
-#include <boost/make_shared.hpp>
 
 // From ms-sql...
 #include "BlobAdapter.h"
@@ -108,20 +108,6 @@ public:
     /**
      * @name Methods inherited from qpid::broker::MessageStore
      */
-    //@{
-    /**
-     * If called after init() but before recovery, will discard the database
-     * and reinitialize using an empty store dir. If @a pushDownStoreFiles
-     * is true, the content of the store dir will be moved to a backup dir
-     * inside the store dir. This is used when cluster nodes recover and must
-     * get their content from a cluster sync rather than directly from the
-     * store.
-     *
-     * @param pushDownStoreFiles If true, will move content of the store dir
-     *                           into a subdir, leaving the store dir
-     *                           otherwise empty.
-     */
-    virtual void truncateInit(const bool pushDownStoreFiles = false);
 
     /**
      * Record the existence of a durable queue
@@ -369,7 +355,7 @@ MSSqlClfsProvider::finalizeMe()
 MSSqlClfsProvider::MSSqlClfsProvider()
     : options("MS SQL/CLFS Provider options")
 {
-    transactions = boost::make_shared<TransactionLog>();
+    transactions.reset(new TransactionLog());
 }
 
 MSSqlClfsProvider::~MSSqlClfsProvider()
@@ -384,7 +370,7 @@ MSSqlClfsProvider::earlyInitialize(Plugin::Target &target)
         // Check the store dir option; if not specified, need to
         // grab the broker's data dir.
         if (options.storeDir.empty()) {
-            DataDir& dir = store->getBroker()->getDataDir();
+            const DataDir& dir = store->getBroker()->getDataDir();
             if (dir.isEnabled()) {
                 options.storeDir = dir.getPath();
             }
@@ -464,11 +450,6 @@ void
 MSSqlClfsProvider::activate(MessageStorePlugin &store)
 {
     QPID_LOG(info, "MS SQL/CLFS Provider is up");
-}
-
-void
-MSSqlClfsProvider::truncateInit(const bool pushDownStoreFiles)
-{
 }
 
 void

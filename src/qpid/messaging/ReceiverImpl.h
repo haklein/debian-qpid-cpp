@@ -22,10 +22,13 @@
  *
  */
 #include "qpid/RefCounted.h"
+#include "qpid/sys/IntegerTypes.h"
 
 namespace qpid {
 namespace messaging {
 
+class Address;
+class Duration;
 class Message;
 class MessageListener;
 class Session;
@@ -46,6 +49,7 @@ class ReceiverImpl : public virtual qpid::RefCounted
     virtual const std::string& getName() const = 0;
     virtual Session getSession() const = 0;
     virtual bool isClosed() const = 0;
+    virtual Address getAddress() const = 0;
 };
 }} // namespace qpid::messaging
 

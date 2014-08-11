@@ -25,14 +25,16 @@
 #include "ReplicationTest.h"
 #include "BrokerInfo.h"
 #include "types.h"
+#include "hash.h"
+#include "qpid/sys/unordered_map.h"
 #include <set>
-#include <map>
 
 namespace qpid {
 
 namespace broker {
 class Queue;
 class QueueRegistry;
+class Connection;
 }
 
 namespace ha {
@@ -54,33 +56,28 @@ class RemoteBackup
     /** Note: isReady() can be true after construction
      *@param connected true if the backup is already connected.
      */
-    RemoteBackup(const BrokerInfo& info, ReplicationTest, bool connected);
+    RemoteBackup(const BrokerInfo&, broker::Connection*);
     ~RemoteBackup();
-
-    /** Set the initial queues for all queues in the registry.
-     *@createGuards if true create guards also, if false guards will be created on demand.
-     */
-    void setInitialQueues(broker::QueueRegistry&, bool createGuards);
 
     /** Return guard associated with a queue. Used to create ReplicatingSubscription. */
     GuardPtr guard(const QueuePtr&);
 
     /** Is the remote backup connected? */
-    void setConnected(bool b) { connected=b; }
-    bool isConnected() const { return connected; }
+    void setConnection(broker::Connection* c) { connection = c; }
+    broker::Connection* getConnection() const { return connection; }
 
     /** ReplicatingSubscription associated with queue is ready.
      * Note: may set isReady()
      */
     void ready(const QueuePtr& queue);
 
-    /** Called via ConfigurationObserver */
+    /** Called via BrokerObserver */
     void queueCreate(const QueuePtr&);
 
-    /** Called via ConfigurationObserver. Note: may set isReady() */
+    /** Called via BrokerObserver. Note: may set isReady() */
     void queueDestroy(const QueuePtr&);
 
-    /**@return true when all initial queues for this backup are ready. */
+    /**@return true when all catch-up queues for this backup are ready. */
     bool isReady();
 
     /**@return true if isReady() and this is the first call to reportReady */
@@ -89,20 +86,29 @@ class RemoteBackup
     /**Cancel all queue guards, called if we are timed out. */
     void cancel();
 
-    BrokerInfo getBrokerInfo() const { return brokerInfo; }
-  private:
-    typedef std::map<QueuePtr, GuardPtr> GuardMap;
-    typedef std::set<QueuePtr> QueueSet;
+    /** Set a catch-up queue for this backup.
+     *@createGuard if true create a guard immediately.
+     */
+    void catchupQueue(const QueuePtr&, bool createGuard);
 
-    /** Add queue to guard as an initial queue */
-    void initialQueue(const QueuePtr&, bool createGuard);
+    BrokerInfo getBrokerInfo() const { return brokerInfo; }
+
+    void startCatchup() { started = true; }
+
+  private:
+    typedef qpid::sys::unordered_map<
+      QueuePtr, GuardPtr, Hasher<boost::shared_ptr<broker::Queue> >
+      > GuardMap;
+
+    typedef std::set<QueuePtr> QueueSet;
 
     std::string logPrefix;
     BrokerInfo brokerInfo;
     ReplicationTest replicationTest;
     GuardMap guards;
-    QueueSet initialQueues;
-    bool connected;
+    QueueSet catchupQueues;
+    bool started;
+    broker::Connection* connection;
     bool reportedReady;
 };
 

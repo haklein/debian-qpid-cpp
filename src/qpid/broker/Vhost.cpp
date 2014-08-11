@@ -29,7 +29,7 @@ namespace qpid { namespace management {
 class Manageable;
 }}
 
-Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker) : mgmtObject(0)
+Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker)
 {
     if (parentBroker != 0 && broker != 0)
     {
@@ -37,10 +37,15 @@ Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker) : mgmt
 
         if (agent != 0)
         {
-            mgmtObject = new _qmf::Vhost(agent, this, parentBroker, "/");
+            mgmtObject = _qmf::Vhost::shared_ptr(new _qmf::Vhost(agent, this, parentBroker, "/"));
             agent->addObject(mgmtObject, 0, true);
         }
     }
+}
+
+Vhost::~Vhost () {
+    if (mgmtObject != 0)
+        mgmtObject->debugStats("destroying");
 }
 
 void Vhost::setFederationTag(const std::string& tag)

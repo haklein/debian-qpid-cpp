@@ -20,6 +20,7 @@
  */
 
 #include "qpid/sys/AsynchIO.h"
+#include "qpid/sys/SecuritySettings.h"
 #include "qpid/sys/Socket.h"
 #include "qpid/sys/SocketAddress.h"
 #include "qpid/sys/Poller.h"
@@ -28,18 +29,18 @@
 #include "qpid/sys/Time.h"
 #include "qpid/log/Statement.h"
 
-#include "qpid/sys/posix/check.h"
-
 // TODO The basic algorithm here is not really POSIX specific and with a
 // bit more abstraction could (should) be promoted to be platform portable
-#include <unistd.h>
-#include <sys/socket.h>
-#include <signal.h>
+// - The POSIX specific code here is ignoring SIGPIPE which should really
+//   be part of the socket code.
+// - And checking errno to detect specific read/write conditions.
+//
 #include <errno.h>
-#include <string.h>
+#include <signal.h>
 
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/shared_array.hpp>
 
 namespace qpid {
 namespace sys {
@@ -142,6 +143,7 @@ class AsynchConnector : public qpid::sys::AsynchConnector,
 
 private:
     void connComplete(DispatchHandle& handle);
+    void requestedCall(RequestCallback rCb);
 
 private:
     ConnectedCallback connCallback;
@@ -157,6 +159,7 @@ public:
                     FailedCallback failCb);
     void start(Poller::shared_ptr poller);
     void stop();
+    void requestCallback(RequestCallback rCb);
 };
 
 AsynchConnector::AsynchConnector(const Socket& s,
@@ -190,11 +193,30 @@ void AsynchConnector::stop()
     stopWatch();
 }
 
+void AsynchConnector::requestCallback(RequestCallback callback) {
+    // TODO creating a function object every time isn't all that
+    // efficient - if this becomes heavily used do something better (what?)
+    assert(callback);
+    DispatchHandle::call(boost::bind(&AsynchConnector::requestedCall, this, callback));
+}
+
+void AsynchConnector::requestedCall(RequestCallback callback) {
+    assert(callback);
+    callback(*this);
+}
+
 void AsynchConnector::connComplete(DispatchHandle& h)
 {
     int errCode = socket.getError();
     if (errCode == 0) {
         h.stopWatch();
+        try {
+            socket.finishConnect(sa);
+        } catch (const std::exception& e) {
+            failCallback(socket, 0, e.what());
+            DispatchHandle::doDelete();
+            return;
+        }
         connCallback(socket);
     } else {
         // Retry while we cause an immediate exception
@@ -239,16 +261,16 @@ public:
     virtual void queueForDeletion();
 
     virtual void start(Poller::shared_ptr poller);
+    virtual void createBuffers(uint32_t size);
     virtual void queueReadBuffer(BufferBase* buff);
     virtual void unread(BufferBase* buff);
     virtual void queueWrite(BufferBase* buff);
     virtual void notifyPendingWrite();
     virtual void queueWriteClose();
     virtual bool writeQueueEmpty();
-    virtual void startReading();
-    virtual void stopReading();
     virtual void requestCallback(RequestCallback);
     virtual BufferBase* getQueuedBuffer();
+    virtual SecuritySettings getSecuritySettings();
 
 private:
     ~AsynchIO();
@@ -270,6 +292,8 @@ private:
     const Socket& socket;
     std::deque<BufferBase*> bufferQueue;
     std::deque<BufferBase*> writeQueue;
+    std::vector<BufferBase> buffers;
+    boost::shared_array<char> bufferMemory;
     bool queuedClose;
     /**
      * This flag is used to detect and handle concurrency between
@@ -278,13 +302,6 @@ private:
      * thread processing this handle.
      */
     volatile bool writePending;
-    /**
-     * This records whether we've been reading is flow controlled:
-     * it's safe as a simple boolean as the only way to be stopped
-     * is in calls only allowed in the callback context, the only calls
-     * checking it are also in calls only allowed in callback context.
-     */
-    volatile bool readingStopped;
 };
 
 AsynchIO::AsynchIO(const Socket& s,
@@ -303,21 +320,12 @@ AsynchIO::AsynchIO(const Socket& s,
     idleCallback(iCb),
     socket(s),
     queuedClose(false),
-    writePending(false),
-    readingStopped(false) {
+    writePending(false) {
 
     s.setNonblocking();
 }
 
-struct deleter
-{
-    template <typename T>
-    void operator()(T *ptr){ delete ptr;}
-};
-
 AsynchIO::~AsynchIO() {
-    std::for_each( bufferQueue.begin(), bufferQueue.end(), deleter());
-    std::for_each( writeQueue.begin(), writeQueue.end(), deleter());
 }
 
 void AsynchIO::queueForDeletion() {
@@ -328,6 +336,19 @@ void AsynchIO::start(Poller::shared_ptr poller) {
     DispatchHandle::startWatch(poller);
 }
 
+void AsynchIO::createBuffers(uint32_t size) {
+    // Allocate all the buffer memory at once
+    bufferMemory.reset(new char[size*BufferCount]);
+
+    // Create the Buffer structs in a vector
+    // And push into the buffer queue
+    buffers.reserve(BufferCount);
+    for (uint32_t i = 0; i < BufferCount; i++) {
+        buffers.push_back(BufferBase(&bufferMemory[i*size], size));
+        queueReadBuffer(&buffers[i]);
+    }
+}
+
 void AsynchIO::queueReadBuffer(BufferBase* buff) {
     assert(buff);
     buff->dataStart = 0;
@@ -335,7 +356,7 @@ void AsynchIO::queueReadBuffer(BufferBase* buff) {
 
     bool queueWasEmpty = bufferQueue.empty();
     bufferQueue.push_back(buff);
-    if (queueWasEmpty && !readingStopped)
+    if (queueWasEmpty)
         DispatchHandle::rewatchRead();
 }
 
@@ -345,7 +366,7 @@ void AsynchIO::unread(BufferBase* buff) {
 
     bool queueWasEmpty = bufferQueue.empty();
     bufferQueue.push_front(buff);
-    if (queueWasEmpty && !readingStopped)
+    if (queueWasEmpty)
         DispatchHandle::rewatchRead();
 }
 
@@ -375,17 +396,6 @@ void AsynchIO::queueWriteClose() {
 
 bool AsynchIO::writeQueueEmpty() {
     return writeQueue.empty();
-}
-
-// This can happen outside the callback context
-void AsynchIO::startReading() {
-    readingStopped = false;
-    DispatchHandle::rewatchRead();
-}
-
-void AsynchIO::stopReading() {
-    readingStopped = true;
-    DispatchHandle::unwatchRead();
 }
 
 void AsynchIO::requestCallback(RequestCallback callback) {
@@ -420,11 +430,6 @@ AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
  * to put it in and reading is not stopped by flow control.
  */
 void AsynchIO::readable(DispatchHandle& h) {
-    if (readingStopped) {
-        // We have been flow controlled.
-        QPID_PROBE1(asynchio_read_flowcontrolled, &h);
-        return;
-    }
     AbsTime readStartTime = AbsTime::now();
     size_t total = 0;
     int readCalls = 0;
@@ -446,12 +451,6 @@ void AsynchIO::readable(DispatchHandle& h) {
                 total += rc;
 
                 readCallback(*this, buff);
-                if (readingStopped) {
-                    // We have been flow controlled.
-                    QPID_PROBE4(asynchio_read_finished_flowcontrolled, &h, duration, total, readCalls);
-                    break;
-                }
-
                 if (rc != readCount) {
                     // If we didn't fill the read buffer then time to stop reading
                     QPID_PROBE4(asynchio_read_finished_done, &h, duration, total, readCalls);
@@ -615,6 +614,13 @@ void AsynchIO::close(DispatchHandle& h) {
     if (closedCallback) {
         closedCallback(*this, socket);
     }
+}
+
+SecuritySettings AsynchIO::getSecuritySettings() {
+    SecuritySettings settings;
+    settings.ssf = socket.getKeyLen();
+    settings.authid = socket.getClientAuthId();
+    return settings;
 }
 
 } // namespace posix

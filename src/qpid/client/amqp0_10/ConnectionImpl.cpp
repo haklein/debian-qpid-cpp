@@ -26,6 +26,7 @@
 #include "qpid/framing/Uuid.h"
 #include "qpid/log/Statement.h"
 #include "qpid/Url.h"
+#include "qpid/amqp_0_10/Codecs.h"
 #include <boost/intrusive_ptr.hpp>
 #include <vector>
 #include <sstream>
@@ -42,6 +43,7 @@ using qpid::framing::Uuid;
 namespace {
 
 const std::string TCP("tcp");
+const std::string COLON(":");
 double FOREVER(std::numeric_limits<double>::max());
 
 // Time values in seconds can be specified as integer or floating point values.
@@ -85,13 +87,12 @@ bool expired(const sys::AbsTime& start, double timeout)
 } // namespace
 
 ConnectionImpl::ConnectionImpl(const std::string& url, const Variant::Map& options) :
-    replaceUrls(false), reconnect(false), timeout(FOREVER), limit(-1),
+    replaceUrls(false), autoReconnect(false), timeout(FOREVER), limit(-1),
     minReconnectInterval(0.001), maxReconnectInterval(2),
-    retries(0), reconnectOnLimitExceeded(true)
+    retries(0), reconnectOnLimitExceeded(true), disableAutoDecode(false)
 {
     setOptions(options);
     urls.insert(urls.begin(), url);
-    QPID_LOG(debug, "Created connection " << url << " with " << options);
 }
 
 void ConnectionImpl::setOptions(const Variant::Map& options)
@@ -105,7 +106,7 @@ void ConnectionImpl::setOption(const std::string& name, const Variant& value)
 {
     sys::Mutex::ScopedLock l(lock);
     if (name == "reconnect") {
-        reconnect = value;
+        autoReconnect = value;
     } else if (name == "reconnect-timeout" || name == "reconnect_timeout") {
         timeout = timeValue(value);
     } else if (name == "reconnect-limit" || name == "reconnect_limit") {
@@ -156,6 +157,10 @@ void ConnectionImpl::setOption(const std::string& name, const Variant& value)
         settings.sslCertName = value.asString();
     } else if (name == "x-reconnect-on-limit-exceeded" || name == "x_reconnect_on_limit_exceeded") {
         reconnectOnLimitExceeded = value;
+    } else if (name == "client-properties" || name == "client_properties") {
+        amqp_0_10::translate(value.asMap(), settings.clientProperties);
+    } else if (name == "disable-auto-decode" || name == "disable_auto_decode") {
+        disableAutoDecode = value;
     } else {
         throw qpid::messaging::MessagingException(QPID_MSG("Invalid option: " << name << " not recognised"));
     }
@@ -251,7 +256,7 @@ void ConnectionImpl::open()
 
 void ConnectionImpl::reopen()
 {
-    if (!reconnect) {
+    if (!autoReconnect) {
         throw qpid::messaging::TransportFailure("Failed to connect (reconnect disabled)");
     }
     open();
@@ -262,7 +267,7 @@ void ConnectionImpl::connect(const qpid::sys::AbsTime& started)
 {
     QPID_LOG(debug, "Starting connection, urls=" << asString(urls));
     for (double i = minReconnectInterval; !tryConnect(); i = std::min(i*2, maxReconnectInterval)) {
-        if (!reconnect) {
+        if (!autoReconnect) {
             throw qpid::messaging::TransportFailure("Failed to connect (reconnect disabled)");
         }
         if (limit >= 0 && retries++ >= limit) {
@@ -313,8 +318,8 @@ bool ConnectionImpl::resetSessions(const sys::Mutex::ScopedLock& )
             getImplPtr(i->second)->setSession(connection.newSession(i->first));
         }
         return true;
-    } catch (const qpid::TransportFailure&) {
-        QPID_LOG(debug, "Connection failed while re-initialising sessions");
+    } catch (const qpid::TransportFailure& e) {
+        QPID_LOG(debug, "Connection Failed to re-initialize sessions: " << e.what());
         return false;
     } catch (const qpid::framing::ResourceLimitExceededException& e) {
         if (reconnectOnLimitExceeded) {
@@ -338,9 +343,52 @@ bool ConnectionImpl::backoff()
     }
 }
 
+void ConnectionImpl::reconnect(const std::string& u)
+{
+    sys::Mutex::ScopedLock l(lock);
+    try {
+        QPID_LOG(info, "Trying to connect to " << u << "...");
+        Url url(u, settings.protocol.size() ? settings.protocol : TCP);
+        if (url.getUser().size()) settings.username = url.getUser();
+        if (url.getPass().size()) settings.password = url.getPass();
+        connection.open(url, settings);
+        QPID_LOG(info, "Connected to " << u);
+        mergeUrls(connection.getInitialBrokers(), l);
+        if (!resetSessions(l)) throw qpid::messaging::TransportFailure("Could not re-establish sessions");
+    } catch (const qpid::TransportFailure& e) {
+        QPID_LOG(info, "Failed to connect to " << u << ": " << e.what());
+        throw qpid::messaging::TransportFailure(e.what());
+    } catch (const std::exception& e) {
+        QPID_LOG(info, "Error while connecting to " << u << ": " << e.what());
+        throw qpid::messaging::MessagingException(e.what());
+    }
+}
+
+void ConnectionImpl::reconnect()
+{
+    if (!tryConnect()) {
+        throw qpid::messaging::TransportFailure("Could not reconnect");
+    }
+}
+std::string ConnectionImpl::getUrl() const
+{
+    if (isOpen()) {
+        std::stringstream u;
+        u << connection.getNegotiatedSettings().protocol << COLON << connection.getNegotiatedSettings().host << COLON << connection.getNegotiatedSettings().port;
+        return u.str();
+    } else {
+        return std::string();
+    }
+}
+
 std::string ConnectionImpl::getAuthenticatedUsername()
 {
     return connection.getNegotiatedSettings().username;
+}
+
+bool ConnectionImpl::getAutoDecode() const
+{
+    return !disableAutoDecode;
 }
 
 }}} // namespace qpid::client::amqp0_10

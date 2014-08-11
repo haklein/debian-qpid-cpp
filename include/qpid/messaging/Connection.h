@@ -51,15 +51,20 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
     /**
      * Current implementation supports the following options:
      *
-     * - username
-     * - password
-     * - heartbeat
-     * - tcp_nodelay
-     * - sasl_mechanisms
-     * - sasl_service
-     * - sasl_min_ssf
-     * - sasl_max_ssf
-     * - transport
+     * - heartbeat: the heartbeat interval in seconds
+     * - tcp_nodelay: true/false, whether nagle should be disabled or not
+     * - transport: the underlying transport to use (e.g. tcp, ssl, rdma)
+     * - protocol: the version of AMQP to use (e.g. amqp0-10 or amqp1.0)
+     *
+     * (Note: the transports and/or protocols recognised may depend on
+     * which plugins are loaded)
+     *
+     * - username: the username to authenticate as
+     * - password: the password to use if required by the selected authentication mechanism
+     * - sasl_mechanisms: a space separated list of acceptable SASL mechanisms
+     * - sasl_min_ssf: the minimum acceptable security strength factor
+     * - sasl_max_ssf: the maximum acceptable security strength factor
+     * - sasl_service: the service name if needed by the SASL mechanism in use
      *
      * Reconnect behaviour can be controlled through the following options:
      *
@@ -93,6 +98,33 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
     QPID_MESSAGING_EXTERN void open();
     QPID_MESSAGING_EXTERN bool isOpen();
     QPID_MESSAGING_EXTERN bool isOpen() const;
+
+    /**
+     * Attempts to reconnect to the specified url, re-establish
+     * existing sessions, senders and receivers and resend any indoubt
+     * messages.
+     *
+     * This can be used to directly control reconnect behaviour rather
+     * than using the reconnect option for automatically handling
+     * that.
+     */
+    QPID_MESSAGING_EXTERN void reconnect(const std::string& url);
+    /**
+     * Attempts to reconnect to the original url, including any
+     * specified reconnect_urls, re-establish existing sessions,
+     * senders and receivers and resend any indoubt messages.
+     *
+     * This can be used to directly control reconnect behaviour rather
+     * than using the reconnect option for automatically handling
+     * that.
+     */
+    QPID_MESSAGING_EXTERN void reconnect();
+    /**
+     * returns a url reprsenting the broker the client is currently
+     * connected to (or an e,pty string if it is not connected).
+     */
+    QPID_MESSAGING_EXTERN std::string getUrl() const;
+
     /**
      * Closes a connection and all sessions associated with it. An
      * opened connection must be closed before the last handle is

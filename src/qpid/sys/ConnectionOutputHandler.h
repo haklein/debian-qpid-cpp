@@ -21,7 +21,7 @@
 #ifndef _ConnectionOutputHandler_
 #define _ConnectionOutputHandler_
 
-#include "qpid/framing/OutputHandler.h"
+#include "qpid/framing/FrameHandler.h"
 #include "qpid/sys/OutputControl.h"
 
 namespace qpid {
@@ -30,11 +30,10 @@ namespace sys {
 /**
  * Provides the output handler associated with a connection.
  */
-class ConnectionOutputHandler : public virtual qpid::framing::OutputHandler, public OutputControl
+class ConnectionOutputHandler : public virtual qpid::framing::FrameHandler, public OutputControl
 {
   public:
     virtual void close() = 0;
-    virtual size_t getBuffered() const { return 0; }
 };
 
 }}

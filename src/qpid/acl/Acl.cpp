@@ -18,11 +18,13 @@
 
 #include "qpid/acl/Acl.h"
 #include "qpid/acl/AclConnectionCounter.h"
+#include "qpid/acl/AclResourceCounter.h"
 #include "qpid/acl/AclData.h"
 #include "qpid/acl/AclValidator.h"
 #include "qpid/sys/Mutex.h"
 
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/Connection.h"
 #include "qpid/Plugin.h"
 #include "qpid/Options.h"
 #include "qpid/log/Logger.h"
@@ -32,6 +34,7 @@
 #include "qmf/org/apache/qpid/acl/Package.h"
 #include "qmf/org/apache/qpid/acl/EventAllow.h"
 #include "qmf/org/apache/qpid/acl/EventConnectionDeny.h"
+#include "qmf/org/apache/qpid/acl/EventQueueQuotaDeny.h"
 #include "qmf/org/apache/qpid/acl/EventDeny.h"
 #include "qmf/org/apache/qpid/acl/EventFileLoaded.h"
 #include "qmf/org/apache/qpid/acl/EventFileLoadFailed.h"
@@ -50,24 +53,41 @@ using qpid::management::Manageable;
 using qpid::management::Args;
 namespace _qmf = qmf::org::apache::qpid::acl;
 
-Acl::Acl (AclValues& av, Broker& b): aclValues(av), broker(&b), transferAcl(false), mgmtObject(0),
-    connectionCounter(new ConnectionCounter(*this, aclValues.aclMaxConnectPerUser, aclValues.aclMaxConnectPerIp, aclValues.aclMaxConnectTotal))
+Acl::Acl (AclValues& av, Broker& b): aclValues(av), broker(&b), transferAcl(false),
+    connectionCounter(new ConnectionCounter(*this, aclValues.aclMaxConnectPerUser, aclValues.aclMaxConnectPerIp, aclValues.aclMaxConnectTotal)),
+    resourceCounter(new ResourceCounter(*this, aclValues.aclMaxQueuesPerUser)),userRules(false)
 {
+
+    if (aclValues.aclMaxConnectPerUser > AclData::getConnectMaxSpec())
+        throw Exception("--connection-limit-per-user switch cannot be larger than " + AclData::getMaxConnectSpecStr());
+    if (aclValues.aclMaxConnectPerIp > AclData::getConnectMaxSpec())
+        throw Exception("--connection-limit-per-ip switch cannot be larger than " + AclData::getMaxConnectSpecStr());
+    if (aclValues.aclMaxConnectTotal > AclData::getConnectMaxSpec())
+        throw Exception("--max-connections switch cannot be larger than " + AclData::getMaxConnectSpecStr());
+    if (aclValues.aclMaxQueuesPerUser > AclData::getConnectMaxSpec())
+        throw Exception("--max-queues-per-user switch cannot be larger than " + AclData::getMaxQueueSpecStr());
 
     agent = broker->getManagementAgent();
 
     if (agent != 0){
         _qmf::Package  packageInit(agent);
-        mgmtObject = new _qmf::Acl (agent, this, broker);
+        mgmtObject = _qmf::Acl::shared_ptr(new _qmf::Acl (agent, this, broker));
         agent->addObject (mgmtObject);
         mgmtObject->set_maxConnections(aclValues.aclMaxConnectTotal);
         mgmtObject->set_maxConnectionsPerIp(aclValues.aclMaxConnectPerIp);
         mgmtObject->set_maxConnectionsPerUser(aclValues.aclMaxConnectPerUser);
+        mgmtObject->set_maxQueuesPerUser(aclValues.aclMaxQueuesPerUser);
     }
-    std::string errorString;
-    if (!readAclFile(errorString)){
-        if (mgmtObject!=0) mgmtObject->set_enforcingAcl(0);
-        throw Exception("Could not read ACL file " + errorString);
+
+    if (!aclValues.aclFile.empty()) {
+        std::string errorString;
+        if (!readAclFile(errorString)){
+            if (mgmtObject!=0) mgmtObject->set_enforcingAcl(0);
+            throw Exception("Could not read ACL file " + errorString);
+        }
+    } else {
+        loadEmptyAclRuleset();
+        QPID_LOG(debug, "ACL loaded empty rule set");
     }
     broker->getConnectionObservers().add(connectionCounter);
     QPID_LOG(info, "ACL Plugin loaded");
@@ -81,6 +101,15 @@ void Acl::reportConnectLimit(const std::string user, const std::string addr)
         mgmtObject->inc_connectionDenyCount();
 
     agent->raiseEvent(_qmf::EventConnectionDeny(user, addr));
+}
+
+
+void Acl::reportQueueLimit(const std::string user, const std::string queueName)
+{
+    if (mgmtObject!=0)
+        mgmtObject->inc_queueQuotaDenyCount();
+
+    agent->raiseEvent(_qmf::EventQueueQuotaDeny(user, queueName));
 }
 
 
@@ -126,13 +155,40 @@ bool Acl::authorise(
 
 bool Acl::approveConnection(const qpid::broker::Connection& conn)
 {
-    return connectionCounter->approveConnection(conn);
+    const std::string& userName(conn.getUserId());
+    uint16_t connectionLimit(0);
+
+    boost::shared_ptr<AclData> dataLocal;
+    {
+        Mutex::ScopedLock locker(dataLock);
+        dataLocal = data;  //rcu copy
+    }
+
+    (void) dataLocal->getConnQuotaForUser(userName, &connectionLimit);
+
+    return connectionCounter->approveConnection(conn, dataLocal->enforcingConnectionQuotas(), connectionLimit);
+}
+
+bool Acl::approveCreateQueue(const std::string& userId, const std::string& queueName)
+{
+//    return resourceCounter->approveCreateQueue(userId, queueName);
+    uint16_t queueLimit(0);
+
+    boost::shared_ptr<AclData> dataLocal;
+    {
+        Mutex::ScopedLock locker(dataLock);
+        dataLocal = data;  //rcu copy
+    }
+
+    (void) dataLocal->getQueueQuotaForUser(userId, &queueLimit);
+
+    return resourceCounter->approveCreateQueue(userId, queueName, dataLocal->enforcingQueueQuotas(), queueLimit);
 }
 
 
-void Acl::setUserId(const qpid::broker::Connection& connection, const std::string& username)
+void Acl::recordDestroyQueue(const std::string& queueName)
 {
-    connectionCounter->setUserId(connection, username);
+    resourceCounter->recordDestroyQueue(queueName);
 }
 
 
@@ -190,7 +246,7 @@ bool Acl::readAclFile(std::string& errorText)
 
 bool Acl::readAclFile(std::string& aclFile, std::string& errorText) {
     boost::shared_ptr<AclData> d(new AclData);
-    AclReader ar;
+    AclReader ar(aclValues.aclMaxConnectPerUser, aclValues.aclMaxQueuesPerUser);
     if (ar.read(aclFile, d)){
         agent->raiseEvent(_qmf::EventFileLoadFailed("", ar.getError()));
         errorText = ar.getError();
@@ -206,9 +262,18 @@ bool Acl::readAclFile(std::string& aclFile, std::string& errorText) {
         data = d;
     }
     transferAcl = data->transferAcl; // any transfer ACL
+    userRules = true; // rules in force came from an ACL file
 
     if (data->transferAcl){
         QPID_LOG(debug,"ACL: Transfer ACL is Enabled!");
+    }
+
+    if (data->enforcingConnectionQuotas()){
+        QPID_LOG(debug, "ACL: Connection quotas are Enabled.");
+    }
+
+    if (data->enforcingQueueQuotas()){
+        QPID_LOG(debug, "ACL: Queue quotas are Enabled.");
     }
 
     data->aclSource = aclFile;
@@ -223,6 +288,29 @@ bool Acl::readAclFile(std::string& aclFile, std::string& errorText) {
     return true;
 }
 
+//
+// loadEmptyAclRuleset()
+//
+// No ACL file is specified but ACL should run.
+// Create a ruleset as if only "ACL ALLOW ALL ALL" was in a file
+//
+void Acl::loadEmptyAclRuleset() {
+    boost::shared_ptr<AclData> d(new AclData);
+    d->decisionMode = ALLOW;
+    d->aclSource = "";
+    {
+        Mutex::ScopedLock locker(dataLock);
+        data = d;
+    }
+    if (mgmtObject!=0){
+        mgmtObject->set_transferAcl(transferAcl?1:0);
+        mgmtObject->set_policyFile("");
+        sys::AbsTime now = sys::AbsTime::now();
+        int64_t ns = sys::Duration(sys::EPOCH, now);
+        mgmtObject->set_lastAclLoad(ns);
+        agent->raiseEvent(_qmf::EventFileLoaded(""));
+    }
+}
 
 //
 // management lookup function performs general query on acl engine
@@ -300,9 +388,9 @@ Acl::~Acl(){
     broker->getConnectionObservers().remove(connectionCounter);
 }
 
-ManagementObject* Acl::GetManagementObject(void) const
+ManagementObject::shared_ptr Acl::GetManagementObject(void) const
 {
-    return (ManagementObject*) mgmtObject;
+    return mgmtObject;
 }
 
 Manageable::status_t Acl::ManagementMethod (uint32_t methodId, Args& args, string& text)

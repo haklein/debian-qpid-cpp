@@ -147,9 +147,9 @@ TopicExchange::TopicExchange(const string& _name, Manageable* _parent, Broker* b
         mgmtExchange->set_type (typeName);
 }
 
-TopicExchange::TopicExchange(const std::string& _name, bool _durable,
+TopicExchange::TopicExchange(const std::string& _name, bool _durable, bool autodelete,
                              const FieldTable& _args, Manageable* _parent, Broker* b) :
-    Exchange(_name, _durable, _args, _parent, b),
+    Exchange(_name, _durable, autodelete, _args, _parent, b),
     nBindings(0)
 {
     if (mgmtExchange != 0)
@@ -179,7 +179,7 @@ bool TopicExchange::bind(Queue::shared_ptr queue, const string& routingKey, cons
                 }
             }
 
-            Binding::shared_ptr binding (new Binding (routingPattern, queue, this, FieldTable(), fedOrigin));
+            Binding::shared_ptr binding (new Binding (routingPattern, queue, this, args ? *args : FieldTable(), fedOrigin));
             binding->startManagement();
             bk->bindingVector.push_back(binding);
             nBindings++;
@@ -241,6 +241,7 @@ bool TopicExchange::unbind(Queue::shared_ptr queue, const string& constRoutingKe
     deleteBinding(queue, routingKey, bk);
     if (propagate)
         propagateFedOp(routingKey, string(), fedOpUnbind, string());
+    if (nBindings == 0) checkAutodelete();
     return true;
 }
 
@@ -333,8 +334,17 @@ bool TopicExchange::isBound(Queue::shared_ptr queue, const string* const routing
     return false;
 }
 
-TopicExchange::~TopicExchange() {}
+TopicExchange::~TopicExchange() {
+    if (mgmtExchange != 0)
+        mgmtExchange->debugStats("destroying");
+}
 
 const std::string TopicExchange::typeName("topic");
+
+bool TopicExchange::hasBindings()
+{
+    RWlock::ScopedRlock l(lock);
+    return nBindings > 0;
+}
 
 }} // namespace qpid::broker

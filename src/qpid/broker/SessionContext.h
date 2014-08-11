@@ -22,26 +22,30 @@
  *
  */
 
-#include "qpid/framing/FrameHandler.h"
-#include "qpid/framing/AMQP_ClientProxy.h"
-#include "qpid/framing/amqp_types.h"
-#include "qpid/sys/OutputControl.h"
-#include "qpid/broker/ConnectionState.h"
 #include "qpid/broker/OwnershipToken.h"
-#include "qpid/SessionId.h"
 
 #include <boost/noncopyable.hpp>
 
 namespace qpid {
+
+class SessionId;
+
+namespace framing {
+class AMQP_ClientProxy;
+}
 namespace broker {
 
-class SessionContext : public OwnershipToken, public sys::OutputControl
+class Broker;
+namespace amqp_0_10 {
+class Connection;
+}
+
+class SessionContext : public OwnershipToken
 {
   public:
     virtual ~SessionContext(){}
-    virtual bool isLocal(const ConnectionToken* t) const = 0;
     virtual bool isAttached() const = 0;
-    virtual ConnectionState& getConnection() = 0;
+    virtual amqp_0_10::Connection& getConnection() = 0;
     virtual framing::AMQP_ClientProxy& getProxy() = 0;
     virtual Broker& getBroker() = 0;
     virtual uint16_t getChannel() const = 0;

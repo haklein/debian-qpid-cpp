@@ -19,9 +19,11 @@
  */
 
 #include "qpid/broker/SessionHandler.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
 #include "qpid/broker/SessionState.h"
-#include "qpid/broker/Connection.h"
 #include "qpid/log/Statement.h"
+#include "qpid/sys/ConnectionOutputHandler.h"
 
 #include <boost/bind.hpp>
 
@@ -31,22 +33,46 @@ using namespace framing;
 using namespace std;
 using namespace qpid::sys;
 
-SessionHandler::SessionHandler(Connection& c, ChannelId ch)
-    : amqp_0_10::SessionHandler(&c.getOutput(), ch),
+namespace {
+class DefaultErrorListener : public SessionHandler::ErrorListener {
+  public:
+    void connectionException(framing::connection::CloseCode code, const std::string& msg) {
+        QPID_LOG(error, "Connection exception: " << framing::createConnectionException(code, msg).what());
+    }
+    void channelException(framing::session::DetachCode code, const std::string& msg) {
+        QPID_LOG(error, "Channel exception: " << framing::createChannelException(code, msg).what());
+    }
+    void executionException(framing::execution::ErrorCode code, const std::string& msg) {
+        QPID_LOG(error, "Execution exception: " << framing::createSessionException(code, msg).what());
+    }
+    void incomingExecutionException(framing::execution::ErrorCode code, const std::string& msg) {
+        QPID_LOG(debug, "Incoming execution exception: " << framing::createSessionException(code, msg).what());
+    }
+    void detach() {}
+
+  private:
+};
+}
+
+SessionHandler::SessionHandler(amqp_0_10::Connection& c, ChannelId ch)
+    : qpid::amqp_0_10::SessionHandler(&c.getOutput(), ch),
       connection(c),
       proxy(out),
-      clusterOrderProxy(c.getClusterOrderOutput() ?
-                        new SetChannelProxy(ch, c.getClusterOrderOutput()) : 0)
-{}
+      errorListener(boost::shared_ptr<ErrorListener>(new DefaultErrorListener()))
+{
+    c.getBroker().getSessionHandlerObservers().newSessionHandler(*this);
+}
 
-SessionHandler::~SessionHandler() {}
+SessionHandler::~SessionHandler()
+{
+    if (session.get())
+        connection.getBroker().getSessionManager().forget(session->getId());
+}
 
 void SessionHandler::connectionException(
     framing::connection::CloseCode code, const std::string& msg)
 {
     // NOTE: must tell the error listener _before_ calling connection.close()
-    if (connection.getErrorListener())
-        connection.getErrorListener()->connectionError(msg);
     if (errorListener)
         errorListener->connectionException(code, msg);
     connection.close(code, msg);
@@ -55,8 +81,6 @@ void SessionHandler::connectionException(
 void SessionHandler::channelException(
     framing::session::DetachCode code, const std::string& msg)
 {
-    if (connection.getErrorListener())
-        connection.getErrorListener()->sessionError(getChannel(), msg);
     if (errorListener)
         errorListener->channelException(code, msg);
 }
@@ -64,18 +88,23 @@ void SessionHandler::channelException(
 void SessionHandler::executionException(
     framing::execution::ErrorCode code, const std::string& msg)
 {
-    if (connection.getErrorListener())
-        connection.getErrorListener()->sessionError(getChannel(), msg);
     if (errorListener)
         errorListener->executionException(code, msg);
 }
 
-ConnectionState& SessionHandler::getConnection() { return connection; }
+void SessionHandler::incomingExecutionException(
+    framing::execution::ErrorCode code, const std::string& msg)
+{
+    if (errorListener)
+        errorListener->incomingExecutionException(code, msg);
+}
 
-const ConnectionState& SessionHandler::getConnection() const { return connection; }
+amqp_0_10::Connection& SessionHandler::getConnection() { return connection; }
+
+const amqp_0_10::Connection& SessionHandler::getConnection() const { return connection; }
 
 void SessionHandler::handleDetach() {
-    amqp_0_10::SessionHandler::handleDetach();
+    qpid::amqp_0_10::SessionHandler::handleDetach();
     assert(&connection.getChannel(channel.get()) == this);
     if (session.get())
         connection.getBroker().getSessionManager().detach(session);
@@ -87,7 +116,7 @@ void SessionHandler::handleDetach() {
 void SessionHandler::setState(const std::string& name, bool force) {
     assert(!session.get());
     SessionId id(connection.getUserId(), name);
-    session = connection.broker.getSessionManager().attach(*this, id, force);
+    session = connection.getBroker().getSessionManager().attach(*this, id, force);
 }
 
 void SessionHandler::detaching()
@@ -109,11 +138,8 @@ void SessionHandler::readyToSend() {
 void SessionHandler::attachAs(const std::string& name)
 {
     SessionId id(connection.getUserId(), name);
-    SessionState::Configuration config = connection.broker.getSessionManager().getSessionConfig();
-    // Delay creating management object till attached(). In a cluster,
-    // only the active link broker calls attachAs but all brokers
-    // receive the subsequent attached() call.
-    session.reset(new SessionState(connection.getBroker(), *this, id, config, true));
+    SessionState::Configuration config = connection.getBroker().getSessionManager().getSessionConfig();
+    session.reset(new SessionState(connection.getBroker(), *this, id, config));
     sendAttach(false);
 }
 
@@ -125,10 +151,10 @@ void SessionHandler::attached(const std::string& name)
 {
     if (session.get()) {
         session->addManagementObject(); // Delayed from attachAs()
-        amqp_0_10::SessionHandler::attached(name);
+        qpid::amqp_0_10::SessionHandler::attached(name);
     } else {
         SessionId id(connection.getUserId(), name);
-        SessionState::Configuration config = connection.broker.getSessionManager().getSessionConfig();
+        SessionState::Configuration config = connection.getBroker().getSessionManager().getSessionConfig();
         session.reset(new SessionState(connection.getBroker(), *this, id, config));
         markReadyToSend();
     }
