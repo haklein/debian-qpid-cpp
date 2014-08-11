@@ -76,6 +76,7 @@ std::string SocketAddress::asString(::sockaddr const * const addr, size_t addrle
     switch (addr->sa_family) {
         case AF_INET: s += dispName; break;
         case AF_INET6: s += "["; s += dispName; s+= "]"; break;
+        case AF_UNIX: s += "UNIX:"; break;
         default: throw Exception(QPID_MSG("Unexpected socket type"));
     }
     s += ":";
@@ -102,22 +103,16 @@ std::string SocketAddress::asString(bool numeric) const
     return asString(ai.ai_addr, ai.ai_addrlen);
 }
 
+std::string SocketAddress::getHost() const
+{
+    return host;
+}
+
 bool SocketAddress::nextAddress() {
     bool r = currentAddrInfo->ai_next != 0;
     if (r)
         currentAddrInfo = currentAddrInfo->ai_next;
     return r;
-}
-
-void SocketAddress::setAddrInfoPort(uint16_t port) {
-    if (!currentAddrInfo) return;
-
-    ::addrinfo& ai = *currentAddrInfo;
-    switch (ai.ai_family) {
-    case AF_INET: ((::sockaddr_in*)(void*)ai.ai_addr)->sin_port = htons(port); return;
-    case AF_INET6:((::sockaddr_in6*)(void*)ai.ai_addr)->sin6_port = htons(port); return;
-    default: throw Exception(QPID_MSG("Unexpected socket type"));
-    }
 }
 
 const ::addrinfo& getAddrInfo(const SocketAddress& sa)

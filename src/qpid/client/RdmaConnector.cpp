@@ -70,7 +70,7 @@ class RdmaConnector : public Connector, public sys::Codec
     sys::ShutdownHandler* shutdownHandler;
     framing::InputHandler* input;
     framing::InitiationHandler* initialiser;
-    framing::OutputHandler* output;
+    framing::FrameHandler* output;
 
     Rdma::AsynchIO* aio;
     Rdma::Connector* acon;
@@ -97,19 +97,17 @@ class RdmaConnector : public Connector, public sys::Codec
 
     void connect(const std::string& host, const std::string& port);
     void close();
-    void send(framing::AMQFrame& frame);
+    void handle(framing::AMQFrame& frame);
     void abort() {} // TODO: need to fix this for heartbeat timeouts to work
 
     void setInputHandler(framing::InputHandler* handler);
     void setShutdownHandler(sys::ShutdownHandler* handler);
-    sys::ShutdownHandler* getShutdownHandler() const;
-    framing::OutputHandler* getOutputHandler();
     const std::string& getIdentifier() const;
     void activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer>);
     const qpid::sys::SecuritySettings* getSecuritySettings() { return 0; }
 
     size_t decode(const char* buffer, size_t size);
-    size_t encode(const char* buffer, size_t size);
+    size_t encode(char* buffer, size_t size);
     bool canEncode();
 
 public:
@@ -310,19 +308,11 @@ void RdmaConnector::setShutdownHandler(ShutdownHandler* handler){
     shutdownHandler = handler;
 }
 
-OutputHandler* RdmaConnector::getOutputHandler(){ 
-    return this; 
-}
-
-sys::ShutdownHandler* RdmaConnector::getShutdownHandler() const {
-    return shutdownHandler;
-}
-
 const std::string& RdmaConnector::getIdentifier() const { 
     return identifier;
 }
 
-void RdmaConnector::send(AMQFrame& frame) {
+void RdmaConnector::handle(AMQFrame& frame) {
     // It is possible that we are called to write after we are already shutting down
     Mutex::ScopedLock l(dataConnectedLock);
     if (!dataConnected) return;
@@ -371,9 +361,9 @@ bool RdmaConnector::canEncode()
     return aio->writable() && (lastEof || currentSize >= maxFrameSize);
 }
 
-size_t RdmaConnector::encode(const char* buffer, size_t size)
+size_t RdmaConnector::encode(char* buffer, size_t size)
 {
-    framing::Buffer out(const_cast<char*>(buffer), size);
+    framing::Buffer out(buffer, size);
     size_t bytesWritten(0);
     {
         Mutex::ScopedLock l(lock);

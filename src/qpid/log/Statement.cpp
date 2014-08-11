@@ -21,6 +21,7 @@
 #include <boost/bind.hpp>
 #include <stdexcept>
 #include <algorithm>
+#include <list>
 #include <ctype.h>
 
 namespace qpid {
@@ -53,8 +54,64 @@ std::string quote(const std::string& str) {
 //
 // Instance of name hints
 //
-static CategoryFileNameHints filenameHints;
+class CategoryFileNameHints {
+public:
+    CategoryFileNameHints(){
+        hintList.push_back(std::make_pair("AsynchIo",    network));
+        hintList.push_back(std::make_pair("TCP",         network));
+        hintList.push_back(std::make_pair("epoll",       network));
+        hintList.push_back(std::make_pair("Pollable",    network));
+        hintList.push_back(std::make_pair("Socket",      network));
 
+        hintList.push_back(std::make_pair("Sasl",        security));
+        hintList.push_back(std::make_pair("Ssl",         security));
+        hintList.push_back(std::make_pair("Acl",         security));
+        hintList.push_back(std::make_pair("acl",         security));
+        hintList.push_back(std::make_pair("cyrus",       security));
+
+        hintList.push_back(std::make_pair("amqp_",       protocol));
+        hintList.push_back(std::make_pair("framing",     protocol));
+
+        hintList.push_back(std::make_pair("management",  management));
+        hintList.push_back(std::make_pair("qmf",         management));
+        hintList.push_back(std::make_pair("console",     management));
+        hintList.push_back(std::make_pair("Management",  management));
+
+        hintList.push_back(std::make_pair("cluster",     ha));
+        hintList.push_back(std::make_pair("qpid/ha",     ha));
+        hintList.push_back(std::make_pair("qpid\\ha",    ha));
+        hintList.push_back(std::make_pair("replication", ha));
+        hintList.push_back(std::make_pair("ClusterSafe", ha));
+
+        hintList.push_back(std::make_pair("broker",      broker));
+        hintList.push_back(std::make_pair("SessionState",broker));
+        hintList.push_back(std::make_pair("DataDir",     broker));
+        hintList.push_back(std::make_pair("qpidd",       broker));
+        hintList.push_back(std::make_pair("xml",         broker));
+        hintList.push_back(std::make_pair("QpidBroker",  broker));
+
+        hintList.push_back(std::make_pair("store",       store));
+
+        hintList.push_back(std::make_pair("assert",      system));
+        hintList.push_back(std::make_pair("Exception",   system));
+        hintList.push_back(std::make_pair("sys",         system));
+        hintList.push_back(std::make_pair("SCM",         system));
+
+        hintList.push_back(std::make_pair("tests",       test));
+
+        hintList.push_back(std::make_pair("messaging",   messaging));
+        hintList.push_back(std::make_pair("types",       messaging));
+
+        hintList.push_back(std::make_pair("client",      client));
+    }
+
+    static Category categoryOf(const char*const fName);
+
+private:
+    std::list<std::pair<const char* const, Category> > hintList;
+};
+
+static CategoryFileNameHints filenameHints;
 
 Category CategoryFileNameHints::categoryOf(const char* const fName) {
     for (std::list<std::pair<const char* const, Category> >::iterator
@@ -87,52 +144,31 @@ void Statement::log(const std::string& message) {
 
 
 Statement::Initializer::Initializer(Statement& s) : statement(s) {
-    // QPID-3891
+    // QPID-3891:
     // From the given BOOST_CURRENT_FUNCTION name extract only the
     // namespace-qualified-functionName, skipping return and calling args.
     // Given:
     //   <possible return value type> qpid::name::space::Function(args)
     // Return:
     //   "qpid::name::space::Function".
-    if (s.function != NULL) {
-        bool         foundOParen(false);
-        const char * opPtr;
-        for (opPtr = s.function; *opPtr != '\0'; opPtr++) {
-            if (*opPtr == '(') {
-                foundOParen = true;
-                break;
-            }
-        }
-
-        if (foundOParen) {
-            const char * bPtr = opPtr;
-            for (bPtr = opPtr; bPtr > s.function; bPtr--) {
-                if (bPtr[-1] == ' ') {
-                    break;
-                }
-            }
-
-            size_t nStoreSize = opPtr - bPtr;
-            if (nStoreSize > 0) {
-                // Note: the struct into which this name is stored
-                // is static and is never deleted.
-                char * nStore = new char[nStoreSize + 1];
-                std::copy (bPtr, opPtr, nStore);
-                nStore[nStoreSize] = '\0';
-
-                s.function = nStore;
-            } else {
-                // Ignore zero length name
-            }
-        } else {
-            // No name found - do nothing
-        }
-    } else {
-        // no function-name pointer to process
+    if (s.function) {
+        const char* end = s.function + strlen(s.function);
+        const char* fEnd = std::find(s.function, end, '(');
+        typedef std::reverse_iterator<const char*> Reverse;
+        const char* fBegin = find(Reverse(fEnd), Reverse(s.function), ' ').base();
+        size_t n = fEnd - fBegin;
+        char* name = new char[n+1];
+        std::copy(fBegin, fEnd, name);
+        name[n] = '\0';
+        s.function = name;
     }
-
     Statement::categorize(s);
     Logger::instance().add(s);
+}
+
+Statement::Initializer::~Initializer() {
+    delete[] const_cast<char*>(statement.function);
+    statement.function = 0;
 }
 
 
@@ -143,7 +179,7 @@ const char* names[LevelTraits::COUNT] = {
 
 const char* catNames[CategoryTraits::COUNT] = {
     "Security", "Broker", "Management", "Protocol", "System", "HA", "Messaging",
-    "Store", "Network", "Test", "Client", "Unspecified"
+    "Store", "Network", "Test", "Client", "Application", "Model", "Unspecified"
 };
 
 } // namespace
@@ -178,4 +214,5 @@ Category CategoryTraits::category(const char* name) {
 const char* CategoryTraits::name(Category c) {
     return catNames[c];
 }
+
 }} // namespace qpid::log

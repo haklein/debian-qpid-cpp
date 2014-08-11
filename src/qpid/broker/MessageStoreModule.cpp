@@ -33,7 +33,7 @@ using std::string;
 namespace qpid {
 namespace broker {
 
-MessageStoreModule::MessageStoreModule(boost::shared_ptr<MessageStore>& _store)
+MessageStoreModule::MessageStoreModule(const boost::shared_ptr<MessageStore>& _store)
   : store(_store) {}
 
 MessageStoreModule::~MessageStoreModule()
@@ -41,11 +41,6 @@ MessageStoreModule::~MessageStoreModule()
 }
 
 bool MessageStoreModule::init(const Options*) { return true; }
-
-void MessageStoreModule::truncateInit(const bool pushDownStoreFiles)
-{
-    TRANSFER_EXCEPTION(store->truncateInit(pushDownStoreFiles));
-}
 
 void MessageStoreModule::create(PersistableQueue& queue, const FieldTable& args)
 {

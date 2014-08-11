@@ -26,13 +26,7 @@
 namespace qpid {
 namespace sys {
 
-AggregateOutput::AggregateOutput(OutputControl& c) : busy(false), control(c) {}
-
-void AggregateOutput::abort() { control.abort(); }
-
-void AggregateOutput::activateOutput() { control.activateOutput(); }
-
-void AggregateOutput::giveReadCredit(int32_t credit) { control.giveReadCredit(credit); }
+AggregateOutput::AggregateOutput() : busy(false) {}
 
 namespace {
 // Clear the busy flag and notify waiting threads in destructor.
@@ -51,6 +45,7 @@ bool AggregateOutput::doOutput() {
     while (!tasks.empty()) {
         OutputTask* t=tasks.front();
         tasks.pop_front();
+        taskSet.erase(t);
         bool didOutput;
         {
             // Allow concurrent call to addOutputTask.
@@ -59,7 +54,9 @@ bool AggregateOutput::doOutput() {
             didOutput = t->doOutput();
         }
         if (didOutput) {
-            tasks.push_back(t);
+            if (taskSet.insert(t).second) {
+                tasks.push_back(t);
+            }
             return true;
         }
     }
@@ -68,12 +65,15 @@ bool AggregateOutput::doOutput() {
   
 void AggregateOutput::addOutputTask(OutputTask* task) {
     Mutex::ScopedLock l(lock);
-    tasks.push_back(task);
+    if (taskSet.insert(task).second) {
+        tasks.push_back(task);
+    }
 }
 
 void AggregateOutput::removeOutputTask(OutputTask* task) {
     Mutex::ScopedLock l(lock);
     while (busy) lock.wait();
+    taskSet.erase(task);
     tasks.erase(std::remove(tasks.begin(), tasks.end(), task), tasks.end());
 }
   
@@ -81,6 +81,7 @@ void AggregateOutput::removeAll()
 {
     Mutex::ScopedLock l(lock);
     while (busy) lock.wait();
+    taskSet.clear();
     tasks.clear();
 }
   

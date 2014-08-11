@@ -37,6 +37,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/format.hpp>
 
 #include <vector>
 
@@ -248,7 +249,7 @@ QPID_AUTO_TEST_CASE(testOpenFailure) {
 
 QPID_AUTO_TEST_CASE(testPeriodicExpiration) {
     Broker::Options opts;
-    opts.queueCleanInterval = 1;
+    opts.queueCleanInterval = 1*TIME_SEC;
     opts.queueFlowStopRatio = 0;
     opts.queueFlowResumeRatio = 0;
     ClientSessionFixture fix(opts);
@@ -621,7 +622,7 @@ QPID_AUTO_TEST_CASE(testQueueDeleted)
     fix.session.queueDeclare(arg::queue="my-queue");
     LocalQueue queue;
     fix.subs.subscribe(queue, "my-queue");
-    
+
     ScopedSuppressLogging sl;
     fix.session.queueDelete(arg::queue="my-queue");
     BOOST_CHECK_THROW(queue.get(1*qpid::sys::TIME_SEC), qpid::framing::ResourceDeletedException);

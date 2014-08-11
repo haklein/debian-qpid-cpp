@@ -26,6 +26,7 @@
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/sys/Poller.h"
 #include "qpid/CommonImportExport.h"
+#include "qpid/sys/Mutex.h"
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <windows.h>
@@ -38,7 +39,7 @@
 namespace qpid {
 namespace sys {
 namespace windows {
-    
+
 /*
  * SSL/Schannel shim between the frame-handling and AsynchIO layers.
  * SslAsynchIO creates a regular AsynchIO object to handle I/O and this class
@@ -70,30 +71,28 @@ public:
     virtual void queueForDeletion();
 
     virtual void start(qpid::sys::Poller::shared_ptr poller);
+    virtual void createBuffers(uint32_t size);
     virtual void queueReadBuffer(BufferBase* buff);
     virtual void unread(BufferBase* buff);
     virtual void queueWrite(BufferBase* buff);
     virtual void notifyPendingWrite();
     virtual void queueWriteClose();
     virtual bool writeQueueEmpty();
-    virtual void startReading();
-    virtual void stopReading();
     virtual void requestCallback(RequestCallback);
     virtual BufferBase* getQueuedBuffer();
-
-    QPID_COMMON_EXTERN unsigned int getSslKeySize();
+    virtual SecuritySettings getSecuritySettings(void);
 
 protected:
     CredHandle credHandle;
 
     // AsynchIO layer below that's actually doing the I/O
     qpid::sys::AsynchIO *aio;
+    Mutex lock;
 
     // Track what the state of the SSL session is. Have to know when it's
     // time to notify the upper layer that the session is up, and also to
     // know when it's not legit to pass data through to either side.
     enum { Negotiating, Running, Redo, ShuttingDown } state;
-    bool sessionUp;
     CtxtHandle ctxtHandle;
     TimeStamp credExpiry;
 
@@ -111,13 +110,17 @@ private:
     // These are callbacks from AsynchIO to here.
     void sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff);
     void idle(qpid::sys::AsynchIO&);
+    void reapCheck();
 
     // These callbacks are to the layer above.
     ReadCallback readCallback;
     IdleCallback idleCallback;
     NegotiateDoneCallback negotiateDoneCallback;
-    volatile unsigned int callbacksInProgress;   // >0 if w/in callbacks
+
     volatile bool queuedDelete;
+    volatile bool queuedClose;
+    volatile bool reapCheckPending;
+    bool started;
 
     // Address of peer, in case it's needed for logging.
     std::string peerAddress;
@@ -149,6 +152,7 @@ public:
 
 private:
     std::string serverHost;
+    bool clientCertRequested;
 
     // Client- and server-side SSL subclasses implement these to do the
     // proper negotiation steps. negotiateStep() is called with a buffer

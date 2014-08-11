@@ -22,13 +22,15 @@
  *
  */
 
+#include <boost/intrusive_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include "qpid/framing/amqp_types.h"
 #include "qpid/framing/Buffer.h"
 
 namespace qpid {
 namespace broker {
-
+class ExpiryPolicy;
+class Message;
 /**
  * The interface through which messages are reloaded on recovery.
  */
@@ -38,6 +40,7 @@ public:
     typedef boost::shared_ptr<RecoverableMessage> shared_ptr;
     virtual void setPersistenceId(uint64_t id) = 0;
     virtual void setRedelivered() = 0;
+    virtual void computeExpiration(const boost::intrusive_ptr<ExpiryPolicy>& e) = 0;
     /**
      * Used by store to determine whether to load content on recovery
      * or let message load its own content as and when it requires it.
@@ -50,6 +53,7 @@ public:
      * of length as necessary)
      */
     virtual void decodeContent(framing::Buffer& buffer) = 0;
+    virtual Message getMessage() = 0;
     virtual ~RecoverableMessage() {};
 };
 

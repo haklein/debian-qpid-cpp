@@ -24,6 +24,7 @@
 
 #include <memory>
 #include <string>
+#include "qpid/CommonImportExport.h"
 #include "qpid/sys/IntegerTypes.h"
 
 namespace qpid {
@@ -34,7 +35,7 @@ struct SecuritySettings;
 }
 
 /**
- * Interface to SASL support. This class is implemented by platform-specific
+ * Interface to support for the SASL client role. This class is implemented by platform-specific
  * SASL providers.
  */
 class Sasl
@@ -53,7 +54,7 @@ class Sasl
     virtual std::string getMechanism() = 0;
     virtual std::string getUserId() = 0;
     virtual std::auto_ptr<qpid::sys::SecurityLayer> getSecurityLayer(uint16_t maxFrameSize) = 0;    
-    virtual ~Sasl() {}
+    QPID_COMMON_EXTERN virtual ~Sasl() {}
 };
 } // namespace qpid
 

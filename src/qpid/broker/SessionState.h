@@ -23,23 +23,25 @@
  */
 
 #include "qpid/SessionState.h"
+#include "qpid/framing/enum.h"
 #include "qpid/framing/FrameHandler.h"
 #include "qpid/framing/SequenceSet.h"
 #include "qpid/sys/Time.h"
 #include "qpid/management/Manageable.h"
 #include "qmf/org/apache/qpid/broker/Session.h"
 #include "qpid/broker/SessionAdapter.h"
-#include "qpid/broker/DeliveryAdapter.h"
 #include "qpid/broker/AsyncCompletion.h"
 #include "qpid/broker/MessageBuilder.h"
 #include "qpid/broker/SessionContext.h"
 #include "qpid/broker/SemanticState.h"
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
 #include "qpid/sys/Monitor.h"
 
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
 
+#include <queue>
 #include <set>
 #include <vector>
 #include <ostream>
@@ -58,7 +60,6 @@ namespace broker {
 
 class Broker;
 class ConnectionState;
-class Message;
 class SessionHandler;
 class SessionManager;
 
@@ -68,19 +69,20 @@ class SessionManager;
  */
 class SessionState : public qpid::SessionState,
                      public SessionContext,
-                     public DeliveryAdapter,
                      public management::Manageable,
                      public framing::FrameHandler::InOutHandler
 {
   public:
     SessionState(Broker&, SessionHandler&, const SessionId&,
-                 const SessionState::Configuration&, bool delayManagement=false);
+                 const SessionState::Configuration&);
     ~SessionState();
     bool isAttached() const { return handler; }
 
     void detach();
     void attach(SessionHandler& handler);
     void disableOutput();
+
+    SessionHandler* getHandler() { return handler; }
 
     /** @pre isAttached() */
     framing::AMQP_ClientProxy& getProxy();
@@ -89,36 +91,28 @@ class SessionState : public qpid::SessionState,
     uint16_t getChannel() const;
 
     /** @pre isAttached() */
-    ConnectionState& getConnection();
-    bool isLocal(const ConnectionToken* t) const;
+    amqp_0_10::Connection& getConnection();
+    bool isLocal(const OwnershipToken* t) const;
 
     Broker& getBroker();
 
     void setTimeout(uint32_t seconds);
 
-    /** OutputControl **/
-    void abort();
-    void activateOutput();
-    void giveReadCredit(int32_t);
-
     void senderCompleted(const framing::SequenceSet& ranges);
 
     void sendCompletion();
 
-    //delivery adapter methods:
-    void deliver(DeliveryRecord&, bool sync);
+    DeliveryId deliver(const qpid::broker::amqp_0_10::MessageTransfer& message,
+                       const std::string& destination, bool isRedelivered, uint64_t ttl,
+                       qpid::framing::message::AcceptMode, qpid::framing::message::AcquireMode,
+                       const qpid::types::Variant::Map& annotations, bool sync);
 
     // Manageable entry points
-    management::ManagementObject* GetManagementObject (void) const;
+    management::ManagementObject::shared_ptr GetManagementObject(void) const;
     management::Manageable::status_t
     ManagementMethod (uint32_t methodId, management::Args& args, std::string&);
 
     void readyToSend();
-
-    // Used by cluster to create replica sessions.
-    SemanticState& getSemanticState() { return semanticState; }
-    boost::intrusive_ptr<Message> getMessageInProgress() { return msgBuilder.getMessage(); }
-    SessionAdapter& getSessionAdapter() { return adapter; }
 
     const SessionId& getSessionId() const { return getId(); }
 
@@ -135,13 +129,17 @@ class SessionState : public qpid::SessionState,
     // belonging to inter-broker bridges
     void addManagementObject();
 
-  private:
-    void handleCommand(framing::AMQMethodBody* method, const framing::SequenceNumber& id);
-    void handleContent(framing::AMQFrame& frame, const framing::SequenceNumber& id);
+    // transaction-related methods just to update statistics
+    void startTx();
+    void commitTx();
+    void rollbackTx();
 
-    // indicate that the given ingress msg has been completely received by the
-    // broker, and the msg's message.transfer command can be considered completed.
-    void completeRcvMsg(SequenceNumber id, bool requiresAccept, bool requiresSync);
+    /** Send result and completion for a given command to the client. */
+    void completeCommand(SequenceNumber id, bool requiresAccept, bool requiresSync,
+                         const std::string& result);
+  private:
+    void handleCommand(framing::AMQMethodBody* method);
+    void handleContent(framing::AMQFrame& frame);
 
     void handleIn(framing::AMQFrame& frame);
     void handleOut(framing::AMQFrame& frame);
@@ -152,27 +150,48 @@ class SessionState : public qpid::SessionState,
 
     void sendAcceptAndCompletion();
 
-    /**
-     * If commands are sent based on the local time (e.g. in timers), they don't have
-     * a well-defined ordering across cluster nodes.
-     * This proxy is for sending such commands. In a clustered broker it will take steps
-     * to synchronize command order across the cluster. In a stand-alone broker
-     * it is just a synonym for getProxy()
-     */
-    framing::AMQP_ClientProxy& getClusterOrderProxy();
-
     Broker& broker;
     SessionHandler* handler;
     sys::AbsTime expiry;        // Used by SessionManager.
     SemanticState semanticState;
     SessionAdapter adapter;
     MessageBuilder msgBuilder;
-    qmf::org::apache::qpid::broker::Session* mgmtObject;
+    qmf::org::apache::qpid::broker::Session::shared_ptr mgmtObject;
     qpid::framing::SequenceSet accepted;
 
     // sequence numbers for pending received Execution.Sync commands
     std::queue<SequenceNumber> pendingExecutionSyncs;
-    bool currentCommandComplete;
+
+  public:
+
+    /** Information about the currently executing command.
+     * Can only be used in the IO thread during command execution.
+     */
+    class CurrentCommand {
+      public:
+        CurrentCommand(
+            SequenceNumber id_=0, bool syncRequired_=false, bool completeSync_=true ) :
+            id(id_), syncRequired(syncRequired_), completeSync(completeSync_)
+        {}
+
+        SequenceNumber getId() const { return id; }
+
+        /**@return true if the sync flag was set for the command. */
+        bool isSyncRequired() const { return syncRequired; }
+
+        /**@return true if the command should be completed synchronously
+         * in the handling thread.
+         */
+        bool isCompleteSync() const { return completeSync; }
+        void setCompleteSync(bool b) { completeSync = b; }
+
+      private:
+        SequenceNumber id;   ///< Command identifier.
+        bool syncRequired;   ///< True if sync flag set for the command.
+        bool completeSync;   ///< Will be completed by handCommand.
+    };
+
+    CurrentCommand& getCurrentCommand() { return currentCommand; }
 
     /** This class provides a context for completing asynchronous commands in a thread
      * safe manner.  Asynchronous commands save their completion state in this class.
@@ -187,43 +206,48 @@ class SessionState : public qpid::SessionState,
         bool isAttached;
         qpid::sys::Mutex completerLock;
 
-        // special-case message.transfer commands for optimization
-        struct MessageInfo {
+        struct CommandInfo {
             SequenceNumber cmd; // message.transfer command id
             bool requiresAccept;
             bool requiresSync;
-        MessageInfo(SequenceNumber c, bool a, bool s)
-        : cmd(c), requiresAccept(a), requiresSync(s) {}
+
+            CommandInfo(
+                SequenceNumber c, bool a, bool s)
+                : cmd(c), requiresAccept(a), requiresSync(s) {}
         };
-        std::vector<MessageInfo> completedMsgs;
+
+        std::vector<CommandInfo> completedCmds;
         // If an ingress message does not require a Sync, we need to
         // hold a reference to it in case an Execution.Sync command is received and we
         // have to manually flush the message.
-        std::map<SequenceNumber, boost::intrusive_ptr<Message> > pendingMsgs;
+        std::map<SequenceNumber, boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> > pendingMsgs;
 
         /** complete all pending commands, runs in IO thread */
         void completeCommands();
-
-        /** for scheduling a run of "completeCommands()" on the IO thread */
-        static void schedule(boost::intrusive_ptr<AsyncCommandCompleter>);
 
     public:
         AsyncCommandCompleter(SessionState *s) : session(s), isAttached(s->isAttached()) {};
         ~AsyncCommandCompleter() {};
 
         /** track a message pending ingress completion */
-        void addPendingMessage(boost::intrusive_ptr<Message> m);
+        void addPendingMessage(boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> m);
         void deletePendingMessage(SequenceNumber id);
         void flushPendingMessages();
-        /** schedule the processing of a completed ingress message.transfer command */
-        void scheduleMsgCompletion(SequenceNumber cmd,
-                                   bool requiresAccept,
-                                   bool requiresSync);
+        /** schedule the processing of command completion. */
+        void scheduleCommandCompletion(SequenceNumber cmd,
+                                       bool requiresAccept,
+                                       bool requiresSync);
+        void schedule(boost::function<void()>);
         void cancel();  // called by SessionState destructor.
         void attached();  // called by SessionState on attach()
         void detached();  // called by SessionState on detach()
+
+        SessionState* getSession() const { return session; }
     };
-    boost::intrusive_ptr<AsyncCommandCompleter> asyncCommandCompleter;
+
+    boost::intrusive_ptr<AsyncCommandCompleter> getAsyncCommandCompleter() {
+        return asyncCommandCompleter;
+    }
 
     /** Abstract class that represents a single asynchronous command that is
      * pending completion.
@@ -231,14 +255,24 @@ class SessionState : public qpid::SessionState,
     class AsyncCommandContext : public AsyncCompletion::Callback
     {
      public:
-        AsyncCommandContext( SessionState *ss, SequenceNumber _id )
-          : id(_id), completerContext(ss->asyncCommandCompleter) {}
+        AsyncCommandContext(SessionState& ss )
+            : id(ss.getCurrentCommand().getId()),
+              requiresSync(ss.getCurrentCommand().isSyncRequired()),
+              completerContext(ss.getAsyncCommandCompleter())
+        {}
+
         virtual ~AsyncCommandContext() {}
 
      protected:
         SequenceNumber id;
+        bool requiresSync;
         boost::intrusive_ptr<AsyncCommandCompleter> completerContext;
     };
+
+
+  private:
+    boost::intrusive_ptr<AsyncCommandCompleter> asyncCommandCompleter;
+    CurrentCommand currentCommand;
 
     /** incomplete Message.transfer commands - inbound to broker from client
      */
@@ -246,35 +280,31 @@ class SessionState : public qpid::SessionState,
     {
      public:
         IncompleteIngressMsgXfer( SessionState *ss,
-                                  boost::intrusive_ptr<Message> m )
-          : AsyncCommandContext(ss, m->getCommandId()),
-          session(ss),
-          msg(m),
-          requiresAccept(m->requiresAccept()),
-          requiresSync(m->getFrames().getMethod()->isSync()),
-          pending(false) {}
-        IncompleteIngressMsgXfer( const IncompleteIngressMsgXfer& x )
-          : AsyncCommandContext(x.session, x.msg->getCommandId()),
-          session(x.session),
-          msg(x.msg),
-          requiresAccept(x.requiresAccept),
-          requiresSync(x.requiresSync),
-          pending(x.pending) {}
+                                  boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> m)
+          : AsyncCommandContext(*ss),
+            session(ss),
+            msg(m),
+            requiresAccept(m->requiresAccept()),
+            requiresSync(m->getFrames().getMethod()->isSync()),
+            pending(false)
+        {
+            assert(id == m->getCommandId());
+        }
 
-  virtual ~IncompleteIngressMsgXfer() {};
+        virtual ~IncompleteIngressMsgXfer() {}
 
         virtual void completed(bool);
         virtual boost::intrusive_ptr<AsyncCompletion::Callback> clone();
 
      private:
         SessionState *session;  // only valid if sync flag in callback is true
-        boost::intrusive_ptr<Message> msg;
+        boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> msg;
         bool requiresAccept;
         bool requiresSync;
         bool pending;   // true if msg saved on pending list...
     };
 
-    friend class SessionManager;
+  friend class SessionManager;
 };
 
 

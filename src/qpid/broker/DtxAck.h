@@ -39,8 +39,10 @@ class DtxAck : public TxOp{
     virtual bool prepare(TransactionContext* ctxt) throw();
     virtual void commit() throw();
     virtual void rollback() throw();
+    // TODO aconway 2013-07-08:
+    virtual void callObserver(const boost::shared_ptr<TransactionObserver>&) {}
+
     virtual ~DtxAck(){}
-    virtual void accept(TxOpConstVisitor& visitor) const { visitor(*this); }
     const DeliveryRecords& getPending() const { return pending; }
 };
 

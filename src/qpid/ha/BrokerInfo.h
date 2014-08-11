@@ -23,10 +23,12 @@
  */
 
 #include "types.h"
+#include "hash.h"
 #include "qpid/Url.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/types/Uuid.h"
 #include "qpid/types/Variant.h"
+#include "qpid/sys/unordered_map.h"
 #include <string>
 #include <iosfwd>
 #include <vector>
@@ -41,20 +43,18 @@ class BrokerInfo
 {
   public:
     typedef std::set<BrokerInfo> Set;
-    typedef std::map<types::Uuid, BrokerInfo> Map;
+    typedef qpid::sys::unordered_map<types::Uuid, BrokerInfo, Hasher<types::Uuid> > Map;
 
-    BrokerInfo() {}
-    BrokerInfo(const std::string& host, uint16_t port_, const types::Uuid& id);
+    BrokerInfo();
+    BrokerInfo(const types::Uuid& id, BrokerStatus, const Address& = Address());
     BrokerInfo(const framing::FieldTable& ft) { assign(ft); }
     BrokerInfo(const types::Variant::Map& m) { assign(m); }
 
     types::Uuid getSystemId() const { return systemId; }
-    std::string getHostName() const { return hostName; }
     BrokerStatus getStatus() const { return status; }
-    uint16_t getPort() const { return port; }
-    std::string getLogId() const { return logId; }
-
     void setStatus(BrokerStatus s)  { status = s; }
+    Address getAddress() const { return address; }
+    void setAddress(const Address& a) { address = a; }
 
     framing::FieldTable asFieldTable() const;
     types::Variant::Map asMap() const;
@@ -65,11 +65,11 @@ class BrokerInfo
     // So it can be put in a set.
     bool operator<(const BrokerInfo x) const { return systemId < x.systemId; }
 
+    // Print just the identifying information, not the status.
+    std::ostream& printId(std::ostream& o) const;
+
   private:
-    void updateLogId();
-    std::string logId;
-    std::string hostName;
-    uint16_t port;
+    Address address;
     types::Uuid systemId;
     BrokerStatus status;
 };

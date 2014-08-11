@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -19,8 +19,6 @@
 # under the License.
 #
 
-source ./test_env.sh
-
 # This minimum value corresponds to sasl version 2.1.22
 minimum_sasl_version=131350
 
@@ -40,18 +38,21 @@ if [ ! -f $QPID_CONFIG_EXEC ] || [ ! -f $QPID_ROUTE_EXEC ] ; then
 fi
 
 
-sasl_config_file=$builddir/sasl_config
+sasl_config_file=$QPID_TEST_EXEC_DIR/sasl_config
 
 my_random_number=$RANDOM
 tmp_root=/tmp/sasl_fed_$my_random_number
 mkdir -p $tmp_root
+
+# create ACL file to allow links
+echo acl allow all all > $tmp_root/sasl_fed.acl
 
 
 #--------------------------------------------------
 #echo " Starting broker 1"
 #--------------------------------------------------
 $QPIDD_EXEC                                  \
-  -p 0                                       \
+  -p 0  --interface 127.0.0.1                \
   --data-dir $tmp_root/data_1                \
   --auth=yes                                 \
   --mgmt-enable=yes                          \
@@ -59,6 +60,7 @@ $QPIDD_EXEC                                  \
   --log-source yes                           \
   --log-to-file $tmp_root/qpidd_1.log        \
   --sasl-config=$sasl_config_file            \
+  --acl-file $tmp_root/sasl_fed.acl          \
   -d > $tmp_root/broker_1_port
 
 broker_1_port=`cat $tmp_root/broker_1_port`
@@ -68,7 +70,7 @@ broker_1_port=`cat $tmp_root/broker_1_port`
 #echo " Starting broker 2"
 #--------------------------------------------------
 $QPIDD_EXEC                                  \
-  -p 0                                       \
+  -p 0 --interface 127.0.0.1                 \
   --data-dir $tmp_root/data_2                \
   --auth=yes                                 \
   --mgmt-enable=yes                          \
@@ -76,6 +78,7 @@ $QPIDD_EXEC                                  \
   --log-source yes                           \
   --log-to-file $tmp_root/qpidd_2.log        \
   --sasl-config=$sasl_config_file            \
+  --acl-file $tmp_root/sasl_fed.acl          \
   -d > $tmp_root/broker_2_port
 
 broker_2_port=`cat $tmp_root/broker_2_port`
@@ -123,7 +126,7 @@ n_messages=100
 #--------------------------------------------------
 #echo "  Sending 100 messages to $broker_1_port "
 #--------------------------------------------------
-$builddir/datagen --count $n_messages | $SENDER_EXEC --mechanism DIGEST-MD5 --username zag --password zag --exchange $EXCHANGE_NAME --routing-key $ROUTING_KEY --port $broker_1_port
+$QPID_TEST_EXEC_DIR/datagen --count $n_messages | $SENDER_EXEC --mechanism DIGEST-MD5 --username zag --password zag --exchange $EXCHANGE_NAME --routing-key $ROUTING_KEY --port $broker_1_port
 
 sleep 5
 

@@ -35,10 +35,11 @@
 
 namespace qpid {
 namespace broker {
-
+namespace amqp_0_10 {
+    class Connection;
+}
     class Link;
     class Broker;
-    class Connection;
     class LinkRegistry {
         typedef std::map<std::string, boost::shared_ptr<Link> > LinkMap;
         typedef std::map<std::string, Bridge::shared_ptr> BridgeMap;
@@ -47,18 +48,18 @@ namespace broker {
         LinkMap   links;    /** indexed by name of Link */
         BridgeMap bridges;  /** indexed by name of Bridge */
         ConnectionMap   connections;  /** indexed by connection identifier, gives link name */
+        LinkMap   pendingLinks;  /** pending connection, indexed by name of Link */
 
         qpid::sys::Mutex lock;
         Broker* broker;
         management::Manageable* parent;
         MessageStore* store;
-        bool passive;
         std::string realm;
 
         boost::shared_ptr<Link> findLink(const std::string& key);
 
         // Methods called by the connection observer, key is connection identifier
-        void notifyConnection (const std::string& key, Connection* c);
+        void notifyConnection (const std::string& key, amqp_0_10::Connection* c);
         void notifyOpened     (const std::string& key);
         void notifyClosed     (const std::string& key);
         void notifyConnectionForced    (const std::string& key, const std::string& text);
@@ -108,10 +109,13 @@ namespace broker {
                 const std::string& excludes,
                 bool         dynamic,
                 uint16_t     sync,
+                uint32_t     credit,
                 Bridge::InitializeCallback=0,
                 const std::string& queueName="",
                 const std::string& altExchange=""
         );
+        QPID_BROKER_EXTERN static const uint32_t INFINITE_CREDIT = 0xFFFFFFFF;
+
         /** determine if Bridge exists */
         QPID_BROKER_EXTERN Bridge::shared_ptr
           getBridge(const std::string&  name);
@@ -143,20 +147,6 @@ namespace broker {
         QPID_BROKER_EXTERN std::string getPassword        (const std::string& key);
         QPID_BROKER_EXTERN std::string getHost            (const std::string& key);
         QPID_BROKER_EXTERN uint16_t    getPort            (const std::string& key);
-
-        /**
-         * Called to alter passive state. In passive state the links
-         * and bridges managed by a link registry will be recorded and
-         * updated but links won't actually establish connections and
-         * bridges won't therefore pull or push any messages.
-         */
-        QPID_BROKER_EXTERN void setPassive(bool);
-        QPID_BROKER_EXTERN bool isPassive() { return passive; }
-
-        /** Iterate over each link in the registry. Used for cluster updates. */
-        QPID_BROKER_EXTERN void eachLink(boost::function<void(boost::shared_ptr<Link>)> f);
-        /** Iterate over each bridge in the registry. Used for cluster updates. */
-        QPID_BROKER_EXTERN void eachBridge(boost::function<void(boost::shared_ptr< Bridge>)> f);
     };
 }
 }

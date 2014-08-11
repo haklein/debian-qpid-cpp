@@ -39,9 +39,9 @@
 
 namespace qpid {
 namespace broker {
-
+namespace amqp_0_10 {
 class Connection;
-class ConnectionState;
+}
 class Link;
 class LinkRegistry;
 
@@ -65,6 +65,7 @@ class Bridge : public PersistableConfig,
 
     QPID_BROKER_EXTERN void close();
     bool isDurable() { return args.i_durable; }
+    framing::ChannelId getChannel() const { return channel; }
     Link *getLink() const { return link; }
     const std::string getSrc() const { return args.i_src; }
     const std::string getDest() const { return args.i_dest; }
@@ -72,7 +73,7 @@ class Bridge : public PersistableConfig,
 
     bool isDetached() const { return detached; }
 
-    management::ManagementObject* GetManagementObject() const;
+    management::ManagementObject::shared_ptr GetManagementObject() const;
     management::Manageable::status_t ManagementMethod(uint32_t methodId,
                                                       management::Args& args,
                                                       std::string& text);
@@ -110,14 +111,15 @@ class Bridge : public PersistableConfig,
     void connectionException(framing::connection::CloseCode code, const std::string& msg);
     void channelException(framing::session::DetachCode, const std::string& msg);
     void executionException(framing::execution::ErrorCode, const std::string& msg);
+    void incomingExecutionException(framing::execution::ErrorCode, const std::string& msg);
     void detach();
 
     void setErrorListener(boost::shared_ptr<ErrorListener> e) { errorListener = e; }
   private:
     struct PushHandler : framing::FrameHandler {
-        PushHandler(Connection* c) { conn = c; }
+        PushHandler(amqp_0_10::Connection* c) { conn = c; }
         void handle(framing::AMQFrame& frame);
-        Connection* conn;
+        amqp_0_10::Connection* conn;
     };
 
     std::auto_ptr<PushHandler>                        pushHandler;
@@ -128,21 +130,20 @@ class Bridge : public PersistableConfig,
     Link* const link;
     const framing::ChannelId          channel;
     qmf::org::apache::qpid::broker::ArgsLinkBridge args;
-    qmf::org::apache::qpid::broker::Bridge*        mgmtObject;
+    qmf::org::apache::qpid::broker::Bridge::shared_ptr mgmtObject;
     CancellationListener        listener;
     std::string name;
     std::string queueName;
     std::string altEx;
     mutable uint64_t  persistenceId;
-    ConnectionState* connState;
-    Connection* conn;
+    amqp_0_10::Connection* conn;
     InitializeCallback initialize;
     bool detached;              // Set when session is detached.
     bool resetProxy();
 
     // connection Management (called by owning Link)
-    void create(Connection& c);
-    void cancel(Connection& c);
+    void create(amqp_0_10::Connection& c);
+    void cancel(amqp_0_10::Connection& c);
     void closed();
     friend class Link; // to call create, cancel, closed()
     boost::shared_ptr<ErrorListener> errorListener;

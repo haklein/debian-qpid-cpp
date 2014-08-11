@@ -10,9 +10,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -66,10 +66,13 @@ class IncomingMessages
     {
         virtual ~Handler() {}
         virtual bool accept(MessageTransfer& transfer) = 0;
+        virtual bool isClosed() { return false; }
     };
 
+    IncomingMessages();
     void setSession(qpid::client::AsyncSession session);
     bool get(Handler& handler, qpid::sys::Duration timeout);
+    void wakeup();
     bool getNextDestination(std::string& destination, qpid::sys::Duration timeout);
     void accept();
     void accept(qpid::framing::SequenceNumber id, bool cumulative);
@@ -84,14 +87,17 @@ class IncomingMessages
   private:
     typedef std::deque<FrameSetPtr> FrameSetQueue;
 
-    sys::Mutex lock;
+    sys::Monitor lock;
     qpid::client::AsyncSession session;
     boost::shared_ptr< sys::BlockingQueue<FrameSetPtr> > incoming;
+    bool inUse;
     FrameSetQueue received;
     AcceptTracker acceptTracker;
 
     bool process(Handler*, qpid::sys::Duration);
     bool wait(qpid::sys::Duration);
+    bool pop(FrameSetPtr&, qpid::sys::Duration);
+
     void retrieve(FrameSetPtr, qpid::messaging::Message*);
 
 };

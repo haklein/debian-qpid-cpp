@@ -23,10 +23,12 @@
 
 #include "qpid/xml/XmlExchange.h"
 
+#include "qpid/amqp/CharSequence.h"
 #include "qpid/broker/DeliverableMessage.h"
 
 #include "qpid/log/Statement.h"
 #include "qpid/broker/FedOps.h"
+#include "qpid/amqp/MapHandler.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/framing/reply_exceptions.h"
@@ -107,9 +109,9 @@ XmlExchange::XmlExchange(const std::string& _name, Manageable* _parent, Broker* 
         mgmtExchange->set_type (typeName);
 }
 
-XmlExchange::XmlExchange(const std::string& _name, bool _durable,
+XmlExchange::XmlExchange(const std::string& _name, bool _durable, bool autodelete,
                          const FieldTable& _args, Manageable* _parent, Broker* b) :
-    Exchange(_name, _durable, _args, _parent, b)
+    Exchange(_name, _durable, autodelete, _args, _parent, b)
 {
     if (mgmtExchange != 0)
         mgmtExchange->set_type (typeName);
@@ -177,28 +179,83 @@ bool XmlExchange::bind(Queue::shared_ptr queue, const std::string& bindingKey, c
 
 bool XmlExchange::unbind(Queue::shared_ptr queue, const std::string& bindingKey, const FieldTable* args)
 {
+    RWlock::ScopedWlock l(lock);
+    return unbindLH(queue, bindingKey, args);
+}
+
+bool XmlExchange::unbindLH(Queue::shared_ptr queue, const std::string& bindingKey, const FieldTable* args)
+{
     /*
      *  When called directly, no qpidFedOrigin argument will be
      *  present. When called from federation, it will be present. 
      *
      *  This is a bit of a hack - the binding needs the origin, but
      *  this interface, as originally defined, would not supply one.
+     *
+     *  Note: caller must hold Wlock
      */
     std::string fedOrigin;
     if (args) fedOrigin = args->getAsString(qpidFedOrigin);
 
-    RWlock::ScopedWlock l(lock);
     if (bindingsMap[bindingKey].remove_if(MatchQueueAndOrigin(queue, fedOrigin))) {
         if (mgmtExchange != 0) {
             mgmtExchange->dec_bindingCount();
         }
+        if (bindingsMap[bindingKey].empty()) bindingsMap.erase(bindingKey);
+        if (bindingsMap.empty()) checkAutodelete();
         return true;
     } else {
-        return false;      
+        return false;
     }
 }
 
-bool XmlExchange::matches(Query& query, Deliverable& msg, const qpid::framing::FieldTable* args, bool parse_message_content) 
+namespace {
+class DefineExternals : public qpid::amqp::MapHandler
+{
+  public:
+    DefineExternals(DynamicContext* c) : context(c) { assert(context); }
+    void handleBool(const qpid::amqp::CharSequence& key, bool value) { process(std::string(key.data, key.size), (int) value); }
+    void handleUint8(const qpid::amqp::CharSequence& key, uint8_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleUint16(const qpid::amqp::CharSequence& key, uint16_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleUint32(const qpid::amqp::CharSequence& key, uint32_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleUint64(const qpid::amqp::CharSequence& key, uint64_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleInt8(const qpid::amqp::CharSequence& key, int8_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleInt16(const qpid::amqp::CharSequence& key, int16_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleInt32(const qpid::amqp::CharSequence& key, int32_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleInt64(const qpid::amqp::CharSequence& key, int64_t value) { process(std::string(key.data, key.size), (int) value); }
+    void handleFloat(const qpid::amqp::CharSequence& key, float value) { process(std::string(key.data, key.size), value); }
+    void handleDouble(const qpid::amqp::CharSequence& key, double value) { process(std::string(key.data, key.size), value); }
+    void handleString(const qpid::amqp::CharSequence& key, const qpid::amqp::CharSequence& value, const qpid::amqp::CharSequence& /*encoding*/)
+    {
+        process(std::string(key.data, key.size), std::string(value.data, value.size));
+    }
+    void handleVoid(const qpid::amqp::CharSequence&) {}
+  private:
+    void process(const std::string& key, double value)
+    {
+        QPID_LOG(trace, "XmlExchange, external variable (double): " << key << " = " << value);
+        Item::Ptr item = context->getItemFactory()->createDouble(value, context);
+        context->setExternalVariable(X(key.c_str()), item);
+    }
+    void process(const std::string& key, int value)
+    {
+        QPID_LOG(trace, "XmlExchange, external variable (int):" << key << " = " << value);
+        Item::Ptr item = context->getItemFactory()->createInteger(value, context);
+        context->setExternalVariable(X(key.c_str()), item);
+    }
+    void process(const std::string& key, const std::string& value)
+    {
+        QPID_LOG(trace, "XmlExchange, external variable (string):" << key << " = " << value);
+        Item::Ptr item = context->getItemFactory()->createString(X(value.c_str()), context);
+        context->setExternalVariable(X(key.c_str()), item);
+    }
+
+    DynamicContext* context;
+};
+
+}
+
+bool XmlExchange::matches(Query& query, Deliverable& msg, bool parse_message_content) 
 {
     std::string msgContent;
 
@@ -212,7 +269,7 @@ bool XmlExchange::matches(Query& query, Deliverable& msg, const qpid::framing::F
 
         if (parse_message_content) {
 
-            msg.getMessage().getFrames().getContent(msgContent);
+            msgContent = msg.getMessage().getContent();
 
             QPID_LOG(trace, "matches: message content is [" << msgContent << "]");
 
@@ -231,28 +288,8 @@ bool XmlExchange::matches(Query& query, Deliverable& msg, const qpid::framing::F
             }
         }
 
-        if (args) {
-            FieldTable::ValueMap::const_iterator v = args->begin();
-            for(; v != args->end(); ++v) {
-
-                if (v->second->convertsTo<double>()) {
-                    QPID_LOG(trace, "XmlExchange, external variable (double): " << v->first << " = " << v->second->get<double>());
-                    Item::Ptr value = context->getItemFactory()->createDouble(v->second->get<double>(), context.get());
-                    context->setExternalVariable(X(v->first.c_str()), value);
-                }              
-                else if (v->second->convertsTo<int>()) {
-                    QPID_LOG(trace, "XmlExchange, external variable (int):" << v->first << " = " << v->second->getData().getInt());
-                    Item::Ptr value = context->getItemFactory()->createInteger(v->second->get<int>(), context.get());
-                    context->setExternalVariable(X(v->first.c_str()), value);
-                }
-                else if (v->second->convertsTo<std::string>()) {
-                    QPID_LOG(trace, "XmlExchange, external variable (string):" << v->first << " = " << v->second->getData().getString().c_str());
-                    Item::Ptr value = context->getItemFactory()->createString(X(v->second->get<std::string>().c_str()), context.get());
-                    context->setExternalVariable(X(v->first.c_str()), value);
-                }
-
-            }
-        }
+        DefineExternals f(context.get());
+        msg.getMessage().processProperties(f);
 
         Result result = query->execute(context.get());
 #ifdef XQ_EFFECTIVE_BOOLEAN_VALUE_HPP
@@ -286,7 +323,6 @@ bool XmlExchange::matches(Query& query, Deliverable& msg, const qpid::framing::F
 void XmlExchange::route(Deliverable& msg)
 {
     const std::string& routingKey = msg.getMessage().getRoutingKey();
-    const FieldTable* args = msg.getMessage().getApplicationHeaders();
     PreRoute pr(msg, this);
     try {
         XmlBinding::vector::ConstPtr p;
@@ -294,14 +330,16 @@ void XmlExchange::route(Deliverable& msg)
         {
             RWlock::ScopedRlock l(lock);
             p = bindingsMap[routingKey].snapshot();
-            if (!p.get()) return;
         }
 
-        for (std::vector<XmlBinding::shared_ptr>::const_iterator i = p->begin(); i != p->end(); i++) {
-            if (matches((*i)->xquery, msg, args, (*i)->parse_message_content)) { 
-                b->push_back(*i);
-            }
+        if (p.get()) {
+            for (std::vector<XmlBinding::shared_ptr>::const_iterator i = p->begin(); i != p->end(); i++) {
+                   if (matches((*i)->xquery, msg, (*i)->parse_message_content)) {
+                       b->push_back(*i);
+                }
+             }
         }
+        // else allow stats to be counted, even for non-matched messages
         doRoute(msg, b);
     } catch (...) {
         QPID_LOG(warning, "XMLExchange " << getName() << ": exception routing message with query " << routingKey);
@@ -336,6 +374,8 @@ bool XmlExchange::isBound(Queue::shared_ptr queue, const std::string* const bind
 
 XmlExchange::~XmlExchange() 
 {
+    if (mgmtExchange != 0)
+        mgmtExchange->debugStats("destroying");
     bindingsMap.clear();
 }
 
@@ -360,9 +400,9 @@ void XmlExchange::propagateFedOp(const std::string& bindingKey, const std::strin
 
 bool XmlExchange::fedUnbind(const std::string& fedOrigin, const std::string& fedTags, Queue::shared_ptr queue, const std::string& bindingKey, const FieldTable* args)
 {
-    RWlock::ScopedRlock l(lock);
+    RWlock::ScopedWlock l(lock);
 
-    if (unbind(queue, bindingKey, args)) {
+    if (unbindLH(queue, bindingKey, args)) {
         propagateFedOp(bindingKey, fedTags, fedOpUnbind, fedOrigin); 
         return true;
     }
@@ -405,6 +445,11 @@ bool XmlExchange::MatchQueueAndOrigin::operator()(XmlBinding::shared_ptr b)
 
 
 const std::string XmlExchange::typeName("xml");
- 
+
+bool XmlExchange::hasBindings()
+{
+    RWlock::ScopedRlock l(lock);
+    return !bindingsMap.empty();
+}
 }
 }
