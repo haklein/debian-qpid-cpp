@@ -8,7 +8,18 @@ Build-Depends: debhelper (>= 9.0.0~),
                pkg-config,
                libboost-program-options-dev,
                libboost-system-dev,
+               libsasl2-dev,
+               doxygen,
+               uuid-dev,
                python,
+               libpython-dev,
+               libnss3-dev,
+               libnspr4-dev,
+               libxqilla-dev,
+               libxerces-c-dev,
+               libaio-dev,
+               libibverbs-dev,
+               ruby,
                libqpid-proton2-dev (>= 0.7~)
 Standards-Version: 3.9.4
 Homepage: http://qpid.apache.org/
