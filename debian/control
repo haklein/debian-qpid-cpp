@@ -21,7 +21,7 @@ Build-Depends: debhelper (>= 9.0.0~),
                libibverbs-dev,
                ruby,
                libqpid-proton2-dev (>= 0.7~)
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://qpid.apache.org/
 Vcs-Browser: http://git.debian.org/?p=pkg-middleware/qpid-cpp.git
 Vcs-Git: git://git.debian.org/git/pkg-middleware/qpid-cpp.git
