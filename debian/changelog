@@ -1,3 +1,11 @@
+qpid-cpp (0.28-4) unstable; urgency=low
+
+  * Added missing amqp.so module.
+  * Added qpid-tools package.
+  * Updated qpidd.postinst to not error out on unknown arguments.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Mon, 08 Sep 2014 07:26:46 -0400
+
 qpid-cpp (0.28-3) unstable; urgency=low
 
   * Updated the list of build dependencies. 
