@@ -1,4 +1,10 @@
-qpid-cpp (0.28-4) unstable; urgency=low
+qpid-cpp (0.28-4precise+mcpierce1.1) precise; urgency=low
+
+  * Converted libpython-dev to python-dev for precise.
+
+ -- Darryl Pierce <mcpierce@gmail.com>  Mon, 08 Sep 2014 17:05:50 -0400
+
+qpid-cpp (0.28-4precise+mcpierce1) precise; urgency=low
 
   * Added missing amqp.so module.
   * Added qpid-tools package.
@@ -6,20 +12,20 @@ qpid-cpp (0.28-4) unstable; urgency=low
 
  -- Darryl L. Pierce <mcpierce@gmail.com>  Mon, 08 Sep 2014 07:26:46 -0400
 
-qpid-cpp (0.28-3) unstable; urgency=low
+qpid-cpp (0.28-3precise+mcpierce1) precise; urgency=low
 
   * Updated the list of build dependencies. 
 
  -- Darryl L. Pierce <mcpierce@gmail.com>  Fri, 05 Sep 2014 16:04:29 -0400
 
-qpid-cpp (0.28-2) unstable; urgency=low
+qpid-cpp (0.28-2precise+mcpierce1) precise; urgency=low
 
   * Enable AMQP 1.0 support by requiring libqpid-proton2.
   * Fixed names of -dev packages to include soversion.
 
  -- Darryl L. Pierce <mcpierce@gmail.com>  Thu, 04 Sep 2014 09:50:35 -0400
 
-qpid-cpp (0.28-1) unstable; urgency=medium
+qpid-cpp (0.28-1precise+mcpierce1) precise; urgency=medium
 
   * New maintainer. (Closes: #729207)
   * Dropped the qpid-client package.
