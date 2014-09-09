@@ -1,4 +1,4 @@
-qpid-cpp (0.28-1) unstable; urgency=medium
+qpid-cpp (0.28-1trusty+mcpierce1) trusty; urgency=medium
 
   * New maintainer. (Closes: #729207)
   * Dropped the qpid-client package.

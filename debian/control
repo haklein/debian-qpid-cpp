@@ -9,7 +9,7 @@ Build-Depends: debhelper (>= 9.0.0~),
                libboost-program-options-dev,
                libboost-system-dev,
                python
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://qpid.apache.org/
 Vcs-Browser: http://git.debian.org/?p=pkg-middleware/qpid-cpp.git
 Vcs-Git: git://git.debian.org/git/pkg-middleware/qpid-cpp.git
