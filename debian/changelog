@@ -1,4 +1,4 @@
-qpid-cpp (0.28-3) unstable; urgency=low
+qpid-cpp (0.28-3trusty+mcpierce1) trusty; urgency=low
 
   * Updated the list of build dependencies. 
 
