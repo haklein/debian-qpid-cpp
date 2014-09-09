@@ -1,4 +1,4 @@
-qpid-cpp (0.28-5) unstable; urgency=low
+qpid-cpp (0.28-5trusty+mcpierce1) trusty; urgency=low
 
   * Split qpid-tools into qpid-send and qpid-receive packages.
 
