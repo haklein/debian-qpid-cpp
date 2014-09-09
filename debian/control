@@ -8,7 +8,8 @@ Build-Depends: debhelper (>= 9.0.0~),
                pkg-config,
                libboost-program-options-dev,
                libboost-system-dev,
-               python
+               python,
+               libqpid-proton2-dev (>= 0.7~)
 Standards-Version: 3.9.4
 Homepage: http://qpid.apache.org/
 Vcs-Browser: http://git.debian.org/?p=pkg-middleware/qpid-cpp.git

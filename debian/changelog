@@ -1,3 +1,10 @@
+qpid-cpp (0.28-2) unstable; urgency=low
+
+  * Enable AMQP 1.0 support by requiring libqpid-proton2.
+  * Fixed names of -dev packages to include soversion.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Thu, 04 Sep 2014 09:50:35 -0400
+
 qpid-cpp (0.28-1precise+qpid1) precise; urgency=medium
 
   * New maintainer. (Closes: #729207)
