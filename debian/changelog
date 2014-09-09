@@ -1,4 +1,4 @@
-qpid-cpp (0.28-4) unstable; urgency=low
+qpid-cpp (0.28-4precise+qpid1) precise; urgency=low
 
   * Added missing amqp.so module.
   * Added qpid-tools package.
