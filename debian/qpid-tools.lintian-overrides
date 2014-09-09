@@ -1,2 +1,0 @@
-qpid-tools: binary-without-manpage usr/bin/qpid-receive
-qpid-tools: binary-without-manpage usr/bin/qpid-send
