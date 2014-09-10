@@ -1,3 +1,9 @@
+qpid-cpp (0.28-6) unstable; urgency=low
+
+  * Corrected the bug # for the new maintainer in changelog.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Wed, 10 Sep 2014 15:14:13 -0400
+
 qpid-cpp (0.28-5) unstable; urgency=low
 
   * Split qpid-tools into qpid-send and qpid-receive packages.
@@ -27,7 +33,7 @@ qpid-cpp (0.28-2) unstable; urgency=low
 
 qpid-cpp (0.28-1) unstable; urgency=medium
 
-  * New maintainer. (Closes: #729207)
+  * New maintainer. (Closes: #757652)
   * Dropped the qpid-client package.
   * Dropped the qpid-client package.
   * Removed the following packages for libraries no longer produced:
