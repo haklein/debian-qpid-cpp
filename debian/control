@@ -19,6 +19,7 @@ Build-Depends: debhelper (>= 9.0.0~),
                libxerces-c-dev,
                libaio-dev,
                libibverbs-dev,
+               swig,
                ruby,
                libqpid-proton2-dev (>= 0.7~)
 Standards-Version: 3.9.5
@@ -181,6 +182,61 @@ Description: Qpid Messaging Framework v2 development libraries
  and Ruby.
  .
  This package provides the Apache QMFv2 development libraries
+
+Package: python-qpid-messaging
+Architecture: any
+Section: python
+Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}
+Provides: ${python:Provides}
+Description: Python language bindings for Qpid, wrapping the C++ libraries
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This package provides the Python language bindings for the Qpid C++ libraries
+
+Package: python-qpid-messaging-examples
+Architecture: all
+Section: python
+Depends: ${python:Depends}, ${misc:Depends},
+         python-qpid-messaging (= ${binary:Version})
+Provides: ${python:Provides}
+Description: Python language examples for writing Qpid AMQP applications
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This package provides example Python applications for Qpid
+
+Package: python-qmf2
+Architecture: any
+Section: python
+Depends: ${python:Depends}, ${misc:Depends},
+         python-cqmf2 (= ${binary:Version}),
+         python-qpid-messaging (= ${binary:Version})
+Provides: ${python:Provides}
+Description: enterprise messaging system - Python QMF2 bindings
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This package provides the Python QMF2 bindings.
+
+Package: python-cqmf2
+Architecture: any
+Section: python
+Depends: ${python:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Provides: ${python:Provides}
+Description: enterprise messaging system - Python CQMF2 bindings
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This package provides the Python QMF2 bindings.
 
 Package: qpidd
 Architecture: any
