@@ -1,3 +1,9 @@
+qpid-cpp (0.28-7trusty+mcpierce2) trusty; urgency=medium
+
+  * Renamed python-qpidmessaging to python-qpid-messaging.
+
+ -- Darryl Pierce <mcpierce@gmail.com>  Mon, 15 Sep 2014 16:06:01 -0400
+
 qpid-cpp (0.28-7trusty+mcpierce1) trusty; urgency=low
 
   * Restored the python-qmf2 package.
