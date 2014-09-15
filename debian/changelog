@@ -1,4 +1,4 @@
-qpid-cpp (0.28-7) unstable; urgency=low
+qpid-cpp (0.28-7trusty+mcpierce1) trusty; urgency=low
 
   * Restored the python-qmf2 package.
   * Restored the python-cqmf2 package.

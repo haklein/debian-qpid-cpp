@@ -199,8 +199,7 @@ Description: Python language bindings for Qpid, wrapping the C++ libraries
 Package: python-qpid-messaging-examples
 Architecture: all
 Section: python
-Depends: ${python:Depends}, ${misc:Depends},
-         python-qpid-messaging (= ${binary:Version})
+Depends: ${python:Depends}, ${misc:Depends}
 Provides: ${python:Provides}
 Description: Python language examples for writing Qpid AMQP applications
  Apache Qpid is a cross-platform enterprise messaging system which implements
