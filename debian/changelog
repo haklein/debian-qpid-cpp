@@ -1,3 +1,9 @@
+qpid-cpp (0.28-7trusty+mcpierce3) trusty; urgency=medium
+
+  * Added swig dependency.
+
+ -- Darryl Pierce <mcpierce@gmail.com>  Tue, 16 Sep 2014 07:32:01 -0400
+
 qpid-cpp (0.28-7trusty+mcpierce2) trusty; urgency=medium
 
   * Renamed python-qpidmessaging to python-qpid-messaging.
