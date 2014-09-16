@@ -1,3 +1,9 @@
+qpid-cpp (0.28-7trusty+mcpierce4) trusty; urgency=medium
+
+  *  Added the python-qpid-messaging-examples package.
+
+ -- Darryl Pierce <mcpierce@gmail.com>  Tue, 16 Sep 2014 09:38:06 -0400
+
 qpid-cpp (0.28-7trusty+mcpierce3) trusty; urgency=medium
 
   * Added swig dependency.
