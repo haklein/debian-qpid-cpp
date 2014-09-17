@@ -1,3 +1,9 @@
+qpid-cpp (0.28-7trusty+mcpierce5) trusty; urgency=medium
+
+  * Fixed the rules file to not compress the examples.
+
+ -- Darryl Pierce <mcpierce@gmail.com>  Wed, 17 Sep 2014 09:54:51 -0400
+
 qpid-cpp (0.28-7trusty+mcpierce4) trusty; urgency=medium
 
   *  Added the python-qpid-messaging-examples package.
