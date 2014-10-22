@@ -70,7 +70,8 @@ Description: Qpid client libraries
 Package: libqpidclient-dev
 Architecture: any
 Section: libdevel
-Depends: libqpidclient2 (= ${binary:Version}), ${misc:Depends}
+Depends: libqpidcommon-dev (= ${binary:Version}),
+        libqpidclient2 (= ${binary:Version}), ${misc:Depends}
 Multi-Arch: same
 Description: Qpid client development libraries
  Apache Qpid is a cross-platform enterprise messaging system which implements
@@ -123,7 +124,8 @@ Package: libqpidmessaging-dev
 Architecture: any
 Section: libdevel
 Depends: libqpidmessaging2 (= ${binary:Version}), 
-         libqpidtypes1-dev (= ${binary:Version}),
+         libqpidtypes-dev (= ${binary:Version}),
+         libqpidcommon-dev (= ${binary:Version}),
          ${misc:Depends}
 Multi-Arch: same
 Description: Qpid messaging development libraries

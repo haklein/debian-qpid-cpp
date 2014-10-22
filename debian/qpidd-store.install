@@ -1,2 +1,1 @@
-usr/lib/*/qpid/daemon/store.so
-usr/lib/*/qpid/daemon/store.so.0.28
+usr/lib/*/qpid/daemon/legacystore.so
