@@ -1,4 +1,4 @@
-qpid-cpp (0.28-8) unstable; urgency=low
+qpid-cpp (0.28-8trusty+mcpierce1) trusty; urgency=low
 
   * Fixed dependencies between development packages.
   * Added libdb dependency to ensure the legacy store is built.
