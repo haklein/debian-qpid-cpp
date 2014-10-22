@@ -1,3 +1,10 @@
+qpid-cpp (0.28-8) unstable; urgency=low
+
+  * Fixed dependencies between development packages.
+  * Added libdb dependency to ensure the legacy store is built.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Wed, 22 Oct 2014 09:53:32 -0400
+
 qpid-cpp (0.28-7trusty+mcpierce6) trusty; urgency=medium
 
   * Added /etc/sasl2/qpidd.conf to qpidd package. 
