@@ -1,3 +1,16 @@
+qpid-cpp (0.28-9) stable; urgency=low
+
+  * Store package still had issues with loading two modules at once. 
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Wed, 22 Oct 2014 17:07:40 -0400
+
+qpid-cpp (0.28-8) unstable; urgency=low
+
+  * Fixed dependencies between development packages.
+  * Added libdb dependency to ensure the legacy store is built.
+
+ -- Darryl L. Pierce <mcpierce@gmail.com>  Wed, 22 Oct 2014 09:53:32 -0400
+
 qpid-cpp (0.28-7) unstable; urgency=low
 
   * Restored the python-qmf2 package.
