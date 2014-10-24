@@ -1,4 +1,4 @@
-qpid-cpp (0.28-10) unstable; urgency=low
+qpid-cpp (0.28-10trusty+mcpierce1) trusty; urgency=low
 
   * Fixed numerous warnings that have cropped up in Ubuntu builds.
   * Added transitional development packages.
