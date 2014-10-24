@@ -41,6 +41,20 @@ Description: Qpid AMQP types libraries
  .
  This package provides the Apache Qpid types libraries.
 
+Package: libqpidtypes1-dev
+Architecture: any
+Section: oldlibs
+Priority: extra
+Depends: libqpidtypes-dev (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Transitional development package for libqpidtypes-dev.
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This is a virtual package.
+
 Package: libqpidtypes-dev
 Architecture: any
 Section: libdevel
@@ -66,6 +80,20 @@ Description: Qpid client libraries
  and Ruby.
  .
  This package provides the Apache Qpid client libraries.
+
+Package: libqpidclient2-dev
+Architecture: any
+Section: oldlibs
+Priority: extra
+Depends: libqpidclient-dev (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Qpid client development transitional package.
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This is a virtual package.
 
 Package: libqpidclient-dev
 Architecture: any
@@ -94,6 +122,20 @@ Description: Qpid common libraries
  .
  This package provides the Apache Qpid common libraries.
 
+Package: libqpidcommon2-dev
+Architecture: any
+Section: oldlibs
+Priority: extra
+Depends: libqpidcommon-dev (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Qpid common development transitional package
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This is a virtual package.
+
 Package: libqpidcommon-dev
 Architecture: any
 Section: libdevel
@@ -119,6 +161,20 @@ Description: Qpid messaging libraries
  and Ruby.
  .
  This package provides the Apache Qpid messaging libraries.
+
+Package: libqpidmessaging2-dev
+Architecture: any
+Section: oldlibs
+Priority: extra
+Depends: libqpidmessaging-dev (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Qpid messaging development transitional package
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This is a virtual package.
 
 Package: libqpidmessaging-dev
 Architecture: any
@@ -148,6 +204,20 @@ Description: Qpid broker libraries
  and Ruby.
  .
  This package provides the Apache Qpid broker libraries.
+
+Package: libqpidbroker2-dev
+Architecture: any
+Section: oldlibs
+Priority: extra
+Depends: libqpidbroker-dev (= ${binary:Version}), ${misc:Depends}
+Multi-Arch: same
+Description: Qpid broker development transitional package
+ Apache Qpid is a cross-platform enterprise messaging system which implements
+ the Advanced Message Queuing Protocol (AMQP), providing message brokers
+ written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
+ and Ruby.
+ .
+ This is a virtual package.
 
 Package: libqpidbroker-dev
 Architecture: any
