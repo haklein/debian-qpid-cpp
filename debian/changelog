@@ -1,4 +1,4 @@
-qpid-cpp (0.28-6) unstable; urgency=low
+qpid-cpp (0.28-6trusty+_mcpierce1) trusty; urgency=low
 
   * Corrected the bug # for the new maintainer in changelog.
 
