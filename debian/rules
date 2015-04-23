@@ -28,7 +28,11 @@ override_dh_auto_configure:
 	dh_auto_configure -- -DLIB_INSTALL_DIR=/usr/lib/${DEB_HOST_MULTIARCH} \
                              -DDOC_INSTALL_DIR:PATH=/usr/share/doc/qpid-cpp \
                              -DCMAKE_SKIP_RPATH=TRUE \
-                             -DSYSCONF_INSTALL_DIR:PATH=/etc
+                             -DSYSCONF_INSTALL_DIR:PATH=/etc \
+			     -DBUILD_LINEARSTORE=true \
+			     -DBUILD_LEGACYSTORE=true \
+			     -DPERL_PFX_ARCHLIB=$Config{sitearch} \
+			     -DBUILDING_BINDING_RUBY=false
 
 override_dh_auto_build:
 	dh_auto_build -- -j4 docs
