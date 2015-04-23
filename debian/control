@@ -326,17 +326,21 @@ Description: Qpid broker
  .
  This package provides the Apache Qpid broker.
 
-Package: qpidd-store
+Package: qpidd-legacy-store
 Architecture: any
+Pre-Depends: multiarch-support
 Depends: qpidd (= ${binary:Version}),
          ${shlibs:Depends}, ${misc:Depends}
-Description: Qpid broker persistence libraries
+Provides: qpidd-store
+Conflicts: qpidd-store
+Replaces: qpidd-store
+Description: Qpid broker legacy store library
  Apache Qpid is a cross-platform enterprise messaging system which implements
  the Advanced Message Queuing Protocol (AMQP), providing message brokers
  written in C++ and Java, along with clients for C++, Java JMS, .Net, Python,
  and Ruby.
  .
- This package provides the Qpid persistence store library
+ This package provides the Qpid legacy store library
 
 Package: qpidd-linear-store
 Architecture: any
