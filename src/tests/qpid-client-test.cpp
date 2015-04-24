@@ -47,7 +47,11 @@ struct Args : public TestOptions {
     uint msgSize;
     bool verbose;
 
+<<<<<<< HEAD
     Args() : TestOptions("Simple test of Qpid c++ client; sends and receives a single message."), msgSize(26)
+=======
+    Args() : TestOptions("Simple test of Qpid c++ client; sends and receives a single message."), msgSize(26), verbose(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         addOptions()
             ("size", optValue(msgSize, "N"), "message size")

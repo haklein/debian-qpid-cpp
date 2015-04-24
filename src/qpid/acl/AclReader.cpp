@@ -17,6 +17,10 @@
  */
 
 #include "qpid/acl/AclReader.h"
+<<<<<<< HEAD
+=======
+#include "qpid/acl/AclData.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <cctype>
 #include <cstring>
@@ -24,6 +28,11 @@
 #include <sstream>
 #include "qpid/log/Statement.h"
 #include "qpid/Exception.h"
+<<<<<<< HEAD
+=======
+#include <boost/lexical_cast.hpp>
+#include <algorithm>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <iomanip> // degug
 #include <iostream> // debug
@@ -53,11 +62,14 @@ namespace acl {
         return props.insert(propNvPair(p, v)).second;
     }
 
+<<<<<<< HEAD
     bool AclReader::aclRule::validate(const AclHelper::objectMapPtr& /*validationMap*/) {
         // TODO - invalid rules won't ever be called in real life...
         return true;
     }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // Debug aid
     std::string AclReader::aclRule::toString() {
         std::ostringstream oss;
@@ -87,6 +99,10 @@ namespace acl {
         d->clear();
         QPID_LOG(debug, "ACL: Load Rules");
         bool foundmode = false;
+<<<<<<< HEAD
+=======
+        bool foundConnectionMode = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         rlCitr i = rules.end();
         for (int cnt = rules.size(); cnt; cnt--) {
@@ -94,14 +110,92 @@ namespace acl {
             QPID_LOG(debug, "ACL: Processing " << std::setfill(' ') << std::setw(2)
                 << cnt << " " << (*i)->toString());
 
+<<<<<<< HEAD
             if (!foundmode && (*i)->actionAll && (*i)->names.size() == 1
                 && (*((*i)->names.begin())).compare("*") == 0) {
+=======
+            if (!(*i)->actionAll && (*i)->objStatus == aclRule::VALUE &&
+                !validator.validateAllowedProperties(
+                    (*i)->action, (*i)->object, (*i)->props, false)) {
+                    // specific object/action has bad property
+                    // this rule gets ignored
+                    continue;
+            } else {
+                // action=all or object=none/all means the rule gets propagated
+                // possibly to many places.
+                // Invalid rule combinations are not propagated.
+            }
+
+            if (!foundmode && (*i)->actionAll && (*i)->names.size() == 1
+                && (*((*i)->names.begin())).compare(AclData::ACL_KEYWORD_WILDCARD) == 0) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     d->decisionMode = (*i)->res;
                     QPID_LOG(debug, "ACL: FoundMode "
                         << AclHelper::getAclResultStr(d->decisionMode));
                     foundmode = true;
+<<<<<<< HEAD
             } else {
                 AclData::rule rule(cnt, (*i)->res, (*i)->props);
+=======
+            } else if ((*i)->action == acl::ACT_CREATE && (*i)->object == acl::OBJ_CONNECTION) {
+                // Intercept CREATE CONNECTION rules process them into separate lists to
+                // be consumed in the connection approval code path.
+                propMap::const_iterator pName = (*i)->props.find(SPECPROP_NAME);
+                if (pName != (*i)->props.end()) {
+                    throw Exception(QPID_MSG("ACL: CREATE CONNECTION rule " << cnt << " must not have a 'name' property"));
+                }
+                propMap::const_iterator pHost = (*i)->props.find(SPECPROP_HOST);
+                if (pHost == (*i)->props.end()) {
+                    throw Exception(QPID_MSG("ACL: CREATE CONNECTION rule " << cnt << " has no 'host' property"));
+                }
+                // create the connection rule
+                bool allUsers = (*(*i)->names.begin()).compare(AclData::ACL_KEYWORD_WILDCARD) == 0;
+                bool allHosts = pHost->second.compare(AclData::ACL_KEYWORD_ALL) == 0;
+                AclBWHostRule bwRule((*i)->res, (allHosts ? "" : pHost->second));
+
+                // apply the rule globally or to user list
+                if (allUsers) {
+                    if (allHosts) {
+                        // allow one specification of allUsers,allHosts
+                        if (foundConnectionMode) {
+                            throw Exception(QPID_MSG("ACL: only one CREATE CONNECTION rule for user=all and host=all allowed"));
+                        }
+                        foundConnectionMode = true;
+                        d->connectionDecisionMode = (*i)->res;
+                        QPID_LOG(trace, "ACL: Found connection mode: " << AclHelper::getAclResultStr( (*i)->res ));
+                    } else {
+                        // Rules for allUsers but not allHosts go into the global list
+                        globalHostRules->insert( globalHostRules->begin(), bwRule );
+                    }
+                } else {
+                    // other rules go into binned rule sets for each user
+                    for (nsCitr itr  = (*i)->names.begin();
+                                itr != (*i)->names.end();
+                                itr++) {
+                        (*userHostRules)[(*itr)].insert( (*userHostRules)[(*itr)].begin(), bwRule);
+                    }
+                }
+            } else {
+                AclData::Rule rule(cnt, (*i)->res, (*i)->props);
+                // Record which properties have the user substitution string
+                for (pmCitr pItr=rule.props.begin(); pItr!=rule.props.end(); pItr++) {
+                    if ((pItr->second.find(AclData::ACL_KEYWORD_USER_SUBST, 0)       != std::string::npos) ||
+                        (pItr->second.find(AclData::ACL_KEYWORD_DOMAIN_SUBST, 0)     != std::string::npos) ||
+                        (pItr->second.find(AclData::ACL_KEYWORD_USERDOMAIN_SUBST, 0) != std::string::npos)) {
+                        rule.ruleHasUserSub[pItr->first] = true;
+                    }
+                }
+
+                // Find possible routingkey property and cache its pattern
+                for (pmCitr pItr=rule.props.begin(); pItr!=rule.props.end(); pItr++) {
+                    if (acl::SPECPROP_ROUTINGKEY == pItr->first)
+                    {
+                        rule.pubRoutingKeyInRule = true;
+                        rule.pubRoutingKey = (std::string)pItr->second;
+                        rule.addTopicTest(rule.pubRoutingKey);
+                    }
+                }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
                 // Action -> Object -> map<user -> set<Rule> >
                 std::ostringstream actionstr;
@@ -110,8 +204,26 @@ namespace acl {
                     (*i)->actionAll ? acnt++ : acnt = acl::ACTIONSIZE) {
 
                     if (acnt == acl::ACT_PUBLISH)
+<<<<<<< HEAD
                         d->transferAcl = true; // we have transfer ACL
 
+=======
+                    {
+                        d->transferAcl = true; // we have transfer ACL
+                        // For Publish the only object should be Exchange
+                        // and the only property should be routingkey.
+                        // Go through the rule properties and find the name and the key.
+                        // If found then place them specially for the lookup engine.
+                        for (pmCitr pItr=(*i)->props.begin(); pItr!=(*i)->props.end(); pItr++) {
+                            if (acl::SPECPROP_NAME == pItr->first)
+                            {
+                                rule.pubExchNameInRule = true;
+                                rule.pubExchName = pItr->second;
+                                rule.pubExchNameMatchesBlank = rule.pubExchName.compare(AclData::ACL_KEYWORD_DEFAULT_EXCHANGE) == 0;
+                            }
+                        }
+                    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     actionstr << AclHelper::getActionStr((Action) acnt) << ",";
 
                     //find the Action, create if not exist
@@ -122,7 +234,10 @@ namespace acl {
                             d->actionList[acnt][j] = NULL;
                     }
 
+<<<<<<< HEAD
                     // TODO: optimize this loop to limit to valid options only!!
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     for (int ocnt = ((*i)->objStatus != aclRule::VALUE ? 0
                         : (*i)->object);
                         ocnt < acl::OBJECTSIZE;
@@ -136,12 +251,17 @@ namespace acl {
                         // add users and Rule to object set
                         bool allNames = false;
                         // check to see if names.begin is '*'
+<<<<<<< HEAD
                         if ((*(*i)->names.begin()).compare("*") == 0)
+=======
+                        if ((*(*i)->names.begin()).compare(AclData::ACL_KEYWORD_WILDCARD) == 0)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                             allNames = true;
 
                         for (nsCitr itr  = (allNames ? names.begin() : (*i)->names.begin());
                                     itr != (allNames ? names.end()   : (*i)->names.end());
                                     itr++) {
+<<<<<<< HEAD
                             AclData::actObjItr itrRule =
                                 d->actionList[acnt][ocnt]->find(*itr);
 
@@ -156,6 +276,25 @@ namespace acl {
                                 // allow peter create queue
 
                                 itrRule->second.push_back(rule);
+=======
+                            if (validator.validateAllowedProperties(acl::Action(acnt),
+                                                                    acl::ObjectType(ocnt),
+                                                                    (*i)->props,
+                                                                    false)) {
+                                AclData::actObjItr itrRule =
+                                    d->actionList[acnt][ocnt]->find(*itr);
+
+                                if (itrRule == d->actionList[acnt][ocnt]->end()) {
+                                    AclData::ruleSet rSet;
+                                    rSet.push_back(rule);
+                                    d->actionList[acnt][ocnt]->insert
+                                        (make_pair(std::string(*itr), rSet));
+                                } else {
+                                        itrRule->second.push_back(rule);
+                                }
+                            } else {
+                                // Skip propagating this rule as it will never match.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                             }
                         }
                     }
@@ -168,7 +307,11 @@ namespace acl {
                         objstr << AclHelper::getObjectTypeStr((ObjectType) ocnt) << ",";
                 }
 
+<<<<<<< HEAD
                 bool allNames = ((*(*i)->names.begin()).compare("*") == 0);
+=======
+                bool allNames = ((*(*i)->names.begin()).compare(AclData::ACL_KEYWORD_WILDCARD) == 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 std::ostringstream userstr;
                 for (nsCitr itr  = (allNames ? names.begin() : (*i)->names.begin());
                             itr != (allNames ? names.end()   : (*i)->names.end());
@@ -184,15 +327,35 @@ namespace acl {
                     AclHelper::propertyMapToString(&rule.props)
                     << " for users {" <<
                     userstr.str().substr(0,userstr.str().length()-1)
+<<<<<<< HEAD
                     << "}" );
             }
         }
+=======
+                    << "}");
+            }
+        }
+
+        // connection quota
+        d->setConnQuotaRuleSettings(connQuota);
+        // queue quota
+        d->setQueueQuotaRuleSettings(queueQuota);
+        // global B/W connection rules
+        d->setConnGlobalRules(globalHostRules);
+        // user B/W connection rules
+        d->setConnUserRules(userHostRules);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
 
     void AclReader::aclRule::processName(const std::string& name, const groupMap& groups) {
+<<<<<<< HEAD
         if (name.compare("all") == 0) {
             names.insert("*");
+=======
+        if (name.compare(AclData::ACL_KEYWORD_ALL) == 0) {
+            names.insert(AclData::ACL_KEYWORD_WILDCARD);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             gmCitr itr = groups.find(name);
             if (itr == groups.end()) {
@@ -203,9 +366,23 @@ namespace acl {
         }
     }
 
+<<<<<<< HEAD
     AclReader::AclReader() : lineNumber(0), contFlag(false), validationMap(new AclHelper::objectMap) {
         AclHelper::loadValidationMap(validationMap);
         names.insert("*");
+=======
+    AclReader::AclReader(uint16_t theCliMaxConnPerUser, uint16_t theCliMaxQueuesPerUser) :
+        lineNumber(0), contFlag(false),
+        cliMaxConnPerUser (theCliMaxConnPerUser),
+        connQuotaRulesExist(false),
+        connQuota(new AclData::quotaRuleSet),
+        cliMaxQueuesPerUser (theCliMaxQueuesPerUser),
+        queueQuotaRulesExist(false),
+        queueQuota(new AclData::quotaRuleSet),
+        globalHostRules(new AclData::bwHostRuleSet),
+        userHostRules(new AclData::bwHostUserRuleMap) {
+        names.insert(AclData::ACL_KEYWORD_WILDCARD);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     AclReader::~AclReader() {}
@@ -223,6 +400,20 @@ namespace acl {
             errorStream << "Unable to open ACL file \"" << fn << "\": eof=" << (ifs.eof()?"T":"F") << "; fail=" << (ifs.fail()?"T":"F") << "; bad=" << (ifs.bad()?"T":"F");
             return -1;
         }
+<<<<<<< HEAD
+=======
+        // Propagate nonzero per-user max connection setting from CLI
+        if (cliMaxConnPerUser > 0) {
+            connQuotaRulesExist = true;
+            (*connQuota)[AclData::ACL_KEYWORD_ALL] = cliMaxConnPerUser;
+        }
+        // Propagate nonzero per-user max queue setting from CLI
+        if (cliMaxQueuesPerUser > 0) {
+            queueQuotaRulesExist = true;
+            (*queueQuota)[AclData::ACL_KEYWORD_ALL] = cliMaxQueuesPerUser;
+        }
+        // Loop to process the Acl file
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         try {
             bool err = false;
             while (ifs.good()) {
@@ -251,7 +442,22 @@ namespace acl {
         }
         printNames();
         printRules();
+<<<<<<< HEAD
         loadDecisionData(d);
+=======
+        printQuotas(AclData::ACL_KEYWORD_QUOTA_CONNECTIONS, connQuota);
+        printQuotas(AclData::ACL_KEYWORD_QUOTA_QUEUES, queueQuota);
+        try {
+            loadDecisionData(d);
+        } catch (const std::exception& e) {
+            errorStream << "Error loading decision data : " << e.what();
+            return -6;
+        }
+        printGlobalConnectRules();
+        printUserConnectRules();
+        validator.tracePropertyDefs();
+        d->printDecisionRules( printNamesFieldWidth() );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         return 0;
     }
@@ -261,7 +467,11 @@ namespace acl {
         std::vector<std::string> toks;
 
         // Check for continuation
+<<<<<<< HEAD
         char* contCharPtr = std::strrchr(line, '\\');
+=======
+        char* contCharPtr = std::strrchr(line, AclData::ACL_SYMBOL_LINE_CONTINUATION);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         bool cont = contCharPtr != 0;
         if (cont) *contCharPtr = 0;
 
@@ -272,10 +482,19 @@ namespace acl {
             return false;
         }
 
+<<<<<<< HEAD
         if (numToks && (toks[0].compare("group") == 0 || contFlag)) {
             ret = processGroupLine(toks, cont);
         } else if (numToks && toks[0].compare("acl") == 0) {
             ret = processAclLine(toks);
+=======
+        if (numToks && (toks[0].compare(AclData::ACL_KEYWORD_GROUP) == 0 || contFlag)) {
+            ret = processGroupLine(toks, cont);
+        } else if (numToks && toks[0].compare(AclData::ACL_KEYWORD_ACL) == 0) {
+            ret = processAclLine(toks);
+        } else if (numToks && toks[0].compare(AclData::ACL_KEYWORD_QUOTA) == 0) {
+            ret = processQuotaLine(toks);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             // Check for whitespace only line, ignore these
             bool ws = true;
@@ -285,8 +504,16 @@ namespace acl {
             if (ws) {
                 ret = true;
             } else {
+<<<<<<< HEAD
                 errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber 
                     << ", Non-continuation line must start with \"group\" or \"acl\".";
+=======
+                errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                    << ", Non-continuation line must start with \""
+                    << AclData::ACL_KEYWORD_GROUP << "\", \""
+                    << AclData::ACL_KEYWORD_ACL << "\". or \""
+                    << AclData::ACL_KEYWORD_QUOTA << "\".";
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 ret = false;
             }
         }
@@ -306,6 +533,117 @@ namespace acl {
         return cnt;
     }
 
+<<<<<<< HEAD
+=======
+
+    // Process 'quota' rule lines
+    // Return true if the line is successfully processed without errors
+    bool AclReader::processQuotaLine(tokList& toks) {
+        const unsigned toksSize = toks.size();
+        const unsigned minimumSize = 3;
+        if (toksSize < minimumSize) {
+            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                << ", Insufficient tokens for quota definition.";
+            return false;
+        }
+
+        if (toks[1].compare(AclData::ACL_KEYWORD_QUOTA_CONNECTIONS) == 0) {
+            if (processQuotaLine(toks, AclData::ACL_KEYWORD_QUOTA_CONNECTIONS, AclData::getConnectMaxSpec(), connQuota)) {
+                // We have processed a connection quota rule
+                connQuotaRulesExist = true;
+                return true;
+            }
+        } else if (toks[1].compare(AclData::ACL_KEYWORD_QUOTA_QUEUES) == 0) {
+            if (processQuotaLine(toks, AclData::ACL_KEYWORD_QUOTA_QUEUES, AclData::getConnectMaxSpec(), queueQuota)) {
+                // We have processed a queue quota rule
+                queueQuotaRulesExist = true;
+                return true;
+            }
+        } else {
+            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                << ", Quota type \"" << toks[1] << "\" unrecognized.";
+            return false;
+        }
+        return false;
+    }
+
+
+    // Process quota rule lines
+    // Return true if the line is successfully processed without errors
+    bool AclReader::processQuotaLine(tokList& toks, const std::string theNoun, uint16_t maxSpec, aclQuotaRuleSet theRules) {
+        const unsigned toksSize = toks.size();
+
+        uint16_t nEntities(0);
+        try {
+        	nEntities = boost::lexical_cast<uint16_t>(toks[2]);
+        } catch(const boost::bad_lexical_cast&) {
+            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                << ", " << theNoun << " quota value \"" << toks[2]
+                << "\" cannot be converted to a 16-bit unsigned integer.";
+            return false;
+        }
+
+        // limit check the setting
+        if (nEntities > maxSpec)
+        {
+            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                << ", " << theNoun << " quota value \"" << toks[2]
+                << "\" exceeds maximum configuration setting of "
+                << maxSpec;
+            return false;
+        }
+
+        // Apply the ount to all names in rule
+        for (unsigned idx = 3; idx < toksSize; idx++) {
+            if (groups.find(toks[idx]) == groups.end()) {
+                // This is the name of an individual, not a group
+                (*theRules)[toks[idx]] = nEntities;
+            } else {
+                if (!processQuotaGroup(toks[idx], nEntities, theRules))
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    // Process quota group expansion
+    // Return true if the quota is applied to all members of the group
+    bool AclReader::processQuotaGroup(const std::string& theGroup, uint16_t theQuota, aclQuotaRuleSet theRules) {
+        gmCitr citr = groups.find(theGroup);
+
+        if (citr == groups.end()) {
+            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+                << ", Failed to expand group \"" << theGroup << "\".";
+            return false;
+        }
+
+        for (nsCitr gni=citr->second->begin(); gni!=citr->second->end(); gni++) {
+            if (groups.find(*gni) == groups.end()) {
+                (*theRules)[*gni] = theQuota;
+            } else {
+                if (!processQuotaGroup(*gni, theQuota, theRules))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+
+    void AclReader::printQuotas(const std::string theNoun, aclQuotaRuleSet theRules) const {
+        QPID_LOG(debug, "ACL: " << theNoun << " quota: " << (*theRules).size() << " rules found:");
+        int cnt = 1;
+        for (AclData::quotaRuleSetItr itr=(*theRules).begin();
+                                      itr != (*theRules).end();
+                                      ++itr,++cnt) {
+            QPID_LOG(debug, "ACL: quota " << cnt << " : " << (*itr).second
+                << " " << theNoun << " for " << (*itr).first)
+        }
+    }
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // Return true if the line is successfully processed without errors
     // If cont is true, then groupName must be set to the continuation group name
     bool AclReader::processGroupLine(tokList& toks, const bool cont) {
@@ -330,7 +668,11 @@ namespace acl {
         } else {
             const unsigned minimumSize = (cont ? 2 : 3);
             if (toksSize < minimumSize) {
+<<<<<<< HEAD
                 errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber 
+=======
+                errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     << ", Insufficient tokens for group definition.";
                 return false;
             }
@@ -390,7 +732,13 @@ namespace acl {
         names.insert(name);
     }
 
+<<<<<<< HEAD
     // Debug aid
+=======
+    /**
+     * Emit debug logs exposing the name lists
+     */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void AclReader::printNames() const {
         QPID_LOG(debug, "ACL: Group list: " << groups.size() << " groups found:" );
         std::string tmp("ACL: ");
@@ -414,6 +762,20 @@ namespace acl {
         QPID_LOG(debug, tmp);
     }
 
+<<<<<<< HEAD
+=======
+    /**
+     * compute the width of longest user name
+     */
+    int AclReader::printNamesFieldWidth() const {
+        std::string::size_type max = 0;
+        for (nsCitr k=names.begin(); k!=names.end(); k++) {
+            max = std::max(max, (*k).length());
+        }
+        return max;
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool AclReader::processAclLine(tokList& toks) {
         const unsigned toksSize = toks.size();
         if (toksSize < 4) {
@@ -431,8 +793,13 @@ namespace acl {
             return false;
         }
 
+<<<<<<< HEAD
         bool actionAllFlag = toks[3].compare("all") == 0;
         bool userAllFlag   = toks[2].compare("all") == 0;
+=======
+        bool actionAllFlag = toks[3].compare(AclData::ACL_KEYWORD_ALL) == 0;
+        bool userAllFlag   = toks[2].compare(AclData::ACL_KEYWORD_ALL) == 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         Action action;
         if (actionAllFlag) {
 
@@ -461,7 +828,11 @@ namespace acl {
         }
 
         if (toksSize >= 5) { // object name-value pair
+<<<<<<< HEAD
             if (toks[4].compare("all") == 0) {
+=======
+            if (toks[4].compare(AclData::ACL_KEYWORD_ALL) == 0) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 rule->setObjectTypeAll();
             } else {
                 try {
@@ -479,7 +850,11 @@ namespace acl {
                 nvPair propNvp = splitNameValuePair(toks[i]);
                 if (propNvp.second.size() == 0) {
                     errorStream << ACL_FORMAT_ERR_LOG_PREFIX <<  "Line : " << lineNumber
+<<<<<<< HEAD
                         <<", Badly formed property name-value pair \"" 
+=======
+                        <<", Badly formed property name-value pair \""
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                         << propNvp.first << "\". (Must be name=value)";
                     return false;
                 }
@@ -495,18 +870,25 @@ namespace acl {
             }
         }
         // Check if name (toks[2]) is group; if not, add as name of individual
+<<<<<<< HEAD
         if (toks[2].compare("all") != 0) {
+=======
+        if (toks[2].compare(AclData::ACL_KEYWORD_ALL) != 0) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (groups.find(toks[2]) == groups.end()) {
                 addName(toks[2]);
             }
         }
 
+<<<<<<< HEAD
         // If rule validates, add to rule list
         if (!rule->validate(validationMap)) {
             errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
                 << ", Invalid object/action/property combination.";
             return false;
         }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         rules.push_back(rule);
 
         return true;
@@ -518,6 +900,32 @@ namespace acl {
         int cnt = 1;
         for (rlCitr i=rules.begin(); i<rules.end(); i++,cnt++) {
             QPID_LOG(debug, "ACL:   " << std::setfill(' ') << std::setw(2) << cnt << " " << (*i)->toString());
+<<<<<<< HEAD
+=======
+            if (!(*i)->actionAll && (*i)->objStatus == aclRule::VALUE) {
+                (void)validator.validateAllowedProperties((*i)->action, (*i)->object, (*i)->props, true);
+            }
+        }
+    }
+
+    void AclReader::printConnectionRules(const std::string name, const AclData::bwHostRuleSet& rules) const {
+        QPID_LOG(debug, "ACL: " << name << " Connection Rule list : " << rules.size() << " rules found :");
+        int cnt = 1;
+        for (AclData::bwHostRuleSetItr i=rules.begin(); i<rules.end(); i++,cnt++) {
+            QPID_LOG(debug, "ACL:   " << std::setfill(' ') << std::setw(2) << cnt << " " << i->toString());
+        }
+    }
+
+    void AclReader::printGlobalConnectRules() const {
+        printConnectionRules("global", *globalHostRules);
+    }
+
+    void AclReader::printUserConnectRules() const {
+        QPID_LOG(debug, "ACL: User Connection Rule lists : " << userHostRules->size() << " user lists found :");
+        int cnt = 1;
+        for (AclData::bwHostUserRuleMapItr i=userHostRules->begin(); i!=userHostRules->end(); i++,cnt++) {
+            printConnectionRules(std::string((*i).first), (*i).second);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 

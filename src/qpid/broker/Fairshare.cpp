@@ -19,7 +19,12 @@
  *
  */
 #include "qpid/broker/Fairshare.h"
+<<<<<<< HEAD
 #include "qpid/broker/QueuedMessage.h"
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/broker/QueueSettings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/log/Statement.h"
@@ -83,6 +88,7 @@ bool Fairshare::setState(uint p, uint c)
     return true;
 }
 
+<<<<<<< HEAD
 bool Fairshare::findFrontLevel(uint& p, PriorityLevels& messages)
 {
     const uint start = p = currentLevel();
@@ -94,6 +100,8 @@ bool Fairshare::findFrontLevel(uint& p, PriorityLevels& messages)
 
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool Fairshare::getState(const Messages& m, uint& priority, uint& count)
 {
     const Fairshare* fairshare = dynamic_cast<const Fairshare*>(&m);
@@ -106,6 +114,7 @@ bool Fairshare::setState(Messages& m, uint priority, uint count)
     return fairshare && fairshare->setState(priority, count);
 }
 
+<<<<<<< HEAD
 int getIntegerSetting(const qpid::framing::FieldTable& settings, const std::vector<std::string>& keys)
 {
     qpid::framing::FieldTable::ValuePtr v;
@@ -182,6 +191,32 @@ std::auto_ptr<Messages> Fairshare::create(const qpid::framing::FieldTable& setti
         else result = std::auto_ptr<Messages>(new PriorityQueue(levels));
     }
     return result;
+=======
+PriorityQueue::Priority Fairshare::firstLevel()
+{
+    return Priority(currentLevel());
+}
+
+bool Fairshare::nextLevel(Priority& p)
+{
+    int next = nextLevel();
+    if (next == p.start) {
+        return false;
+    } else {
+        p.current = next;
+        return true;
+    }
+}
+
+std::auto_ptr<Messages> Fairshare::create(const QueueSettings& settings)
+{
+    std::auto_ptr<Fairshare> fairshare(new Fairshare(settings.priorities, settings.defaultFairshare));
+    for (uint i = 0; i < settings.priorities; i++) {
+        std::map<uint32_t,uint32_t>::const_iterator l = settings.fairshare.find(i);
+        if (l != settings.fairshare.end()) fairshare->setLimit(i, l->second);
+    }
+    return std::auto_ptr<Messages>(fairshare.release());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::broker

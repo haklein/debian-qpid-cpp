@@ -19,8 +19,15 @@
  *
  */
 #include "qpid/broker/LinkRegistry.h"
+<<<<<<< HEAD
 #include "qpid/broker/Link.h"
 #include "qpid/broker/Connection.h"
+=======
+
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+#include "qpid/broker/Link.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 #include <iostream>
 #include <boost/format.hpp>
@@ -42,7 +49,11 @@ namespace _qmf = qmf::org::apache::qpid::broker;
 // factored: The persistence element should be factored separately
 LinkRegistry::LinkRegistry () :
     broker(0),
+<<<<<<< HEAD
     parent(0), store(0), passive(false),
+=======
+    parent(0), store(0),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     realm("")
 {
 }
@@ -51,16 +62,44 @@ class LinkRegistryConnectionObserver : public ConnectionObserver {
     LinkRegistry& links;
   public:
     LinkRegistryConnectionObserver(LinkRegistry& l) : links(l) {}
+<<<<<<< HEAD
     void connection(Connection& c) { links.notifyConnection(c.getMgmtId(), &c); }
     void opened(Connection& c) { links.notifyOpened(c.getMgmtId()); }
     void closed(Connection& c) { links.notifyClosed(c.getMgmtId()); }
     void forced(Connection& c, const string& text) { links.notifyConnectionForced(c.getMgmtId(), text); }
+=======
+    void connection(Connection& in)
+    {
+        amqp_0_10::Connection* c = dynamic_cast<amqp_0_10::Connection*>(&in);
+        if (c) links.notifyConnection(c->getMgmtId(), c);
+    }
+    void opened(Connection& in)
+    {
+        amqp_0_10::Connection* c = dynamic_cast<amqp_0_10::Connection*>(&in);
+        if (c) links.notifyOpened(c->getMgmtId());
+    }
+    void closed(Connection& in)
+    {
+        amqp_0_10::Connection* c = dynamic_cast<amqp_0_10::Connection*>(&in);
+        if (c) links.notifyClosed(c->getMgmtId());
+    }
+    void forced(Connection& in, const string& text)
+    {
+        amqp_0_10::Connection* c = dynamic_cast<amqp_0_10::Connection*>(&in);
+        if (c) links.notifyConnectionForced(c->getMgmtId(), text);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 LinkRegistry::LinkRegistry (Broker* _broker) :
     broker(_broker),
+<<<<<<< HEAD
     parent(0), store(0), passive(false),
     realm(broker->getOptions().realm)
+=======
+    parent(0), store(0),
+    realm(broker->getRealm())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     broker->getConnectionObservers().add(
         boost::shared_ptr<ConnectionObserver>(new LinkRegistryConnectionObserver(*this)));
@@ -117,8 +156,15 @@ pair<Link::shared_ptr, bool> LinkRegistry::declare(const string& name,
                       boost::bind(&LinkRegistry::linkDestroyed, this, _1),
                       durable, authMechanism, username, password, broker,
                       parent, failover));
+<<<<<<< HEAD
         if (durable && store) store->create(*link);
         links[name] = link;
+=======
+        if (durable && store && !broker->inRecovery())
+            store->create(*link);
+        links[name] = link;
+        pendingLinks[name] = link;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "Creating new link; name=" << name );
         return std::pair<Link::shared_ptr, bool>(link, true);
     }
@@ -164,6 +210,10 @@ pair<Bridge::shared_ptr, bool> LinkRegistry::declare(const std::string& name,
                                                      const std::string& excludes,
                                                      bool         dynamic,
                                                      uint16_t     sync,
+<<<<<<< HEAD
+=======
+                                                     uint32_t     credit,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                                      Bridge::InitializeCallback init,
                                                      const std::string& queueName,
                                                      const std::string& altExchange
@@ -205,6 +255,10 @@ pair<Bridge::shared_ptr, bool> LinkRegistry::declare(const std::string& name,
         args.i_excludes   = excludes;
         args.i_dynamic    = dynamic;
         args.i_sync       = sync;
+<<<<<<< HEAD
+=======
+        args.i_credit     = credit;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         bridge = Bridge::shared_ptr
           (new Bridge (name, &link, link.nextChannel(),
@@ -212,7 +266,11 @@ pair<Bridge::shared_ptr, bool> LinkRegistry::declare(const std::string& name,
                        args, init, queueName, altExchange));
         bridges[name] = bridge;
         link.add(bridge);
+<<<<<<< HEAD
         if (durable && store)
+=======
+        if (durable && store && !broker->inRecovery())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             store->create(*bridge);
 
         QPID_LOG(debug, "Bridge '" << name <<"' declared on link '" << link.getName() <<
@@ -229,6 +287,10 @@ void LinkRegistry::linkDestroyed(Link *link)
     QPID_LOG(debug, "LinkRegistry::destroy(); link= " << link->getName());
     Mutex::ScopedLock   locker(lock);
 
+<<<<<<< HEAD
+=======
+    pendingLinks.erase(link->getName());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     LinkMap::iterator i = links.find(link->getName());
     if (i != links.end())
     {
@@ -251,6 +313,10 @@ void LinkRegistry::destroyBridge(Bridge *bridge)
     Link *link = b->second->getLink();
     if (link) {
         link->cancel(b->second);
+<<<<<<< HEAD
+=======
+        link->returnChannel( bridge->getChannel() );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     if (b->second->isDurable())
         store->destroy(*(b->second));
@@ -266,6 +332,7 @@ MessageStore* LinkRegistry::getStore() const {
     return store;
 }
 
+<<<<<<< HEAD
 namespace {
     void extractHostPort(const std::string& connId, std::string *host, uint16_t *port)
     {
@@ -298,6 +365,8 @@ namespace {
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /** find the Link that corresponds to the given connection */
 Link::shared_ptr LinkRegistry::findLink(const std::string& connId)
 {
@@ -311,12 +380,17 @@ Link::shared_ptr LinkRegistry::findLink(const std::string& connId)
     return Link::shared_ptr();
 }
 
+<<<<<<< HEAD
 void LinkRegistry::notifyConnection(const std::string& key, Connection* c)
+=======
+void LinkRegistry::notifyConnection(const std::string& key, amqp_0_10::Connection* c)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     // find a link that is attempting to connect to the remote, and
     // create a mapping from connection id to link
     QPID_LOG(debug, "LinkRegistry::notifyConnection(); key=" << key );
     std::string host;
+<<<<<<< HEAD
     uint16_t port = 0;
     extractHostPort( key, &host, &port );
     Link::shared_ptr link;
@@ -328,6 +402,17 @@ void LinkRegistry::notifyConnection(const std::string& key, Connection* c)
                 connections[key] = link->getName();
                 break;
             }
+=======
+    Link::shared_ptr link;
+    {
+        Mutex::ScopedLock locker(lock);
+        LinkMap::iterator l = pendingLinks.find(key);
+        if (l != pendingLinks.end()) {
+            link = l->second;
+            pendingLinks.erase(l);
+            connections[key] = link->getName();
+            QPID_LOG(debug, "LinkRegistry:: found pending =" << link->getName());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 
@@ -347,6 +432,13 @@ void LinkRegistry::notifyClosed(const std::string& key)
 {
     Link::shared_ptr link = findLink(key);
     if (link) {
+<<<<<<< HEAD
+=======
+        {
+            Mutex::ScopedLock locker(lock);
+            pendingLinks[link->getName()] = link;
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         link->closed(0, "Closed by peer");
     }
 }
@@ -355,6 +447,13 @@ void LinkRegistry::notifyConnectionForced(const std::string& key, const std::str
 {
     Link::shared_ptr link = findLink(key);
     if (link) {
+<<<<<<< HEAD
+=======
+        {
+            Mutex::ScopedLock locker(lock);
+            pendingLinks[link->getName()] = link;
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         link->notifyConnectionForced(text);
     }
 }
@@ -434,6 +533,7 @@ std::string LinkRegistry::getAuthIdentity(const std::string& key)
     return link->getUsername();
 }
 
+<<<<<<< HEAD
 
 void LinkRegistry::setPassive(bool p)
 {
@@ -456,4 +556,6 @@ void LinkRegistry::eachBridge(boost::function<void(boost::shared_ptr<Bridge>)> f
     for (BridgeMap::iterator i = bridges.begin(); i != bridges.end(); ++i) f(i->second);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::broker

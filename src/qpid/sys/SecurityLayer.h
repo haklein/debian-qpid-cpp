@@ -33,8 +33,17 @@ namespace sys {
 class SecurityLayer : public Codec
 {
   public:
+<<<<<<< HEAD
     virtual void init(Codec*) = 0;
     virtual ~SecurityLayer() {}
+=======
+    SecurityLayer(int ssf_) : ssf(ssf_) {}
+    int getSsf() const { return ssf; }
+    virtual void init(Codec*) = 0;
+    virtual ~SecurityLayer() {}
+  private:
+    int ssf;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::sys

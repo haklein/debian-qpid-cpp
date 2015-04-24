@@ -29,8 +29,11 @@
 #include "qpid/broker/TransactionalStore.h"
 #include "qpid/framing/FieldTable.h"
 
+<<<<<<< HEAD
 #include <qpid/Options.h>
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/shared_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
 
@@ -46,6 +49,7 @@ class MessageStore : public TransactionalStore, public Recoverable {
   public:
 
     /**
+<<<<<<< HEAD
      * If called after initialization but before recovery, will discard the database
      * content and reinitialize as though it were a new installation. If the parameter
      * saveStoreContent is true, the content of the store will be saved in such a way
@@ -60,6 +64,8 @@ class MessageStore : public TransactionalStore, public Recoverable {
     virtual void truncateInit(const bool saveStoreContent = false) = 0;
 
     /**
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
      * Record the existence of a durable queue
      */
     virtual void create(PersistableQueue& queue,

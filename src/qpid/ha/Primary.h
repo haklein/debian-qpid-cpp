@@ -23,11 +23,25 @@
  */
 
 #include "types.h"
+<<<<<<< HEAD
 #include "BrokerInfo.h"
 #include "qpid/sys/Mutex.h"
 #include <boost/shared_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <map>
+=======
+#include "hash.h"
+#include "BrokerInfo.h"
+#include "LogPrefix.h"
+#include "PrimaryQueueLimits.h"
+#include "ReplicationTest.h"
+#include "Role.h"
+#include "qpid/sys/Mutex.h"
+#include "qpid/sys/unordered_map.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
+#include <boost/intrusive_ptr.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <string>
 
 namespace qpid {
@@ -36,7 +50,14 @@ namespace broker {
 class Queue;
 class Connection;
 class ConnectionObserver;
+<<<<<<< HEAD
 class ConfigurationObserver;
+=======
+class BrokerObserver;
+class SessionHandlerObserver;
+class TxBuffer;
+class DtxBuffer;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace sys {
@@ -48,6 +69,11 @@ class HaBroker;
 class ReplicatingSubscription;
 class RemoteBackup;
 class QueueGuard;
+<<<<<<< HEAD
+=======
+class Membership;
+class PrimaryTxObserver;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * State associated with a primary broker:
@@ -55,6 +81,7 @@ class QueueGuard;
  * - sets queue guards on new queues for each backup.
  *
  * THREAD SAFE: called concurrently in arbitrary connection threads.
+<<<<<<< HEAD
  */
 class Primary
 {
@@ -62,16 +89,57 @@ class Primary
     typedef boost::shared_ptr<broker::Queue> QueuePtr;
 
     static Primary* get() { return instance; }
+=======
+ *
+ * Locking rules: BrokerObserver create/destroy functions are called with
+ * the QueueRegistry lock held. Functions holding Primary::lock *must not*
+ * directly or indirectly call on the queue registry.
+ */
+class Primary : public Role
+{
+  public:
+    typedef boost::shared_ptr<broker::Queue> QueuePtr;
+    typedef boost::shared_ptr<broker::Exchange> ExchangePtr;
+    typedef boost::shared_ptr<RemoteBackup> RemoteBackupPtr;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Primary(HaBroker& hb, const BrokerInfo::Set& expectedBackups);
     ~Primary();
 
+<<<<<<< HEAD
     void readyReplica(const ReplicatingSubscription&);
     void removeReplica(const std::string& q);
 
     // Called via ConfigurationObserver
     void queueCreate(const QueuePtr&);
     void queueDestroy(const QueuePtr&);
+=======
+    // Role implementation
+    Role* promote();
+    void setBrokerUrl(const Url&) {}
+
+    void readyReplica(const ReplicatingSubscription&);
+    void addReplica(ReplicatingSubscription&);
+    void removeReplica(const ReplicatingSubscription&);
+
+    /** Skip replication of ids to queue on backup. */
+    void skipEnqueues(const types::Uuid& backup,
+                      const boost::shared_ptr<broker::Queue>& queue,
+                      const ReplicationIdSet& ids);
+
+    /** Skip replication of dequeue of ids to queue on backup. */
+    void skipDequeues(const types::Uuid& backup,
+                      const boost::shared_ptr<broker::Queue>& queue,
+                      const ReplicationIdSet& ids);
+
+    // Called via BrokerObserver
+    void queueCreate(const QueuePtr&);
+    void queueDestroy(const QueuePtr&);
+    void exchangeCreate(const ExchangePtr&);
+    void exchangeDestroy(const ExchangePtr&);
+    void startTx(const boost::intrusive_ptr<broker::TxBuffer>&);
+    void startDtx(const boost::intrusive_ptr<broker::DtxBuffer>&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Called via ConnectionObserver
     void opened(broker::Connection& connection);
@@ -83,6 +151,7 @@ class Primary
     void timeoutExpectedBackups();
 
   private:
+<<<<<<< HEAD
     typedef std::map<types::Uuid, boost::shared_ptr<RemoteBackup> > BackupMap;
     typedef std::set<boost::shared_ptr<RemoteBackup> > BackupSet;
 
@@ -109,6 +178,54 @@ class Primary
     boost::intrusive_ptr<sys::TimerTask> timerTask;
 
     static Primary* instance;
+=======
+    typedef sys::unordered_map<
+      types::Uuid, RemoteBackupPtr, Hasher<types::Uuid> > BackupMap;
+
+    typedef std::set<RemoteBackupPtr > BackupSet;
+
+    typedef std::pair<types::Uuid, boost::shared_ptr<broker::Queue> > UuidQueue;
+    typedef sys::unordered_map<UuidQueue, ReplicatingSubscription*,
+                               Hasher<UuidQueue> > ReplicaMap;
+
+    // Map of PrimaryTxObservers by tx-queue name
+    typedef sys::unordered_map<std::string, boost::weak_ptr<PrimaryTxObserver> > TxMap;
+
+    RemoteBackupPtr backupConnect(const BrokerInfo&, broker::Connection&, sys::Mutex::ScopedLock&);
+    void backupDisconnect(RemoteBackupPtr, sys::Mutex::ScopedLock&);
+
+    void checkReady();
+    void checkReady(RemoteBackupPtr);
+    void setCatchupQueues(const RemoteBackupPtr&, bool createGuards);
+    void deduplicate();
+    boost::shared_ptr<PrimaryTxObserver> makeTxObserver(
+        const boost::intrusive_ptr<broker::TxBuffer>&);
+
+    mutable sys::Mutex lock;
+    HaBroker& haBroker;
+    Membership& membership;
+    const LogPrefix& logPrefix;
+    bool active;
+    ReplicationTest replicationTest;
+
+    /**
+     * Set of expected backups that must be ready before we declare ourselves
+     * active. These are backups that were known and ready before the primary
+     * crashed. As new primary we expect them to re-connect.
+     */
+    BackupSet expectedBackups;
+    /**
+     * Map of all the expected backups plus all connected backups.
+     */
+    BackupMap backups;
+    boost::shared_ptr<broker::ConnectionObserver> connectionObserver;
+    boost::shared_ptr<broker::BrokerObserver> brokerObserver;
+    boost::shared_ptr<broker::SessionHandlerObserver> sessionHandlerObserver;
+    boost::intrusive_ptr<sys::TimerTask> timerTask;
+    ReplicaMap replicas;
+    TxMap txMap;
+    PrimaryQueueLimits queueLimits;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::ha
 

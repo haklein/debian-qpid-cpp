@@ -51,6 +51,7 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
     /**
      * Current implementation supports the following options:
      *
+<<<<<<< HEAD
      * - username
      * - password
      * - heartbeat
@@ -60,6 +61,23 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
      * - sasl_min_ssf
      * - sasl_max_ssf
      * - transport
+=======
+     * - heartbeat: the heartbeat interval in seconds
+     * - tcp_nodelay: true/false, whether nagle should be disabled or not
+     * - transport: the underlying transport to use (e.g. tcp, ssl, rdma)
+     * - protocol: the version of AMQP to use (e.g. amqp0-10 or amqp1.0)
+     *
+     * (Note: the transports and/or protocols recognised may depend on
+     * which plugins are loaded. AT present support for heartbeats is
+     * missing in AMQP 1.0)
+     *
+     * - username: the username to authenticate as
+     * - password: the password to use if required by the selected authentication mechanism
+     * - sasl_mechanisms: a space separated list of acceptable SASL mechanisms
+     * - sasl_min_ssf: the minimum acceptable security strength factor
+     * - sasl_max_ssf: the maximum acceptable security strength factor
+     * - sasl_service: the service name if needed by the SASL mechanism in use
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
      *
      * Reconnect behaviour can be controlled through the following options:
      *
@@ -78,6 +96,39 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
      *
      * Values in seconds can be fractional, for example 0.001 is a
      * millisecond delay.
+<<<<<<< HEAD
+=======
+     *
+     * If the SSL transport is used, the following options apply:
+     *
+     * - ssl_cert_name: the name of the certificate to use for a given
+     * - connection ssl_ignore_hostname_verification_failure: if set
+     *               to true, will allow client to connect to server even
+     *               if the  hostname used (or ip address) doesn't match
+     *               what is in the servers certificate. I.e. this disables
+     *               authentication of the server to the client (and should
+     *               be used only as a last resort)
+     *
+     * When AMQP 1.0 is used, the following options apply:
+     *
+     * - container_id: sets the container id to use for the connection
+     * - nest_annotations: if true, any annotations in received
+     *      messages will be presented as properties with keys
+     *      x-amqp-delivery-annotations or x-amqp-delivery-annotations
+     *      and values that are nested maps containing the
+     *      annotations. If false, the annotations will simply be merged
+     *      in with the properties.
+     * - set_to_on_send: If true, all sent messages will have the to
+     *      field set to the node name of the sender
+     * - properties or client_properties: the properties to include in the open frame sent
+     *
+     * The following options can be used to tune behaviour if needed
+     * (these are not yet supported over AMQP 1.0):
+     *
+     * - tcp_nodelay: disables Nagle's algorithm on the underlying tcp socket
+     * - max_channels: restricts the maximum number of channels supported
+     * - max_frame_size: restricts the maximum frame size supported
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
      */
     QPID_MESSAGING_EXTERN Connection(const std::string& url, const qpid::types::Variant::Map& options = qpid::types::Variant::Map());
     /**
@@ -93,6 +144,36 @@ class QPID_MESSAGING_CLASS_EXTERN Connection : public qpid::messaging::Handle<Co
     QPID_MESSAGING_EXTERN void open();
     QPID_MESSAGING_EXTERN bool isOpen();
     QPID_MESSAGING_EXTERN bool isOpen() const;
+<<<<<<< HEAD
+=======
+
+    /**
+     * Attempts to reconnect to the specified url, re-establish
+     * existing sessions, senders and receivers and resend any indoubt
+     * messages.
+     *
+     * This can be used to directly control reconnect behaviour rather
+     * than using the reconnect option for automatically handling
+     * that.
+     */
+    QPID_MESSAGING_EXTERN void reconnect(const std::string& url);
+    /**
+     * Attempts to reconnect to the original url, including any
+     * specified reconnect_urls, re-establish existing sessions,
+     * senders and receivers and resend any indoubt messages.
+     *
+     * This can be used to directly control reconnect behaviour rather
+     * than using the reconnect option for automatically handling
+     * that.
+     */
+    QPID_MESSAGING_EXTERN void reconnect();
+    /**
+     * returns a url reprsenting the broker the client is currently
+     * connected to (or an empty string if it is not connected).
+     */
+    QPID_MESSAGING_EXTERN std::string getUrl() const;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /**
      * Closes a connection and all sessions associated with it. An
      * opened connection must be closed before the last handle is

@@ -35,7 +35,10 @@
 
 using std::string;
 
+<<<<<<< HEAD
 using boost::intrusive_ptr;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using namespace qpid::broker;
 using namespace qpid::framing;
 using namespace qpid::sys;
@@ -62,11 +65,17 @@ QPID_AUTO_TEST_CASE(testMe)
     queue.reset();
     queue2.reset();
 
+<<<<<<< HEAD
     intrusive_ptr<Message> msgPtr(MessageUtils::createMessage("exchange", "abc", false, "id"));
     DeliverableMessage msg(msgPtr);
     topic.route(msg);
     direct.route(msg);
 
+=======
+    DeliverableMessage msg(MessageUtils::createMessage("exchange", "abc"), 0);
+    topic.route(msg);
+    direct.route(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_CASE(testIsBound)
@@ -141,7 +150,11 @@ QPID_AUTO_TEST_CASE(testIsBound)
     args3.setInt("b", 6);
 
     headers.bind(a, "", &args1);
+<<<<<<< HEAD
     headers.bind(a, "", &args3);
+=======
+    headers.bind(a, "other", &args3);//need to use different binding key to correctly identify second binding
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     headers.bind(b, "", &args2);
     headers.bind(c, "", &args1);
 
@@ -161,11 +174,16 @@ QPID_AUTO_TEST_CASE(testIsBound)
 QPID_AUTO_TEST_CASE(testDeleteGetAndRedeclare)
 {
     ExchangeRegistry exchanges;
+<<<<<<< HEAD
     exchanges.declare("my-exchange", "direct", false, FieldTable());
+=======
+    exchanges.declare("my-exchange", "direct", false, false, FieldTable());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     exchanges.destroy("my-exchange");
     try {
         exchanges.get("my-exchange");
     } catch (const NotFoundException&) {}
+<<<<<<< HEAD
     std::pair<Exchange::shared_ptr, bool> response = exchanges.declare("my-exchange", "direct", false, FieldTable());
     BOOST_CHECK_EQUAL(string("direct"), response.first->getType());
 }
@@ -180,6 +198,12 @@ intrusive_ptr<Message> cmessage(std::string exchange, std::string routingKey) {
     return msg;
 }
 
+=======
+    std::pair<Exchange::shared_ptr, bool> response = exchanges.declare("my-exchange", "direct", false, false, FieldTable());
+    BOOST_CHECK_EQUAL(string("direct"), response.first->getType());
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testSequenceOptions)
 {
     FieldTable args;
@@ -187,6 +211,7 @@ QPID_AUTO_TEST_CASE(testSequenceOptions)
     char* buff = new char[10000];
     framing::Buffer buffer(buff,10000);
     {
+<<<<<<< HEAD
         DirectExchange direct("direct1", false, args);
 
         intrusive_ptr<Message> msg1 = cmessage("e", "abc");
@@ -229,6 +254,39 @@ QPID_AUTO_TEST_CASE(testSequenceOptions)
 
         topic.route(dmsg6);
         BOOST_CHECK_EQUAL(1, msg6->getApplicationHeaders()->getAsInt64("qpid.msg_sequence"));
+=======
+        DirectExchange direct("direct1", false, false, args);
+
+        DeliverableMessage msg1(MessageUtils::createMessage("e", "abc"), 0);
+        DeliverableMessage msg2(MessageUtils::createMessage("e", "abc"), 0);
+        DeliverableMessage msg3(MessageUtils::createMessage("e", "abc"), 0);
+
+        direct.route(msg1);
+        direct.route(msg2);
+        direct.route(msg3);
+
+        BOOST_CHECK_EQUAL(1, msg1.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+        BOOST_CHECK_EQUAL(2, msg2.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+        BOOST_CHECK_EQUAL(3, msg3.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+
+        FanOutExchange fanout("fanout1", false, false, args);
+        HeadersExchange header("headers1", false, false, args);
+        TopicExchange topic ("topic1", false, false, args);
+
+        // check other exchanges, that they preroute
+        DeliverableMessage msg4(MessageUtils::createMessage("e", "abc"), 0);
+        DeliverableMessage msg5(MessageUtils::createMessage("e", "abc"), 0);
+        DeliverableMessage msg6(MessageUtils::createMessage("e", "abc"), 0);
+
+        fanout.route(msg4);
+        BOOST_CHECK_EQUAL(1, msg4.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+
+        header.route(msg5);
+        BOOST_CHECK_EQUAL(1, msg5.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+
+        topic.route(msg6);
+        BOOST_CHECK_EQUAL(1, msg6.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         direct.encode(buffer);
     }
     {
@@ -237,11 +295,18 @@ QPID_AUTO_TEST_CASE(testSequenceOptions)
         buffer.reset();
         DirectExchange::shared_ptr exch_dec = Exchange::decode(exchanges, buffer);
 
+<<<<<<< HEAD
         intrusive_ptr<Message> msg1 = cmessage("e", "abc");
         DeliverableMessage dmsg1(msg1);
         exch_dec->route(dmsg1);
 
         BOOST_CHECK_EQUAL(4, msg1->getApplicationHeaders()->getAsInt64("qpid.msg_sequence"));
+=======
+        DeliverableMessage msg1(MessageUtils::createMessage("e", "abc"), 0);
+        exch_dec->route(msg1);
+
+        BOOST_CHECK_EQUAL(4, msg1.getMessage().getAnnotation("qpid.msg_sequence").asInt64());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     }
     delete [] buff;
@@ -251,6 +316,7 @@ QPID_AUTO_TEST_CASE(testIVEOption)
 {
     FieldTable args;
     args.setInt("qpid.ive",1);
+<<<<<<< HEAD
     DirectExchange direct("direct1", false, args);
     FanOutExchange fanout("fanout1", false, args);
     HeadersExchange header("headers1", false, args);
@@ -259,6 +325,18 @@ QPID_AUTO_TEST_CASE(testIVEOption)
     intrusive_ptr<Message> msg1 = cmessage("direct1", "abc");
     msg1->insertCustomProperty("a", "abc");
     DeliverableMessage dmsg1(msg1);
+=======
+    DirectExchange direct("direct1", false, false, args);
+    FanOutExchange fanout("fanout1", false, false, args);
+    HeadersExchange header("headers1", false, false, args);
+    TopicExchange topic ("topic1", false, false, args);
+
+    qpid::types::Variant::Map properties;
+    properties["routing-key"] = "abc";
+    properties["a"] = "abc";
+    Message msg1 = MessageUtils::createMessage(properties, "my-message", "direct1");
+    DeliverableMessage dmsg1(msg1, 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     FieldTable args2;
     args2.setString("x-match", "any");
@@ -273,8 +351,11 @@ QPID_AUTO_TEST_CASE(testIVEOption)
     Queue::shared_ptr queue2(new Queue("queue2", true));
     Queue::shared_ptr queue3(new Queue("queue3", true));
 
+<<<<<<< HEAD
     BOOST_CHECK(HeadersExchange::match(args2, msg1->getProperties<MessageProperties>()->getApplicationHeaders()));
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK(direct.bind(queue, "abc", 0));
     BOOST_CHECK(fanout.bind(queue1, "abc", 0));
     BOOST_CHECK(header.bind(queue2, "", &args2));
@@ -287,7 +368,10 @@ QPID_AUTO_TEST_CASE(testIVEOption)
 
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

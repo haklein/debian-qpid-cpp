@@ -24,18 +24,34 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/Options.h"
+<<<<<<< HEAD
 #include "qpid/broker/Broker.h"
 #include "qpid/broker/MessageStore.h"
 #include "qpid/broker/PersistableExchange.h"
 #include "qpid/broker/PersistableMessage.h"
 #include "qpid/broker/PersistableQueue.h"
 #include "qpid/management/Manageable.h"
+=======
+#include "qpid/broker/MessageStore.h"
+//#include "qpid/management/Manageable.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <string>
 
 using namespace qpid;
 
 namespace qpid {
+<<<<<<< HEAD
+=======
+
+namespace broker {
+class Broker;
+class PersistableExchange;
+class PersistableMessage;
+class PersistableQueue;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace store {
 
 class StorageProvider;
@@ -82,6 +98,7 @@ class MessageStorePlugin :
     /**
      * @name Methods inherited from qpid::broker::MessageStore
      */
+<<<<<<< HEAD
     //@{
     /**
      * If called before recovery, will discard the database and reinitialize
@@ -94,6 +111,8 @@ class MessageStorePlugin :
      *                            reinitializing the store content.
      */
     virtual void truncateInit(const bool saveStoreContent = false);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Record the existence of a durable queue
@@ -275,7 +294,11 @@ class MessageStorePlugin :
     };
     StoreOptions options;
 
+<<<<<<< HEAD
     typedef std::map<const std::string, StorageProvider*> ProviderMap;
+=======
+    typedef std::map<std::string, StorageProvider*> ProviderMap;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ProviderMap providers;
     ProviderMap::const_iterator provider;
 

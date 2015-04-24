@@ -36,7 +36,11 @@ namespace amqp0_10 {
 
 class AddressResolution;
 class MessageSink;
+<<<<<<< HEAD
 struct OutgoingMessage;
+=======
+class OutgoingMessage;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  *
@@ -47,7 +51,11 @@ class SenderImpl : public qpid::messaging::SenderImpl
     enum State {UNRESOLVED, ACTIVE, CANCELLED};
 
     SenderImpl(SessionImpl& parent, const std::string& name, 
+<<<<<<< HEAD
                const qpid::messaging::Address& address);
+=======
+               const qpid::messaging::Address& address, bool autoReconnect);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void send(const qpid::messaging::Message&, bool sync);
     void close();
     void setCapacity(uint32_t);
@@ -56,10 +64,18 @@ class SenderImpl : public qpid::messaging::SenderImpl
     void init(qpid::client::AsyncSession, AddressResolution&);
     const std::string& getName() const;
     qpid::messaging::Session getSession() const;
+<<<<<<< HEAD
+=======
+    qpid::messaging::Address getAddress() const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
   private:
     mutable sys::Mutex lock;
     boost::intrusive_ptr<SessionImpl> parent;
+<<<<<<< HEAD
+=======
+    const bool autoReconnect;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string name;
     const qpid::messaging::Address address;
     State state;

@@ -1476,8 +1476,16 @@ class SchemaClass:
 
   def genMethodIdDeclarations (self, stream, variables):
     number = 1
+<<<<<<< HEAD
     for method in self.methods:
       stream.write ("    QPID_BROKER_EXTERN static const uint32_t METHOD_" + method.getName().upper() +\
+=======
+    ext = ""
+    if variables['genForBroker']:
+        ext = "QPID_BROKER_EXTERN "
+    for method in self.methods:
+      stream.write ("    " + ext + "static const uint32_t METHOD_" + method.getName().upper() +\
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     " = %d;\n" % number)
       number = number + 1
 
@@ -1521,7 +1529,11 @@ class SchemaClass:
     for config in self.properties:
       if config.isParentRef == 1:
         stream.write (config.getName () + \
+<<<<<<< HEAD
                       " = _parent->GetManagementObject ()->getObjectId ();")
+=======
+                      " = _parent->GetManagementObject()->getObjectId();")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return
 
   def genSchemaMD5 (self, stream, variables):

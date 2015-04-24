@@ -23,11 +23,19 @@
 #include <string>
 #include <limits>
 
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/Address.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/Sender.h"
 #include "qpid/messaging/Session.h"
 #include "qpid/messaging/Message.h"
 
 #include "Sender.h"
+<<<<<<< HEAD
+=======
+#include "Address.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "Message.h"
 #include "QpidException.h"
 
@@ -50,8 +58,13 @@ namespace Messaging {
 
     // unmanaged clone
     Sender::Sender(const ::qpid::messaging::Sender & s,
+<<<<<<< HEAD
         Org::Apache::Qpid::Messaging::Session ^ sessRef) :
     parentSession(sessRef)
+=======
+        Org::Apache::Qpid::Messaging::Session ^ sessRef)
+        : parentSession(sessRef)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Exception ^ newException = nullptr;
 
@@ -199,4 +212,47 @@ namespace Messaging {
             throw newException;
         }
     }
+<<<<<<< HEAD
+=======
+
+    Org::Apache::Qpid::Messaging::Address ^ Sender::GetAddress()
+    {
+        msclr::lock lk(privateLock);
+        ThrowIfDisposed();
+
+        System::Exception           ^ newException = nullptr;
+        Messaging::Address          ^ newAddress   = nullptr;
+
+        try
+        {
+            // fetch unmanaged Address
+            ::qpid::messaging::Address addr =
+                nativeObjPtr->getAddress();
+
+            // create a managed Address
+            newAddress = gcnew Address(addr);
+        }
+        catch (const ::qpid::types::Exception & error)
+        {
+            String ^ errmsg = gcnew String(error.what());
+            newException    = gcnew QpidException(errmsg);
+        }
+        finally
+        {
+            if (newException != nullptr)
+            {
+                if (newAddress != nullptr)
+                {
+                    delete newAddress;
+                }
+            }
+        }
+        if (newException != nullptr)
+        {
+            throw newException;
+        }
+
+        return newAddress;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }}}}

@@ -43,6 +43,12 @@ public:
     virtual void bind(const std::string& queue,
                       const std::string& routingKey,
                       qpid::framing::FieldTable& args) = 0;
+<<<<<<< HEAD
+=======
+
+    virtual std::string getName() const = 0;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual ~RecoverableExchange() {};
 };
 

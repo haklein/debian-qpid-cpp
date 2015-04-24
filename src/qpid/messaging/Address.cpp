@@ -19,6 +19,11 @@
  *
  */
 #include "qpid/messaging/Address.h"
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/AddressImpl.h"
+#include "qpid/messaging/AddressParser.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/Uuid.h"
 #include <sstream>
 #include <boost/format.hpp>
@@ -34,6 +39,7 @@ const std::string OPTIONS_DIVIDER = ";";
 const std::string SPACE = " ";
 const std::string TYPE = "type";
 }
+<<<<<<< HEAD
 class AddressImpl
 {
   public:
@@ -79,6 +85,11 @@ class AddressParser
 Address::Address() : impl(new AddressImpl()) {}
 Address::Address(const std::string& address) : impl(new AddressImpl())
 { 
+=======
+Address::Address() : impl(new AddressImpl()) {}
+Address::Address(const std::string& address) : impl(new AddressImpl())
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AddressParser parser(address);
     parser.parse(*this);
 }
@@ -86,7 +97,11 @@ Address::Address(const std::string& name, const std::string& subject, const Vari
                  const std::string& type)
     : impl(new AddressImpl(name, subject, options)) { setType(type); }
 Address::Address(const Address& a) :
+<<<<<<< HEAD
     impl(new AddressImpl(a.impl->name, a.impl->subject, a.impl->options)) {}
+=======
+    impl(new AddressImpl(a.impl->name, a.impl->subject, a.impl->options)) { impl->temporary = a.impl->temporary; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Address::~Address() { delete impl; }
 
 Address& Address::operator=(const Address& a) { *impl = *a.impl; return *this; }

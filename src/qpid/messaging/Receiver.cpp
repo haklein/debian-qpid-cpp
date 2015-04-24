@@ -19,7 +19,13 @@
  *
  */
 #include "qpid/messaging/Receiver.h"
+<<<<<<< HEAD
 #include "qpid/messaging/Message.h"
+=======
+#include "qpid/messaging/Address.h"
+#include "qpid/messaging/Message.h"
+#include "qpid/messaging/MessageImpl.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/ReceiverImpl.h"
 #include "qpid/messaging/Session.h"
 #include "qpid/messaging/PrivateImplRef.h"
@@ -27,15 +33,35 @@
 namespace qpid {
 namespace messaging {
 
+<<<<<<< HEAD
+=======
+// Explicitly instantiate Handle superclass
+template class Handle<ReceiverImpl>;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 typedef PrivateImplRef<qpid::messaging::Receiver> PI;
 
 Receiver::Receiver(ReceiverImpl* impl) { PI::ctor(*this, impl); }
 Receiver::Receiver(const Receiver& s) : Handle<ReceiverImpl>() { PI::copy(*this, s); }
 Receiver::~Receiver() { PI::dtor(*this); }
 Receiver& Receiver::operator=(const Receiver& s) { return PI::assign(*this, s); }
+<<<<<<< HEAD
 bool Receiver::get(Message& message, Duration timeout) { return impl->get(message, timeout); }
 Message Receiver::get(Duration timeout) { return impl->get(timeout); }
 bool Receiver::fetch(Message& message, Duration timeout) { return impl->fetch(message, timeout); }
+=======
+bool Receiver::get(Message& message, Duration timeout)
+{
+    MessageImplAccess::get(message).clear();
+    return impl->get(message, timeout);
+}
+Message Receiver::get(Duration timeout) { return impl->get(timeout); }
+bool Receiver::fetch(Message& message, Duration timeout)
+{
+    MessageImplAccess::get(message).clear();
+    return impl->fetch(message, timeout);
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Message Receiver::fetch(Duration timeout) { return impl->fetch(timeout); }
 void Receiver::setCapacity(uint32_t c) { impl->setCapacity(c); }
 uint32_t Receiver::getCapacity() { return impl->getCapacity(); }
@@ -45,4 +71,8 @@ void Receiver::close() { impl->close(); }
 const std::string& Receiver::getName() const { return impl->getName(); }
 Session Receiver::getSession() const { return impl->getSession(); }
 bool Receiver::isClosed() const { return impl->isClosed(); }
+<<<<<<< HEAD
+=======
+Address Receiver::getAddress() const { return impl->getAddress(); }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::messaging

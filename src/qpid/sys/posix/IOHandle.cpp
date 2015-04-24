@@ -19,13 +19,17 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/IOHandle.h"
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/posix/PrivatePosix.h"
 
 namespace qpid {
 namespace sys {
 
+<<<<<<< HEAD
 int toFd(const IOHandlePrivate* h)
 {
     return h->fd;
@@ -41,4 +45,8 @@ IOHandle::~IOHandle() {
 	delete impl;
 }
 
+=======
+NullIOHandle DummyIOHandle;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::sys

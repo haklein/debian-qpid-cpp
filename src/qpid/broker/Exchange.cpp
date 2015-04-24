@@ -25,6 +25,10 @@
 #include "qpid/broker/ExchangeRegistry.h"
 #include "qpid/broker/FedOps.h"
 #include "qpid/broker/Queue.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/MessageProperties.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/log/Statement.h"
@@ -62,10 +66,17 @@ Exchange::PreRoute::PreRoute(Deliverable& msg, Exchange* _p):parent(_p) {
 
         if (parent->sequence){
             parent->sequenceNo++;
+<<<<<<< HEAD
             msg.getMessage().insertCustomProperty(qpidMsgSequence,parent->sequenceNo);
         }
         if (parent->ive) {
             parent->lastMsg =  &( msg.getMessage());
+=======
+            msg.getMessage().addAnnotation(qpidMsgSequence,parent->sequenceNo);
+        }
+        if (parent->ive) {
+            parent->lastMsg = msg.getMessage();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 }
@@ -111,12 +122,15 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
     int count = 0;
 
     if (b.get()) {
+<<<<<<< HEAD
         // Block the content release if the message is transient AND there is more than one binding
         if (!msg.getMessage().isPersistent() && b->size() > 1) {
             msg.getMessage().blockContentRelease();
         }
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         ExInfo error(getName()); // Save exception to throw at the end.
         for(std::vector<Binding::shared_ptr>::const_iterator i = b->begin(); i != b->end(); i++, count++) {
             try {
@@ -140,7 +154,11 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
     if (mgmtExchange != 0)
     {
         qmf::org::apache::qpid::broker::Exchange::PerThreadStats *eStats = mgmtExchange->getStatistics();
+<<<<<<< HEAD
         uint64_t contentSize = msg.contentSize();
+=======
+        uint64_t contentSize = msg.getMessage().getMessageSize();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         eStats->msgReceives += 1;
         eStats->byteReceives += contentSize;
@@ -157,46 +175,78 @@ void Exchange::doRoute(Deliverable& msg, ConstBindingList b)
             eStats->msgRoutes += count;
             eStats->byteRoutes += count * contentSize;
         }
+<<<<<<< HEAD
+=======
+
+        mgmtExchange->statisticsUpdated();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void Exchange::routeIVE(){
+<<<<<<< HEAD
     if (ive && lastMsg.get()){
         DeliverableMessage dmsg(lastMsg);
+=======
+    if (ive && lastMsg){
+        DeliverableMessage dmsg(lastMsg, 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         route(dmsg);
     }
 }
 
 
 Exchange::Exchange (const string& _name, Manageable* parent, Broker* b) :
+<<<<<<< HEAD
     name(_name), durable(false), alternateUsers(0), persistenceId(0), sequence(false),
     sequenceNo(0), ive(false), mgmtExchange(0), brokerMgmtObject(0), broker(b), destroyed(false)
+=======
+    name(_name), durable(false), autodelete(false), alternateUsers(0), otherUsers(0), persistenceId(0), sequence(false),
+    sequenceNo(0), ive(false), broker(b), destroyed(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (parent != 0 && broker != 0)
     {
         ManagementAgent* agent = broker->getManagementAgent();
         if (agent != 0)
         {
+<<<<<<< HEAD
             mgmtExchange = new _qmf::Exchange (agent, this, parent, _name);
             mgmtExchange->set_durable(durable);
             mgmtExchange->set_autoDelete(false);
             agent->addObject(mgmtExchange, 0, durable);
             if (broker)
                 brokerMgmtObject = (qmf::org::apache::qpid::broker::Broker*) broker->GetManagementObject();
+=======
+            mgmtExchange = _qmf::Exchange::shared_ptr(new _qmf::Exchange (agent, this, parent, _name));
+            mgmtExchange->set_durable(durable);
+            mgmtExchange->set_autoDelete(autodelete);
+            agent->addObject(mgmtExchange, 0, durable);
+            if (broker)
+                brokerMgmtObject = boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(broker->GetManagementObject());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 }
 
+<<<<<<< HEAD
 Exchange::Exchange(const string& _name, bool _durable, const qpid::framing::FieldTable& _args,
                    Manageable* parent, Broker* b)
     : name(_name), durable(_durable), alternateUsers(0), persistenceId(0),
       args(_args), sequence(false), sequenceNo(0), ive(false), mgmtExchange(0), brokerMgmtObject(0), broker(b), destroyed(false)
+=======
+Exchange::Exchange(const string& _name, bool _durable, bool _autodelete, const qpid::framing::FieldTable& _args,
+                   Manageable* parent, Broker* b)
+    : name(_name), durable(_durable), autodelete(_autodelete), alternateUsers(0), otherUsers(0), persistenceId(0),
+      args(_args), sequence(false), sequenceNo(0), ive(false), broker(b), destroyed(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (parent != 0 && broker != 0)
     {
         ManagementAgent* agent = broker->getManagementAgent();
         if (agent != 0)
         {
+<<<<<<< HEAD
             mgmtExchange = new _qmf::Exchange (agent, this, parent, _name);
             mgmtExchange->set_durable(durable);
             mgmtExchange->set_autoDelete(false);
@@ -208,15 +258,33 @@ Exchange::Exchange(const string& _name, bool _durable, const qpid::framing::Fiel
     }
 
     sequence = _args.get(qpidMsgSequence);
+=======
+            mgmtExchange = _qmf::Exchange::shared_ptr(new _qmf::Exchange (agent, this, parent, _name));
+            mgmtExchange->set_durable(durable);
+            mgmtExchange->set_autoDelete(autodelete);
+            mgmtExchange->set_arguments(ManagementAgent::toMap(args));
+            agent->addObject(mgmtExchange, 0, durable);
+            if (broker)
+                brokerMgmtObject = boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(broker->GetManagementObject());
+        }
+    }
+
+    sequence = !!_args.get(qpidMsgSequence);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (sequence) {
         QPID_LOG(debug, "Configured exchange " <<  _name  << " with Msg sequencing");
         args.setInt64(std::string(qpidSequenceCounter), sequenceNo);
     }
 
+<<<<<<< HEAD
     ive = _args.get(qpidIVE);
     if (ive) {
         if (broker && broker->isInCluster())
             throw framing::NotImplementedException("Cannot use Initial Value Exchanges in a cluster");
+=======
+    ive = !!_args.get(qpidIVE);
+    if (ive) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "Configured exchange " <<  _name  << " with Initial Value");
     }
 }
@@ -230,6 +298,10 @@ Exchange::~Exchange ()
 void Exchange::setAlternate(Exchange::shared_ptr _alternate)
 {
     alternate = _alternate;
+<<<<<<< HEAD
+=======
+    alternate->incAlternateUsers();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (mgmtExchange != 0) {
         if (alternate.get() != 0)
             mgmtExchange->set_altExchange(alternate->GetManagementObject()->getObjectId());
@@ -257,9 +329,17 @@ Exchange::shared_ptr Exchange::decode(ExchangeRegistry& exchanges, Buffer& buffe
     // For backwards compatibility on restoring exchanges from before the alt-exchange update, perform check
     if (buffer.available())
         buffer.getShortString(altName);
+<<<<<<< HEAD
 
     try {
         Exchange::shared_ptr exch = exchanges.declare(name, type, durable, args).first;
+=======
+    // Check autodelete bool; for backwards compatibility if the bool isn't present, assume false
+    bool _autodelete = ((buffer.available()) && (buffer.getInt8()));
+
+    try {
+        Exchange::shared_ptr exch = exchanges.declare(name, type, durable, _autodelete, args).first;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         exch->sequenceNo = args.getAsInt64(qpidSequenceCounter);
         exch->alternateName.assign(altName);
         return exch;
@@ -278,6 +358,10 @@ void Exchange::encode(Buffer& buffer) const
         args.setInt64(std::string(qpidSequenceCounter),sequenceNo);
     buffer.put(args);
     buffer.putShortString(alternate.get() ? alternate->getName() : string(""));
+<<<<<<< HEAD
+=======
+    buffer.putInt8(isAutoDelete());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 uint32_t Exchange::encodedSize() const
@@ -286,7 +370,12 @@ uint32_t Exchange::encodedSize() const
         + 1 /*durable*/
         + getType().size() + 1/*short string size*/
         + (alternate.get() ? alternate->getName().size() : 0) + 1/*short string size*/
+<<<<<<< HEAD
         + args.encodedSize();
+=======
+        + args.encodedSize()
+        + 1 /* autodelete bool as int_8 */;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Exchange::recoveryComplete(ExchangeRegistry& exchanges)
@@ -299,9 +388,15 @@ void Exchange::recoveryComplete(ExchangeRegistry& exchanges)
     }
 }
 
+<<<<<<< HEAD
 ManagementObject* Exchange::GetManagementObject (void) const
 {
     return (ManagementObject*) mgmtExchange;
+=======
+ManagementObject::shared_ptr Exchange::GetManagementObject (void) const
+{
+    return mgmtExchange;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Exchange::registerDynamicBridge(DynamicBridge* db)
@@ -350,16 +445,27 @@ void Exchange::propagateFedOp(const string& routingKey, const string& tags, cons
 
 Exchange::Binding::Binding(const string& _key, Queue::shared_ptr _queue, Exchange* _parent,
                            FieldTable _args, const string& _origin)
+<<<<<<< HEAD
     : parent(_parent), queue(_queue), key(_key), args(_args), origin(_origin), mgmtBinding(0)
+=======
+    : parent(_parent), queue(_queue), key(_key), args(_args), origin(_origin)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
 }
 
 Exchange::Binding::~Binding ()
 {
     if (mgmtBinding != 0) {
+<<<<<<< HEAD
         ManagementObject* mo = queue->GetManagementObject();
         if (mo != 0)
             static_cast<_qmf::Queue*>(mo)->dec_bindingCount();
+=======
+        mgmtBinding->debugStats("destroying");
+        _qmf::Queue::shared_ptr mo = boost::dynamic_pointer_cast<_qmf::Queue>(queue->GetManagementObject());
+        if (mo != 0)
+            mo->dec_bindingCount();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         mgmtBinding->resourceDestroy ();
     }
 }
@@ -372,6 +478,7 @@ void Exchange::Binding::startManagement()
         if (broker != 0) {
             ManagementAgent* agent = broker->getManagementAgent();
             if (agent != 0) {
+<<<<<<< HEAD
                 ManagementObject* mo = queue->GetManagementObject();
                 if (mo != 0) {
                     management::ObjectId queueId = mo->getObjectId();
@@ -382,15 +489,33 @@ void Exchange::Binding::startManagement()
                         mgmtBinding->set_origin(origin);
                     agent->addObject(mgmtBinding);
                     static_cast<_qmf::Queue*>(mo)->inc_bindingCount();
+=======
+                _qmf::Queue::shared_ptr mo = boost::dynamic_pointer_cast<_qmf::Queue>(queue->GetManagementObject());
+                if (mo != 0) {
+                    management::ObjectId queueId = mo->getObjectId();
+
+                    mgmtBinding = _qmf::Binding::shared_ptr(new _qmf::Binding
+                        (agent, this, (Manageable*) parent, queueId, key, ManagementAgent::toMap(args)));
+                    if (!origin.empty())
+                        mgmtBinding->set_origin(origin);
+                    agent->addObject(mgmtBinding);
+                    mo->inc_bindingCount();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 }
             }
         }
     }
 }
 
+<<<<<<< HEAD
 ManagementObject* Exchange::Binding::GetManagementObject () const
 {
     return (ManagementObject*) mgmtBinding;
+=======
+ManagementObject::shared_ptr Exchange::Binding::GetManagementObject () const
+{
+    return mgmtBinding;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 Exchange::MatchQueue::MatchQueue(Queue::shared_ptr q) : queue(q) {}
@@ -400,9 +525,15 @@ bool Exchange::MatchQueue::operator()(Exchange::Binding::shared_ptr b)
     return b->queue == queue;
 }
 
+<<<<<<< HEAD
 void Exchange::setProperties(const boost::intrusive_ptr<Message>& msg) {
     msg->setExchange(getName());
 }
+=======
+//void Exchange::setProperties(Message& msg) {
+//    qpid::broker::amqp_0_10::MessageTransfer::setExchange(msg, getName());
+//}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 bool Exchange::routeWithAlternate(Deliverable& msg)
 {
@@ -413,5 +544,94 @@ bool Exchange::routeWithAlternate(Deliverable& msg)
     return msg.delivered;
 }
 
+<<<<<<< HEAD
+=======
+void Exchange::setArgs(const framing::FieldTable& newArgs) {
+    args = newArgs;
+    if (mgmtExchange) mgmtExchange->set_arguments(ManagementAgent::toMap(args));
+}
+
+void Exchange::checkAutodelete()
+{
+    if (autodelete && !inUse() && broker) {
+        broker->getExchanges().destroy(name);
+    }
+}
+void Exchange::incAlternateUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    alternateUsers++;
+}
+
+void Exchange::decAlternateUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    alternateUsers--;
+}
+
+bool Exchange::inUseAsAlternate()
+{
+    Mutex::ScopedLock l(usersLock);
+    return alternateUsers > 0;
+}
+
+void Exchange::incOtherUsers()
+{
+    Mutex::ScopedLock l(usersLock);
+    otherUsers++;
+}
+void Exchange::decOtherUsers(bool isControllingLink=false)
+{
+    Mutex::ScopedLock l(usersLock);
+    assert(otherUsers);
+    if (otherUsers) otherUsers--;
+    if (autodelete) {
+        if (isControllingLink) {
+            if (broker) broker->getExchanges().destroy(name);
+        } else if (!inUse() && !hasBindings()) {
+            checkAutodelete();
+        }
+    }
+}
+bool Exchange::inUse() const
+{
+    Mutex::ScopedLock l(usersLock);
+    return alternateUsers > 0 || otherUsers > 0;
+}
+void Exchange::setDeletionListener(const std::string& key, boost::function0<void> listener)
+{
+    Mutex::ScopedLock l(usersLock);
+    if (listener) deletionListeners[key] = listener;
+}
+void Exchange::unsetDeletionListener(const std::string& key)
+{
+    Mutex::ScopedLock l(usersLock);
+    deletionListeners.erase(key);
+}
+
+void Exchange::destroy()
+{
+    std::map<std::string, boost::function0<void> > copy;
+    {
+        Mutex::ScopedLock l(usersLock);
+        destroyed = true;
+        deletionListeners.swap(copy);
+    }
+    for (std::map<std::string, boost::function0<void> >::iterator i = copy.begin(); i != copy.end(); ++i) {
+        QPID_LOG(debug, "Exchange::destroy() notifying " << i->first);
+        if (i->second) i->second();
+    }
+}
+bool Exchange::isDestroyed() const
+{
+    Mutex::ScopedLock l(usersLock);
+    return destroyed;
+}
+bool Exchange::isAutoDelete() const
+{
+    return autodelete;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }}
 

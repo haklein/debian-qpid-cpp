@@ -22,7 +22,11 @@
 #define _Connector_
 
 
+<<<<<<< HEAD
 #include "qpid/framing/OutputHandler.h"
+=======
+#include "qpid/framing/FrameHandler.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/ProtocolVersion.h"
 
 #include <boost/shared_ptr.hpp>
@@ -49,7 +53,11 @@ struct ConnectionSettings;
 class ConnectionImpl;
 
 ///@internal
+<<<<<<< HEAD
 class Connector : public framing::OutputHandler
+=======
+class Connector : public framing::FrameHandler
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
   public:
     // Protocol connector factory related stuff (it might be better to separate this code from the TCP Connector in the future)
@@ -64,13 +72,20 @@ class Connector : public framing::OutputHandler
     virtual void connect(const std::string& host, const std::string& port) = 0;
     virtual void init() {};
     virtual void close() = 0;
+<<<<<<< HEAD
     virtual void send(framing::AMQFrame& frame) = 0;
+=======
+    virtual void handle(framing::AMQFrame& frame) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual void abort() = 0;
 
     virtual void setInputHandler(framing::InputHandler* handler) = 0;
     virtual void setShutdownHandler(sys::ShutdownHandler* handler) = 0;
+<<<<<<< HEAD
     virtual sys::ShutdownHandler* getShutdownHandler() const = 0;
     virtual framing::OutputHandler* getOutputHandler() = 0;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual const std::string& getIdentifier() const = 0;
 
     virtual void activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer>);

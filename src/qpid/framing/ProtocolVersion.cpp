@@ -26,7 +26,15 @@ using namespace qpid::framing;
 const std::string ProtocolVersion::toString() const
 {
     std::stringstream ss;
+<<<<<<< HEAD
     ss << major_ << "-" << minor_;
+=======
+    ss << unsigned(major_) << "-" << unsigned(minor_);
+    if (major_ == 1) {
+        if (protocol_ == SASL) ss << " (SASL)";
+        else if (protocol_ == TLS) ss << " (TLS)";
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return ss.str();
 }
 
@@ -42,3 +50,10 @@ bool ProtocolVersion::operator==(ProtocolVersion p) const
     return major_ == p.major_ && minor_ == p.minor_;
 }
 
+<<<<<<< HEAD
+=======
+const uint8_t ProtocolVersion::AMQP(0);
+const uint8_t ProtocolVersion::LEGACY_AMQP(1);
+const uint8_t ProtocolVersion::TLS(2);
+const uint8_t ProtocolVersion::SASL(3);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

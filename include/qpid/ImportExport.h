@@ -60,12 +60,25 @@
    //
    // Non-Windows (Linux, etc.) definitions:
    //
+<<<<<<< HEAD
 #  define QPID_EXPORT
 #  define QPID_IMPORT
 #  define QPID_CLASS_EXPORT
 #  define QPID_CLASS_IMPORT
 #  define QPID_INLINE_EXPORT
 #  define QPID_INLINE_IMPORT
+=======
+#if __GNUC__ >= 4
+#  define QPID_EXPORT __attribute ((visibility ("default")))
+#else
+#  define QPID_EXPORT
+#endif
+#  define QPID_IMPORT
+#  define QPID_CLASS_EXPORT QPID_EXPORT
+#  define QPID_CLASS_IMPORT QPID_IMPORT
+#  define QPID_INLINE_EXPORT QPID_EXPORT
+#  define QPID_INLINE_IMPORT QPID_IMPORT
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #endif
 
 #endif  /*!QPID_IMPORTEXPORT_H*/

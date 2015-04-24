@@ -24,6 +24,11 @@
 
 #include <set>
 
+<<<<<<< HEAD
+=======
+#include <boost/array.hpp>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace tests {
 
@@ -47,6 +52,7 @@ QPID_AUTO_TEST_CASE(testUuidCtor) {
     for_each(uuids.begin(), uuids.end(), unique);
 }
 
+<<<<<<< HEAD
 boost::array<uint8_t, 16>  sample =  {{0x1b, 0x4e, 0x28, 0xba, 0x2f, 0xa1, 0x11, 0xd2, 0x88, 0x3f, 0xb9, 0xa7, 0x61, 0xbd, 0xe3, 0xfb}};
 const string sampleStr("1b4e28ba-2fa1-11d2-883f-b9a761bde3fb");
 const string zeroStr("00000000-0000-0000-0000-000000000000");
@@ -55,18 +61,33 @@ QPID_AUTO_TEST_CASE(testUuidStr) {
     Uuid uuid(sampleStr);
     BOOST_CHECK(uuid == sample);
 }
+=======
+boost::array<uint8_t, 16>  sample =  {{0x1b, 0x4e, 0x28, 0xba, 0x2f, 0xa1, 0x11, 0x02, 0x88, 0x3f, 0xb9, 0xa7, 0x61, 0xbd, 0xe3, 0xfb}};
+const string sampleStr("1b4e28ba-2fa1-1102-883f-b9a761bde3fb");
+const string zeroStr("00000000-0000-0000-0000-000000000000");
+const string badUuid1("1b4e28ba-2fa1-11d2-883f-b9761bde3fb");
+const string badUuid2("1b4e28ba-2fa1-11d23883f-b9761dbde3fb");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 QPID_AUTO_TEST_CASE(testUuidIstream) {
     Uuid uuid;
     istringstream in(sampleStr);
     in >> uuid;
     BOOST_CHECK(!in.fail());
+<<<<<<< HEAD
     BOOST_CHECK(uuid == sample);
+=======
+    BOOST_CHECK(::memcmp(uuid.data(), sample.data(), uuid.size())==0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     istringstream is(zeroStr);
     Uuid zero;
     is >> zero;
+<<<<<<< HEAD
     BOOST_CHECK(!in.fail());
+=======
+    BOOST_CHECK(!is.fail());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK_EQUAL(zero, Uuid());
 }
 
@@ -83,6 +104,19 @@ QPID_AUTO_TEST_CASE(testUuidOstream) {
     BOOST_CHECK_EQUAL(os.str(), zeroStr);
 }
 
+<<<<<<< HEAD
+=======
+QPID_AUTO_TEST_CASE(testBadUuidIstream) {
+  Uuid a;
+  istringstream is(badUuid1);
+  is >> a;
+  BOOST_CHECK(!is.good());
+  istringstream is2(badUuid2);
+  is2 >> a;
+  BOOST_CHECK(!is2.good());
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testUuidIOstream) {
     Uuid a(true), b(true);
     ostringstream os;
@@ -105,7 +139,11 @@ QPID_AUTO_TEST_CASE(testUuidEncodeDecode) {
     Uuid decoded;
     decoded.decode(rbuf);
     BOOST_CHECK_EQUAL(string(sample.begin(), sample.end()),
+<<<<<<< HEAD
                       string(decoded.begin(), decoded.end()));
+=======
+                      string(decoded.data(), decoded.data()+decoded.size()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_CASE(testTypesUuid)

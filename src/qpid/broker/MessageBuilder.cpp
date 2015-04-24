@@ -21,10 +21,18 @@
 #include "qpid/broker/MessageBuilder.h"
 
 #include "qpid/broker/Message.h"
+<<<<<<< HEAD
 #include "qpid/broker/MessageStore.h"
 #include "qpid/broker/NullMessageStore.h"
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/reply_exceptions.h"
+=======
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+#include "qpid/framing/AMQFrame.h"
+#include "qpid/framing/MessageTransferBody.h"
+#include "qpid/framing/reply_exceptions.h"
+#include "qpid/log/Statement.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 using boost::intrusive_ptr;
 using namespace qpid::broker;
@@ -36,8 +44,12 @@ namespace
     const std::string QPID_MANAGEMENT("qpid.management");
 }
 
+<<<<<<< HEAD
 MessageBuilder::MessageBuilder(MessageStore* const _store) :
     state(DORMANT), store(_store) {}
+=======
+MessageBuilder::MessageBuilder() : state(DORMANT) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void MessageBuilder::handle(AMQFrame& frame)
 {
@@ -45,6 +57,13 @@ void MessageBuilder::handle(AMQFrame& frame)
     switch(state) {
     case METHOD:
         checkType(METHOD_BODY, type);
+<<<<<<< HEAD
+=======
+        if (!frame.getMethod()->isA<qpid::framing::MessageTransferBody>())
+            throw NotImplementedException(QPID_MSG("Unexpected method: " << *(frame.getMethod())));
+
+        exchange = frame.castBody<qpid::framing::MessageTransferBody>()->getDestination();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         state = HEADER;
         break;
     case HEADER:
@@ -55,7 +74,13 @@ void MessageBuilder::handle(AMQFrame& frame)
             header.setBof(false);
             header.setEof(false);
             message->getFrames().append(header);
+<<<<<<< HEAD
         } else if (type != HEADER_BODY) {
+=======
+        } else if (type == HEADER_BODY) {
+            frame.castBody<AMQHeaderBody>()->get<DeliveryProperties>(true)->setExchange(exchange);
+        } else {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             throw CommandInvalidException(
                 QPID_MSG("Invalid frame sequence for message, expected header or content got "
                          << type_str(type) << ")"));
@@ -73,14 +98,22 @@ void MessageBuilder::handle(AMQFrame& frame)
 
 void MessageBuilder::end()
 {
+<<<<<<< HEAD
+=======
+    message->computeRequiredCredit();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     message = 0;
     state = DORMANT;
 }
 
 void MessageBuilder::start(const SequenceNumber& id)
 {
+<<<<<<< HEAD
     message = intrusive_ptr<Message>(new Message(id));
     message->setStore(store);
+=======
+    message = intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer>(new qpid::broker::amqp_0_10::MessageTransfer(id));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     state = METHOD;
 }
 
@@ -112,3 +145,8 @@ void MessageBuilder::checkType(uint8_t expected, uint8_t actual)
                                                << type_str(expected) << " got " << type_str(actual) << ")"));
     }
 }
+<<<<<<< HEAD
+=======
+
+boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> MessageBuilder::getMessage() { return message; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

@@ -105,7 +105,11 @@ namespace Rdma {
     }
 
     QueuePair::QueuePair(boost::shared_ptr< ::rdma_cm_id > i) :
+<<<<<<< HEAD
         qpid::sys::IOHandle(new qpid::sys::IOHandlePrivate),
+=======
+        handle(new qpid::sys::IOHandle),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         pd(allocPd(i->verbs)),
         cchannel(mkCChannel(i->verbs)),
         scq(mkCq(i->verbs, DEFAULT_CQ_ENTRIES, 0, cchannel.get())),
@@ -113,7 +117,11 @@ namespace Rdma {
         outstandingSendEvents(0),
         outstandingRecvEvents(0)
     {
+<<<<<<< HEAD
         impl->fd = cchannel->fd;
+=======
+        handle->fd = cchannel->fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         // Set cq context to this QueuePair object so we can find
         // ourselves again
@@ -163,6 +171,14 @@ namespace Rdma {
         // The buffers vectors automatically deletes all the buffers we've allocated
     }
 
+<<<<<<< HEAD
+=======
+    QueuePair::operator qpid::sys::IOHandle&() const
+    {
+        return *handle;
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // Create buffers to use for writing
     void QueuePair::createSendBuffers(int sendBufferCount, int bufferSize, int reserved)
     {
@@ -325,7 +341,11 @@ namespace Rdma {
     {}
 
     ConnectionEvent::operator bool() const {
+<<<<<<< HEAD
         return event;
+=======
+        return !!event;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     ::rdma_cm_event_type ConnectionEvent::getEventType() const {
@@ -359,11 +379,19 @@ namespace Rdma {
     // Wrap the passed in rdma_cm_id with a Connection
     // this basically happens only on connection request
     Connection::Connection(::rdma_cm_id* i) :
+<<<<<<< HEAD
         qpid::sys::IOHandle(new qpid::sys::IOHandlePrivate),
         id(mkId(i)),
         context(0)
     {
         impl->fd = id->channel->fd;
+=======
+        handle(new qpid::sys::IOHandle),
+        id(mkId(i)),
+        context(0)
+    {
+        handle->fd = id->channel->fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         // Just overwrite the previous context as it will
         // have come from the listening connection
@@ -372,12 +400,20 @@ namespace Rdma {
     }
 
     Connection::Connection() :
+<<<<<<< HEAD
         qpid::sys::IOHandle(new qpid::sys::IOHandlePrivate),
+=======
+        handle(new qpid::sys::IOHandle),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         channel(mkEChannel()),
         id(mkId(channel.get(), this, RDMA_PS_TCP)),
         context(0)
     {
+<<<<<<< HEAD
         impl->fd = channel->fd;
+=======
+        handle->fd = channel->fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     Connection::~Connection() {
@@ -385,6 +421,14 @@ namespace Rdma {
         id->context = 0;
     }
 
+<<<<<<< HEAD
+=======
+    Connection::operator qpid::sys::IOHandle&() const
+    {
+        return *handle;
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void Connection::ensureQueuePair() {
         assert(id.get());
 

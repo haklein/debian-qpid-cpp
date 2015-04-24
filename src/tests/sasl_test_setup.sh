@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #! /bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -18,8 +22,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+<<<<<<< HEAD
 
 SASL_PW=/usr/sbin/saslpasswd2
+=======
+source ./test_env.sh
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 test -x $SASL_PW || { echo Skipping SASL test, saslpasswd2 not found; exit 0; }
 
 mkdir -p sasl_config

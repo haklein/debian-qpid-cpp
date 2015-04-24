@@ -34,6 +34,10 @@ namespace messaging {
 #ifndef SWIG
 template <class> class PrivateImplRef;
 #endif
+<<<<<<< HEAD
+=======
+class Address;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class Message;
 class SenderImpl;
 class Session;
@@ -89,6 +93,14 @@ class QPID_MESSAGING_CLASS_EXTERN Sender : public qpid::messaging::Handle<Sender
      * Returns a handle to the session associated with this sender.
      */
     QPID_MESSAGING_EXTERN Session getSession() const;
+<<<<<<< HEAD
+=======
+
+    /**
+     * Returns an address for this sender.
+     */
+    QPID_MESSAGING_EXTERN Address getAddress() const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #ifndef SWIG
   private:
   friend class qpid::messaging::PrivateImplRef<Sender>;

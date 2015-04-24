@@ -136,12 +136,15 @@ MessageStorePlugin::providerAvailable(const std::string name,
         QPID_LOG(warning, "Storage provider " << name << " duplicate; ignored.");
 }
 
+<<<<<<< HEAD
 void
 MessageStorePlugin::truncateInit(const bool /*saveStoreContent*/)
 {
     QPID_LOG(info, "Store: truncateInit");
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * Record the existence of a durable queue
@@ -249,7 +252,11 @@ MessageStorePlugin::destroy(const broker::PersistableConfig& config)
 void
 MessageStorePlugin::stage(const boost::intrusive_ptr<broker::PersistableMessage>& msg)
 {
+<<<<<<< HEAD
     if (msg->getPersistenceId() == 0 && !msg->isContentReleased()) {
+=======
+    if (msg->getPersistenceId() == 0) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         provider->second->stage(msg);
     }
 }

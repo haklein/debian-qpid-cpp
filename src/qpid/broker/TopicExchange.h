@@ -81,14 +81,22 @@ class TopicExchange : public virtual Exchange {
     };
 
 public:
+<<<<<<< HEAD
     static const std::string typeName;
+=======
+    QPID_BROKER_EXTERN static const std::string typeName;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     static QPID_BROKER_EXTERN std::string normalize(const std::string& pattern);
 
     QPID_BROKER_EXTERN TopicExchange(const std::string& name,
                                      management::Manageable* parent = 0, Broker* broker = 0);
     QPID_BROKER_EXTERN TopicExchange(const std::string& _name,
+<<<<<<< HEAD
                                      bool _durable,
+=======
+                                     bool _durable, bool autodelete,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                      const qpid::framing::FieldTable& _args,
                                      management::Manageable* parent = 0, Broker* broker = 0);
 
@@ -111,6 +119,11 @@ public:
 
     class TopicExchangeTester;
     friend class TopicExchangeTester;
+<<<<<<< HEAD
+=======
+  protected:
+    bool hasBindings();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 

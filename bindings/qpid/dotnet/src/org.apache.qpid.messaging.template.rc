@@ -19,7 +19,11 @@
 
 // Microsoft Visual C++ generated resource script.
 //
+<<<<<<< HEAD
 #include "..\resource1.h"
+=======
+#include "${DOTNET_relPathToResource}"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -48,7 +52,11 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 1 TEXTINCLUDE 
 BEGIN
+<<<<<<< HEAD
     "resource1.h\0"
+=======
+    "${DOTNET_relPathToResource}\0"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 END
 
 2 TEXTINCLUDE 

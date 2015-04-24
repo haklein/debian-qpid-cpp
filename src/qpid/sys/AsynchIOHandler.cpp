@@ -33,6 +33,7 @@
 namespace qpid {
 namespace sys {
 
+<<<<<<< HEAD
 // Buffer definition
 struct Buff : public AsynchIO::BufferBase {
     Buff() :
@@ -50,21 +51,43 @@ struct ProtocolTimeoutTask : public sys::TimerTask {
         TimerTask(timeout, "ProtocolTimeout"),
         handler(h),
         id(i)
+=======
+struct ProtocolTimeoutTask : public sys::TimerTask {
+    AsynchIOHandler& handler;
+    std::string id;
+    Duration timeout;
+
+    ProtocolTimeoutTask(const std::string& i, const Duration& timeout_, AsynchIOHandler& h) :
+        TimerTask(timeout_, "ProtocolTimeout"),
+        handler(h),
+        id(i),
+        timeout(timeout_)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {}
 
     void fire() {
         // If this fires it means that we didn't negotiate the connection in the timeout period
         // Schedule closing the connection for the io thread
+<<<<<<< HEAD
         QPID_LOG(error, "Connection " << id << " No protocol received closing");
+=======
+        QPID_LOG(error, "Connection " << id << " No protocol received after " << timeout
+                 << ", closing");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         handler.abort();
     }
 };
 
+<<<<<<< HEAD
 AsynchIOHandler::AsynchIOHandler(const std::string& id, ConnectionCodec::Factory* f) :
+=======
+AsynchIOHandler::AsynchIOHandler(const std::string& id, ConnectionCodec::Factory* f, bool isClient0, bool nodict0) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     identifier(id),
     aio(0),
     factory(f),
     codec(0),
+<<<<<<< HEAD
     reads(0),
     readError(false),
     isClient(false),
@@ -74,6 +97,15 @@ AsynchIOHandler::AsynchIOHandler(const std::string& id, ConnectionCodec::Factory
 AsynchIOHandler::~AsynchIOHandler() {
     if (timeoutTimerTask)
         timeoutTimerTask->cancel();
+=======
+    readError(false),
+    isClient(isClient0),
+    nodict(nodict0),
+    headerSent(false)
+{}
+
+AsynchIOHandler::~AsynchIOHandler() {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (codec)
         codec->closed();
     if (timeoutTimerTask)
@@ -81,7 +113,20 @@ AsynchIOHandler::~AsynchIOHandler() {
     delete codec;
 }
 
+<<<<<<< HEAD
 void AsynchIOHandler::init(qpid::sys::AsynchIO* a, qpid::sys::Timer& timer, uint32_t maxTime, int numBuffs) {
+=======
+namespace {
+    SecuritySettings getSecuritySettings(AsynchIO* aio, bool nodict)
+    {
+        SecuritySettings settings = aio->getSecuritySettings();
+        settings.nodict = nodict;
+        return settings;
+    }
+}
+
+void AsynchIOHandler::init(qpid::sys::AsynchIO* a, qpid::sys::Timer& timer, uint32_t maxTime) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     aio = a;
 
     // Start timer for this connection
@@ -89,8 +134,15 @@ void AsynchIOHandler::init(qpid::sys::AsynchIO* a, qpid::sys::Timer& timer, uint
     timer.add(timeoutTimerTask);
 
     // Give connection some buffers to use
+<<<<<<< HEAD
     for (int i = 0; i < numBuffs; i++) {
         aio->queueReadBuffer(new Buff);
+=======
+    aio->createBuffers();
+
+    if (isClient) {
+        codec = factory->create(*this, identifier, getSecuritySettings(aio, nodict));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -98,8 +150,12 @@ void AsynchIOHandler::write(const framing::ProtocolInitiation& data)
 {
     QPID_LOG(debug, "SENT [" << identifier << "]: INIT(" << data << ")");
     AsynchIO::BufferBase* buff = aio->getQueuedBuffer();
+<<<<<<< HEAD
     if (!buff)
         buff = new Buff;
+=======
+    assert(buff);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::Buffer out(buff->bytes, buff->byteCount);
     data.encode(out);
     buff->dataCount = data.encodedSize();
@@ -111,6 +167,7 @@ void AsynchIOHandler::abort() {
     if (!readError) {
         aio->requestCallback(boost::bind(&AsynchIOHandler::eof, this, _1));
     }
+<<<<<<< HEAD
 }
 
 void AsynchIOHandler::activateOutput() {
@@ -130,6 +187,20 @@ void AsynchIOHandler::giveReadCredit(int32_t credit) {
     assert(readCredit.get() >= 0);
     if (readCredit.get() != 0)
         aio->startReading();
+=======
+    aio->queueWriteClose();
+}
+
+void AsynchIOHandler::connectionEstablished() {
+    if (timeoutTimerTask) {
+        timeoutTimerTask->cancel();
+        timeoutTimerTask = 0;
+    }
+}
+
+void AsynchIOHandler::activateOutput() {
+    aio->notifyPendingWrite();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
@@ -137,6 +208,7 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
         return;
     }
 
+<<<<<<< HEAD
     // Check here for read credit
     if (readCredit.get() != InfiniteCredit) {
         if (readCredit.get() == 0) {
@@ -158,10 +230,13 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
     }
 
     ++reads;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     size_t decoded = 0;
     if (codec) {                // Already initiated
         try {
             decoded = codec->decode(buff->bytes+buff->dataStart, buff->dataCount);
+<<<<<<< HEAD
             // When we've decoded 3 reads (probably frames) we will have authenticated and
             // started heartbeats, if specified, in many (but not all) cases so now we will cancel
             // the idle connection timeout - this is really hacky, and would be better implemented
@@ -169,6 +244,8 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
             if (reads == 3) {
                 timeoutTimerTask->cancel();
             }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }catch(const std::exception& e){
             QPID_LOG(error, e.what());
             readError = true;
@@ -182,6 +259,7 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
 
             QPID_LOG(debug, "RECV [" << identifier << "]: INIT(" << protocolInit << ")");
             try {
+<<<<<<< HEAD
                 codec = factory->create(protocolInit.getVersion(), *this, identifier, SecuritySettings());
                 if (!codec) {
                     //TODO: may still want to revise this...
@@ -189,6 +267,18 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
                     write(framing::ProtocolInitiation(framing::highestProtocolVersion));
                     readError = true;
                     aio->queueWriteClose();
+=======
+                codec = factory->create(protocolInit.getVersion(), *this, identifier, getSecuritySettings(aio, nodict));
+                if (!codec) {
+                    //TODO: may still want to revise this...
+                    //send valid version header & close connection.
+                    write(framing::ProtocolInitiation(factory->supportedVersion()));
+                    readError = true;
+                    aio->queueWriteClose();
+                } else {
+                    //read any further data that may already have been sent
+                    decoded += codec->decode(buff->bytes+buff->dataStart+in.getPosition(), buff->dataCount-in.getPosition());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 }
             } catch (const std::exception& e) {
                 QPID_LOG(error, e.what());
@@ -236,6 +326,7 @@ void AsynchIOHandler::nobuffs(AsynchIO&) {
 }
 
 void AsynchIOHandler::idle(AsynchIO&){
+<<<<<<< HEAD
     if (isClient && codec == 0) {
         codec = factory->create(*this, identifier, SecuritySettings());
         write(framing::ProtocolInitiation(codec->getVersion()));
@@ -264,6 +355,32 @@ void AsynchIOHandler::idle(AsynchIO&){
         readError = true;
         aio->queueWriteClose();
     }
+=======
+    if (isClient && !headerSent) {
+        write(framing::ProtocolInitiation(codec->getVersion()));
+        headerSent = true;
+        return;
+    }
+    if (codec == 0) return;
+    if (!codec->canEncode()) {
+        return;
+    }
+    AsynchIO::BufferBase* buff = aio->getQueuedBuffer();
+    if (buff) {
+        try {
+            size_t encoded=codec->encode(buff->bytes, buff->byteCount);
+            buff->dataCount = encoded;
+            aio->queueWrite(buff);
+            if (!codec->isClosed()) {
+                return;
+            }
+        } catch (const std::exception& e) {
+            QPID_LOG(error, e.what());
+        }
+    }
+    readError = true;
+    aio->queueWriteClose();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::sys

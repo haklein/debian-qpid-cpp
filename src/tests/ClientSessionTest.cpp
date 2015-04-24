@@ -37,6 +37,10 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+<<<<<<< HEAD
+=======
+#include <boost/format.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <vector>
 
@@ -51,7 +55,11 @@ using namespace qpid;
 using qpid::sys::Monitor;
 using qpid::sys::Thread;
 using qpid::sys::TIME_SEC;
+<<<<<<< HEAD
 using qpid::broker::Broker;
+=======
+using qpid::broker::BrokerOptions;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using std::string;
 using std::cout;
 using std::endl;
@@ -104,7 +112,11 @@ struct SimpleListener : public MessageListener
 
 struct ClientSessionFixture : public SessionFixture
 {
+<<<<<<< HEAD
     ClientSessionFixture(Broker::Options opts = Broker::Options()) : SessionFixture(opts) {
+=======
+    ClientSessionFixture(const BrokerOptions& opts = BrokerOptions()) : SessionFixture(opts) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         session.queueDeclare(arg::queue="my-queue");
     }
 };
@@ -247,8 +259,13 @@ QPID_AUTO_TEST_CASE(testOpenFailure) {
 }
 
 QPID_AUTO_TEST_CASE(testPeriodicExpiration) {
+<<<<<<< HEAD
     Broker::Options opts;
     opts.queueCleanInterval = 1;
+=======
+    BrokerOptions opts;
+    opts.queueCleanInterval = 1*TIME_SEC;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     opts.queueFlowStopRatio = 0;
     opts.queueFlowResumeRatio = 0;
     ClientSessionFixture fix(opts);
@@ -621,7 +638,11 @@ QPID_AUTO_TEST_CASE(testQueueDeleted)
     fix.session.queueDeclare(arg::queue="my-queue");
     LocalQueue queue;
     fix.subs.subscribe(queue, "my-queue");
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ScopedSuppressLogging sl;
     fix.session.queueDelete(arg::queue="my-queue");
     BOOST_CHECK_THROW(queue.get(1*qpid::sys::TIME_SEC), qpid::framing::ResourceDeletedException);

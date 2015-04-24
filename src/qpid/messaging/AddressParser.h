@@ -21,6 +21,10 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/ImportExport.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/Address.h"
 
 namespace qpid {
@@ -29,10 +33,17 @@ namespace messaging {
 class AddressParser
 {
   public:
+<<<<<<< HEAD
     AddressParser(const std::string&);
     bool parse(Address& address);
     bool parseMap(qpid::types::Variant::Map& map);
     bool parseList(qpid::types::Variant::List& list);
+=======
+    QPID_MESSAGING_EXTERN AddressParser(const std::string&);
+    bool parse(Address& address);
+    QPID_MESSAGING_EXTERN bool parseMap(qpid::types::Variant::Map& map);
+    QPID_MESSAGING_EXTERN bool parseList(qpid::types::Variant::List& list);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   private:
     const std::string& input;
     std::string::size_type current;

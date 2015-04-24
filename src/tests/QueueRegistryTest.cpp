@@ -19,6 +19,10 @@
 
 #include "qpid/broker/QueueRegistry.h"
 #include "qpid/broker/Queue.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/QueueSettings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "unit_test.h"
 #include <string>
 
@@ -36,23 +40,36 @@ QPID_AUTO_TEST_CASE(testDeclare)
     QueueRegistry reg;
     std::pair<Queue::shared_ptr,  bool> qc;
 
+<<<<<<< HEAD
     qc = reg.declare(foo, false, 0, 0);
+=======
+    qc = reg.declare(foo, QueueSettings());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Queue::shared_ptr q = qc.first;
     BOOST_CHECK(q);
     BOOST_CHECK(qc.second); // New queue
     BOOST_CHECK_EQUAL(foo, q->getName());
 
+<<<<<<< HEAD
     qc = reg.declare(foo, false, 0, 0);
     BOOST_CHECK_EQUAL(q, qc.first);
     BOOST_CHECK(!qc.second);
 
     qc = reg.declare(bar, false, 0, 0);
+=======
+    qc = reg.declare(foo, QueueSettings());
+    BOOST_CHECK_EQUAL(q, qc.first);
+    BOOST_CHECK(!qc.second);
+
+    qc = reg.declare(bar, QueueSettings());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     q = qc.first;
     BOOST_CHECK(q);
     BOOST_CHECK_EQUAL(true, qc.second);
     BOOST_CHECK_EQUAL(bar, q->getName());
 }
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testDeclareTmp)
 {
     QueueRegistry reg;
@@ -63,6 +80,8 @@ QPID_AUTO_TEST_CASE(testDeclareTmp)
     BOOST_CHECK_EQUAL(std::string("tmp_1"), qc.first->getName());
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testFind)
 {
     std::string foo("foo");
@@ -72,8 +91,13 @@ QPID_AUTO_TEST_CASE(testFind)
 
     BOOST_CHECK(reg.find(foo) == 0);
 
+<<<<<<< HEAD
     reg.declare(foo, false, 0, 0);
     reg.declare(bar, false, 0, 0);
+=======
+    reg.declare(foo, QueueSettings());
+    reg.declare(bar, QueueSettings());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Queue::shared_ptr q = reg.find(bar);
     BOOST_CHECK(q);
     BOOST_CHECK_EQUAL(bar, q->getName());
@@ -85,7 +109,11 @@ QPID_AUTO_TEST_CASE(testDestroy)
     QueueRegistry reg;
     std::pair<Queue::shared_ptr,  bool> qc;
 
+<<<<<<< HEAD
     qc = reg.declare(foo, false, 0, 0);
+=======
+    qc = reg.declare(foo, QueueSettings());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     reg.destroy(foo);
     // Queue is gone from the registry.
     BOOST_CHECK(reg.find(foo) == 0);

@@ -50,10 +50,13 @@ public:
 
 NullMessageStore::NullMessageStore() : nextPersistenceId(1) {}
 
+<<<<<<< HEAD
 bool NullMessageStore::init(const Options* /*options*/) {return true;}
 
 void NullMessageStore::truncateInit(const bool /*pushDownStoreFiles*/) {}
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void NullMessageStore::create(PersistableQueue& queue, const framing::FieldTable& /*args*/)
 {
     queue.setPersistenceId(nextPersistenceId++);

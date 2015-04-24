@@ -20,6 +20,7 @@
 ##------------------------------------------------------
 ## Use Swig to generate a literal binding to the C++ API
 ##------------------------------------------------------
+<<<<<<< HEAD
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/python.i PROPERTIES CPLUSPLUS ON)
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/python.i PROPERTIES SWIG_FLAGS "-I${qpid-cpp_SOURCE_DIR}/include")
 
@@ -27,10 +28,32 @@ swig_add_module(cqpid_python python ${CMAKE_CURRENT_SOURCE_DIR}/python.i)
 swig_link_libraries(cqpid_python qpidmessaging qpidtypes qmf2 ${PYTHON_LIBRARIES})
 
 set_source_files_properties(${swig_generated_file_fullname} PROPERTIES COMPILE_FLAGS "-fno-strict-aliasing -I${PYTHON_INCLUDE_PATH} -I${qpid-cpp_SOURCE_DIR}/include")
+=======
+
+# NB For python the SWIG module name must have the same name as the input .i file for CMake to generate the
+# correct dependencies
+
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/qpid_messaging.i PROPERTIES
+    CPLUSPLUS ON
+    SWIG_FLAGS "-I${qpid-cpp_SOURCE_DIR}/include;-I${qpid-cpp_SOURCE_DIR}/bindings")
+
+list(APPEND SWIG_MODULE_qpid_messaging_EXTRA_DEPS
+    ${CMAKE_SOURCE_DIR}/include/qpid/qpid.i
+    ${CMAKE_SOURCE_DIR}/include/qpid/swig_python_typemaps.i
+)
+swig_add_module(qpid_messaging python ${CMAKE_CURRENT_SOURCE_DIR}/qpid_messaging.i)
+swig_link_libraries(qpid_messaging qpidmessaging qpidtypes ${PYTHON_LIBRARIES})
+set_source_files_properties(${swig_generated_file_fullname} PROPERTIES COMPILE_FLAGS "${NOSTRICT_ALIASING}")
+
+include_directories(${PYTHON_INCLUDE_PATH}
+                    ${qpid-cpp_SOURCE_DIR}/include
+                    ${qpid-cpp_SOURCE_DIR}/bindings)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 ##------------------------------------
 ## Install the complete Python binding
 ##------------------------------------
+<<<<<<< HEAD
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()" OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE)
 install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m py_compile cqpid.py
                               WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
@@ -45,6 +68,20 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cqpid.py
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/_cqpid_python.so
         RENAME _cqpid.so
         DESTINATION ${PYTHON_SITE_PACKAGES}
+=======
+install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m py_compile qpid_messaging.py
+                              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+install(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -O -m py_compile qpid_messaging.py
+                              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qpid_messaging.py
+              ${CMAKE_CURRENT_BINARY_DIR}/qpid_messaging.pyc
+              ${CMAKE_CURRENT_BINARY_DIR}/qpid_messaging.pyo
+        DESTINATION ${PYTHON_SITEARCH_PACKAGES}
+        COMPONENT ${QPID_COMPONENT_CLIENT}
+        )
+install(TARGETS ${SWIG_MODULE_qpid_messaging_REAL_NAME}
+        DESTINATION ${PYTHON_SITEARCH_PACKAGES}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         COMPONENT ${QPID_COMPONENT_CLIENT}
         )
 

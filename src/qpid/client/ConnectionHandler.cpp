@@ -50,6 +50,10 @@ using qpid::sys::Mutex;
 namespace {
 const std::string OK("OK");
 const std::string PLAIN("PLAIN");
+<<<<<<< HEAD
+=======
+const std::string ANONYMOUS("ANONYMOUS");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string en_US("en_US");
 
 const std::string INVALID_STATE_START("start received in invalid state");
@@ -82,9 +86,17 @@ void ConnectionHandler::Adapter::handle(qpid::framing::AMQFrame& f)
     handler.out(f);
 }
 
+<<<<<<< HEAD
 ConnectionHandler::ConnectionHandler(const ConnectionSettings& s, ProtocolVersion& v, Bounds& b)
     : StateManager(NOT_STARTED), ConnectionSettings(s), outHandler(*this, b), proxy(outHandler),
       errorCode(CLOSE_CODE_NORMAL), version(v)
+=======
+ConnectionHandler::ConnectionHandler(
+    const ConnectionSettings& s, ProtocolVersion& v, Bounds& b)
+    : StateManager(NOT_STARTED), ConnectionSettings(s),
+      outHandler(*this, b), proxy(outHandler), errorCode(CLOSE_CODE_NORMAL), version(v),
+      properties(s.clientProperties)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     insist = true;
 
@@ -242,6 +254,10 @@ void ConnectionHandler::start(const FieldTable& /*serverProps*/, const Array& me
 
     std::vector<std::string> mechlist;
     mechlist.reserve(mechanisms.size());
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (mechanism.empty()) {
         //mechlist is simply what the server offers
         std::transform(mechanisms.begin(), mechanisms.end(), std::back_inserter(mechlist), Array::get<std::string, Array::ValuePtr>);
@@ -271,9 +287,31 @@ void ConnectionHandler::start(const FieldTable& /*serverProps*/, const Array& me
             proxy.send(body);
         }
     } else {
+<<<<<<< HEAD
         //TODO: verify that desired mechanism and locale are supported
         std::string response = ((char)0) + username + ((char)0) + password;
         proxy.startOk(properties, mechanism, response, locale);
+=======
+        bool haveAnonymous(false);
+        bool havePlain(false);
+        for (std::vector<std::string>::const_iterator i = mechlist.begin(); i != mechlist.end(); ++i) {
+            if (*i == ANONYMOUS) {
+                haveAnonymous = true;
+                break;
+            } else if (*i == PLAIN) {
+                havePlain = true;
+            }
+        }
+        if (haveAnonymous && (mechanism.empty() || mechanism.find(ANONYMOUS) != std::string::npos)) {
+            proxy.startOk(properties, ANONYMOUS, username, locale);
+        } else if (havePlain && (mechanism.empty() || mechanism.find(PLAIN) !=std::string::npos)) {
+            std::string response = ((char)0) + username + ((char)0) + password;
+            proxy.startOk(properties, PLAIN, response, locale);
+        } else {
+            if (!mechanism.empty()) throw Exception(QPID_MSG("Desired mechanism(s) not valid: " << mechanism << "; client supports PLAIN or ANONYMOUS, broker supports: " << join(mechlist)));
+            throw Exception(QPID_MSG("No valid mechanism; client supports PLAIN or ANONYMOUS, broker supports: " << join(mechlist)));
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 

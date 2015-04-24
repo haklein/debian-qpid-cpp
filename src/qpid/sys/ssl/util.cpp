@@ -31,8 +31,11 @@
 
 #include <iostream>
 #include <fstream>
+<<<<<<< HEAD
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace sys {
@@ -82,6 +85,7 @@ SslOptions SslOptions::global;
 char* readPasswordFromFile(PK11SlotInfo*, PRBool retry, void*)
 {
     const std::string& passwordFile = SslOptions::global.certPasswordFile;
+<<<<<<< HEAD
     if (retry || passwordFile.empty() || !boost::filesystem::exists(passwordFile)) {
         return 0;
     } else {
@@ -91,6 +95,16 @@ char* readPasswordFromFile(PK11SlotInfo*, PRBool retry, void*)
         return PL_strdup(password.c_str());
     }
 }    
+=======
+    if (retry || passwordFile.empty()) return 0;
+    std::ifstream file(passwordFile.c_str());
+    if (!file) return 0;
+
+    std::string password;
+    getline(file, password);
+    return PL_strdup(password.c_str());
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void initNSS(const SslOptions& options, bool server)
 {
@@ -110,6 +124,19 @@ void initNSS(const SslOptions& options, bool server)
         //use defaults for all args, TODO: may want to make this configurable
         SSL_ConfigServerSessionIDCache(0, 0, 0, 0);
     }
+<<<<<<< HEAD
+=======
+
+    // disable SSLv2 and SSLv3 versions of the protocol - they are
+    // no longer considered secure
+    SSLVersionRange vrange;
+    const uint16_t tlsv1 = 0x0301;  // Protocol version for TLSv1.0
+    NSS_CHECK(SSL_VersionRangeGetDefault(ssl_variant_stream, &vrange));
+    if (vrange.min < tlsv1) {
+        vrange.min = tlsv1;
+        NSS_CHECK(SSL_VersionRangeSetDefault(ssl_variant_stream, &vrange));
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void shutdownNSS()

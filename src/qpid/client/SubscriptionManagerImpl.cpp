@@ -28,6 +28,10 @@
 #include <qpid/client/Session.h>
 #include <qpid/client/MessageListener.h>
 #include <qpid/framing/Uuid.h>
+<<<<<<< HEAD
+=======
+#include <qpid/log/Statement.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <set>
 #include <sstream>
 
@@ -167,6 +171,18 @@ void SubscriptionManagerImpl::setFlowControl(const std::string& name, uint32_t m
     setFlowControl(name, FlowControl(messages, bytes, window));
 }
 
+<<<<<<< HEAD
+=======
+AutoCancel::AutoCancel(SubscriptionManager& sm_, const std::string& tag_) : sm(sm_), tag(tag_) {}
+AutoCancel::~AutoCancel() {
+    try {
+        sm.cancel(tag);
+    } catch (const qpid::Exception& e) {
+        QPID_LOG(info, "Exception in AutoCancel destructor: " << e.what());
+    }
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::client
 
 

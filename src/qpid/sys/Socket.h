@@ -22,7 +22,10 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/IOHandle.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/CommonImportExport.h"
 #include <string>
@@ -31,6 +34,7 @@ namespace qpid {
 namespace sys {
 
 class Duration;
+<<<<<<< HEAD
 class SocketAddress;
 
 class QPID_COMMON_CLASS_EXTERN Socket : public IOHandle
@@ -51,25 +55,58 @@ public:
     QPID_COMMON_EXTERN void connect(const SocketAddress&) const;
 
     QPID_COMMON_EXTERN void close() const;
+=======
+class IOHandle;
+class SocketAddress;
+
+class Socket
+{
+public:
+    virtual ~Socket() {};
+
+    virtual operator const IOHandle&() const = 0;
+
+    /** Set socket non blocking */
+    virtual void setNonblocking() const = 0;
+
+    virtual void setTcpNoDelay() const = 0;
+
+    virtual void connect(const SocketAddress&) const = 0;
+    virtual void finishConnect(const SocketAddress&) const = 0;
+
+    virtual void close() const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Bind to a port and start listening.
      *@param port 0 means choose an available port.
      *@param backlog maximum number of pending connections.
      *@return The bound port.
      */
+<<<<<<< HEAD
     QPID_COMMON_EXTERN int listen(const std::string& host = "", const std::string& port = "0", int backlog = 10) const;
     QPID_COMMON_EXTERN int listen(const SocketAddress&, int backlog = 10) const;
+=======
+    virtual int listen(const SocketAddress&, int backlog = 10) const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Returns an address (host and port) for the remote end of the
      * socket
      */
+<<<<<<< HEAD
     QPID_COMMON_EXTERN std::string getPeerAddress() const;
+=======
+    virtual std::string getPeerAddress() const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /**
      * Returns an address (host and port) for the local end of the
      * socket
      */
+<<<<<<< HEAD
     QPID_COMMON_EXTERN std::string getLocalAddress() const;
+=======
+    virtual std::string getLocalAddress() const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Returns the full address of the connection: local and remote host and port.
@@ -80,11 +117,16 @@ public:
      * Returns the error code stored in the socket.  This may be used
      * to determine the result of a non-blocking connect.
      */
+<<<<<<< HEAD
     QPID_COMMON_EXTERN int getError() const;
+=======
+    virtual int getError() const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Accept a connection from a socket that is already listening
      * and has an incoming connection
      */
+<<<<<<< HEAD
     QPID_COMMON_EXTERN Socket* accept() const;
 
     // TODO The following are raw operations, maybe they need better wrapping?
@@ -106,5 +148,21 @@ protected:
     mutable bool nodelay;
 };
 
+=======
+    virtual Socket* accept() const = 0;
+
+    virtual int read(void *buf, size_t count) const = 0;
+    virtual int write(const void *buf, size_t count) const = 0;
+
+    /* Transport security related: */
+    virtual int getKeyLen() const = 0;
+    virtual std::string getClientAuthId() const = 0;
+};
+
+/** Make the default socket for whatever platform we are executing on
+ */
+QPID_COMMON_EXTERN Socket* createSocket();
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }}
 #endif  /*!_sys_Socket_h*/

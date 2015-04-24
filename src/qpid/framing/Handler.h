@@ -21,9 +21,12 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 #include <assert.h>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace framing {
@@ -49,6 +52,7 @@ struct Handler {
      * Functor<F>(f) will copy f.
      * Functor<F&>(f) will only take a reference to x.
      */
+<<<<<<< HEAD
     template <class F> class Functor : public Handler<T> {
       public:
         Functor(F f, Handler<T>* next=0) : Handler<T>(next), functor(f) {}
@@ -56,10 +60,14 @@ struct Handler {
       private:
         F functor;
     };
+=======
+    template <class F> class Functor;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Adapt a member function of X as a Handler.
      * Only holds a reference to its target, not a copy.
      */
+<<<<<<< HEAD
     template <class X, void (X::*F)(T)>
     class MemFunRef : public Handler<T> {
       public:
@@ -72,6 +80,9 @@ struct Handler {
       private:
         X* target;
     };
+=======
+    template <class X, void (X::*F)(T)> class MemFunRef;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Interface for a handler that implements a
      * pair of in/out handle operations.
@@ -94,7 +105,33 @@ struct Handler {
     };
 };
 
+<<<<<<< HEAD
 
+=======
+template <class T>
+template <class F>
+class Handler<T>::Functor : public Handler<T> {
+  public:
+    Functor(F f, Handler<T>* next=0) : Handler<T>(next), functor(f) {}
+    void handle(T t) { functor(t); }
+  private:
+    F functor;
+};
+
+template <class T>
+template <class X, void (X::*F)(T)>
+class Handler<T>::MemFunRef : public Handler<T> {
+  public:
+    MemFunRef(X& x, Handler<T>* next=0) : Handler(next), target(&x) {}
+    void handle(T t) { (target->*F)(t); }
+
+    /** Allow calling with -> syntax */
+    MemFunRef* operator->() { return this; }
+
+  private:
+    X* target;
+};
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 }}
 #endif  /*!QPID_FRAMING_HANDLER_H*/

@@ -37,11 +37,20 @@ ConnectionSettings::ConnectionSettings() :
     maxChannels(32767),
     maxFrameSize(65535),
     bounds(2),
+<<<<<<< HEAD
     tcpNoDelay(false),
     service(qpid::saslName),
     minSsf(0),
     maxSsf(256),
     sslCertName("")
+=======
+    tcpNoDelay(true),
+    service(qpid::saslName),
+    minSsf(0),
+    maxSsf(256),
+    sslCertName(""),
+    sslIgnoreHostnameVerificationFailure(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 ConnectionSettings::~ConnectionSettings() {}

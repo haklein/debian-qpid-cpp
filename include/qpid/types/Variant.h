@@ -38,7 +38,12 @@ namespace types {
  */
 struct QPID_TYPES_CLASS_EXTERN InvalidConversion : public Exception 
 {
+<<<<<<< HEAD
     InvalidConversion(const std::string& msg);
+=======
+    QPID_TYPES_EXTERN InvalidConversion(const std::string& msg);
+    QPID_TYPES_EXTERN ~InvalidConversion() throw();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 enum VariantType {
@@ -177,6 +182,10 @@ QPID_TYPES_EXTERN std::ostream& operator<<(std::ostream& out, const Variant& val
 QPID_TYPES_EXTERN std::ostream& operator<<(std::ostream& out, const Variant::Map& map);
 QPID_TYPES_EXTERN std::ostream& operator<<(std::ostream& out, const Variant::List& list);
 QPID_TYPES_EXTERN bool operator==(const Variant& a, const Variant& b);
+<<<<<<< HEAD
+=======
+QPID_TYPES_EXTERN bool operator!=(const Variant& a, const Variant& b);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #endif
 }} // namespace qpid::types
 

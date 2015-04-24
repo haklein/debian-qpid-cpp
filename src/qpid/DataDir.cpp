@@ -26,6 +26,7 @@
 
 namespace qpid {
 
+<<<<<<< HEAD
 DataDir::DataDir (std::string path) :
     enabled (!path.empty ()),
     dirPath (path)
@@ -42,6 +43,21 @@ DataDir::DataDir (std::string path) :
     std::string lockFileName(path);
     lockFileName += "/lock";
     lockFile = std::auto_ptr<sys::LockFile>(new sys::LockFile(lockFileName, true));
+=======
+DataDir::DataDir (const std::string& path) :
+    enabled (!path.empty ()),
+    dirPath (path)
+{
+    if (enabled)
+    {
+        sys::FileSysDir dir(dirPath);
+        if (!dir.exists())
+            dir.mkdir();
+        std::string lockFileName(path);
+        lockFileName += "/lock";
+        lockFile = std::auto_ptr<sys::LockFile>(new sys::LockFile(lockFileName, true));
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 DataDir::~DataDir () {}

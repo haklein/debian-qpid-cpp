@@ -35,10 +35,18 @@
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 
     class Link;
     class Broker;
     class Connection;
+=======
+namespace amqp_0_10 {
+    class Connection;
+}
+    class Link;
+    class Broker;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     class LinkRegistry {
         typedef std::map<std::string, boost::shared_ptr<Link> > LinkMap;
         typedef std::map<std::string, Bridge::shared_ptr> BridgeMap;
@@ -47,18 +55,29 @@ namespace broker {
         LinkMap   links;    /** indexed by name of Link */
         BridgeMap bridges;  /** indexed by name of Bridge */
         ConnectionMap   connections;  /** indexed by connection identifier, gives link name */
+<<<<<<< HEAD
+=======
+        LinkMap   pendingLinks;  /** pending connection, indexed by name of Link */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         qpid::sys::Mutex lock;
         Broker* broker;
         management::Manageable* parent;
         MessageStore* store;
+<<<<<<< HEAD
         bool passive;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         std::string realm;
 
         boost::shared_ptr<Link> findLink(const std::string& key);
 
         // Methods called by the connection observer, key is connection identifier
+<<<<<<< HEAD
         void notifyConnection (const std::string& key, Connection* c);
+=======
+        void notifyConnection (const std::string& key, amqp_0_10::Connection* c);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         void notifyOpened     (const std::string& key);
         void notifyClosed     (const std::string& key);
         void notifyConnectionForced    (const std::string& key, const std::string& text);
@@ -108,10 +127,19 @@ namespace broker {
                 const std::string& excludes,
                 bool         dynamic,
                 uint16_t     sync,
+<<<<<<< HEAD
+=======
+                uint32_t     credit,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 Bridge::InitializeCallback=0,
                 const std::string& queueName="",
                 const std::string& altExchange=""
         );
+<<<<<<< HEAD
+=======
+        QPID_BROKER_EXTERN static const uint32_t INFINITE_CREDIT = 0xFFFFFFFF;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         /** determine if Bridge exists */
         QPID_BROKER_EXTERN Bridge::shared_ptr
           getBridge(const std::string&  name);
@@ -143,6 +171,7 @@ namespace broker {
         QPID_BROKER_EXTERN std::string getPassword        (const std::string& key);
         QPID_BROKER_EXTERN std::string getHost            (const std::string& key);
         QPID_BROKER_EXTERN uint16_t    getPort            (const std::string& key);
+<<<<<<< HEAD
 
         /**
          * Called to alter passive state. In passive state the links
@@ -157,6 +186,8 @@ namespace broker {
         QPID_BROKER_EXTERN void eachLink(boost::function<void(boost::shared_ptr<Link>)> f);
         /** Iterate over each bridge in the registry. Used for cluster updates. */
         QPID_BROKER_EXTERN void eachBridge(boost::function<void(boost::shared_ptr< Bridge>)> f);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 }
 }

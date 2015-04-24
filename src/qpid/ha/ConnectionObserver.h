@@ -29,9 +29,18 @@
 #include "boost/shared_ptr.hpp"
 
 namespace qpid {
+<<<<<<< HEAD
 namespace ha {
 class BrokerInfo;
 class HaBroker;
+=======
+struct Address;
+
+namespace ha {
+class BrokerInfo;
+class HaBroker;
+class LogPrefix;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * Observes connections, delegates to another ConnectionObserver for
@@ -50,14 +59,26 @@ class ConnectionObserver : public broker::ConnectionObserver
 
     static const std::string ADMIN_TAG;
     static const std::string BACKUP_TAG;
+<<<<<<< HEAD
 
     static bool getBrokerInfo(const broker::Connection& connection, BrokerInfo& info);
+=======
+    static const std::string ADDRESS_TAG;
+
+    static bool getBrokerInfo(const broker::Connection& connection, BrokerInfo&);
+    static bool getAddress(const broker::Connection& connection, Address&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     ConnectionObserver(HaBroker& haBroker, const types::Uuid& self);
 
     void setObserver(const ObserverPtr&);
     ObserverPtr getObserver();
 
+<<<<<<< HEAD
+=======
+    void reset();
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void opened(broker::Connection& connection);
     void closed(broker::Connection& connection);
 
@@ -66,7 +87,11 @@ class ConnectionObserver : public broker::ConnectionObserver
 
     sys::Mutex lock;
     HaBroker& haBroker;
+<<<<<<< HEAD
     std::string logPrefix;
+=======
+    const LogPrefix& logPrefix;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ObserverPtr observer;
     types::Uuid self;
 };

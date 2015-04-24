@@ -404,6 +404,35 @@ namespace Messaging {
         }
     }
 
+<<<<<<< HEAD
+=======
+    
+    void Message::SetContentObject(System::Object ^ managedObject)
+    {
+        msclr::lock lk(privateLock);
+        ThrowIfDisposed();
+
+        System::Exception ^ newException = nullptr;
+
+        try
+        {
+            ::qpid::types::Variant nativeObjValue;
+            TypeTranslator::ManagedToNativeObject(managedObject, nativeObjValue);
+            nativeObjPtr->setContentObject(nativeObjValue);
+        }
+        catch (const ::qpid::types::Exception & error)
+        {
+            String ^ errmsg = gcnew String(error.what());
+            newException    = gcnew QpidException(errmsg);
+        }
+
+        if (newException != nullptr)
+        {
+            throw newException;
+        }
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     System::String ^ Message::GetContent()
     {
@@ -539,6 +568,37 @@ namespace Messaging {
     }
 
 
+<<<<<<< HEAD
+=======
+    System::Object ^ Message::GetContentObject()
+    {
+        msclr::lock lk(privateLock);
+        ThrowIfDisposed();
+
+        System::Exception ^ newException = nullptr;
+        System::Object ^ result = nullptr;
+
+        try
+        {
+            ::qpid::types::Variant nativeObject = nativeObjPtr->getContentObject();
+
+            result = TypeTranslator::NativeToManagedObject(nativeObject);
+        }
+        catch (const ::qpid::types::Exception & error)
+        {
+            String ^ errmsg = gcnew String(error.what());
+            newException    = gcnew QpidException(errmsg);
+        }
+
+        if (newException != nullptr)
+        {
+            throw newException;
+        }
+
+        return result;
+    }
+    
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     System::String ^ Message::MapAsString(System::Collections::Generic::Dictionary<
         System::String^, System::Object^> ^ dict)
     {

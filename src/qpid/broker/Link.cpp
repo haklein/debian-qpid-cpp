@@ -22,7 +22,11 @@
 #include "qpid/broker/Link.h"
 #include "qpid/broker/LinkRegistry.h"
 #include "qpid/broker/Broker.h"
+<<<<<<< HEAD
 #include "qpid/broker/Connection.h"
+=======
+#include "qpid/broker/amqp_0_10/Connection.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Timer.h"
 #include "qmf/org/apache/qpid/broker/EventBrokerLinkUp.h"
 #include "qmf/org/apache/qpid/broker/EventBrokerLinkDown.h"
@@ -30,8 +34,15 @@
 #include "qpid/log/Statement.h"
 #include "qpid/framing/enum.h"
 #include "qpid/framing/reply_exceptions.h"
+<<<<<<< HEAD
 #include "qpid/broker/AclModule.h"
 #include "qpid/broker/Exchange.h"
+=======
+#include "qpid/framing/amqp_types.h"
+#include "qpid/broker/AclModule.h"
+#include "qpid/broker/Exchange.h"
+#include "qpid/broker/NameGenerator.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/UrlArray.h"
 
 namespace qpid {
@@ -59,8 +70,12 @@ namespace {
 
 struct LinkTimerTask : public sys::TimerTask {
     LinkTimerTask(Link& l, sys::Timer& t)
+<<<<<<< HEAD
         : TimerTask(int64_t(l.getBroker()->getOptions().linkMaintenanceInterval*
                             sys::TIME_SEC),
+=======
+        : TimerTask(l.getBroker()->getLinkMaintenanceInterval(),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     "Link retry timer"),
           link(l), timer(t) {}
 
@@ -89,6 +104,7 @@ public:
     bool bind(boost::shared_ptr<broker::Queue>, const std::string&, const framing::FieldTable*) { return false; }
     bool unbind(boost::shared_ptr<broker::Queue>, const std::string&, const framing::FieldTable*) { return false; }
     bool isBound(boost::shared_ptr<broker::Queue>, const std::string* const, const framing::FieldTable* const) {return false;}
+<<<<<<< HEAD
 
     // Process messages sent from the remote's amq.failover exchange by extracting the failover URLs
     // and saving them should the Link need to reconnect.
@@ -96,6 +112,15 @@ public:
     {
         if (!link) return;
         const framing::FieldTable* headers = msg.getMessage().getApplicationHeaders();
+=======
+    bool hasBindings() { return false; }
+    // Process messages sent from the remote's amq.failover exchange by extracting the failover URLs
+    // and saving them should the Link need to reconnect.
+    void route(broker::Deliverable& /*msg*/)
+    {
+        if (!link) return;
+        const framing::FieldTable* headers = 0;//TODO: msg.getMessage().getApplicationHeaders();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         framing::Array addresses;
         if (headers && headers->getArray(FAILOVER_HEADER_KEY, addresses)) {
             // convert the Array of addresses to a single Url container for used with setUrl():
@@ -143,12 +168,21 @@ Link::Link(const string&  _name,
       host(_host), port(_port), transport(_transport),
       durable(_durable),
       authMechanism(_authMechanism), username(_username), password(_password),
+<<<<<<< HEAD
       persistenceId(0), mgmtObject(0), broker(_broker), state(0),
       visitCount(0),
       currentInterval(1),
       closing(false),
       reconnectNext(0),         // Index of next address for reconnecting in url.
       channelCounter(1),
+=======
+      persistenceId(0), broker(_broker), state(0),
+      visitCount(0),
+      currentInterval(1),
+      reconnectNext(0),         // Index of next address for reconnecting in url.
+      nextFreeChannel(1),
+      freeChannels(1, framing::CHANNEL_MAX),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       connection(0),
       agent(0),
       listener(l),
@@ -161,19 +195,28 @@ Link::Link(const string&  _name,
         agent = broker->getManagementAgent();
         if (agent != 0)
         {
+<<<<<<< HEAD
             mgmtObject = new _qmf::Link(agent, this, parent, name, durable);
+=======
+            mgmtObject = _qmf::Link::shared_ptr(new _qmf::Link(agent, this, parent, name, durable));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             mgmtObject->set_host(host);
             mgmtObject->set_port(port);
             mgmtObject->set_transport(transport);
             agent->addObject(mgmtObject, 0, durable);
         }
     }
+<<<<<<< HEAD
     if (links->isPassive()) {
         setStateLH(STATE_PASSIVE);
     } else {
         setStateLH(STATE_WAITING);
         startConnectionLH();
     }
+=======
+    setStateLH(STATE_WAITING);
+    startConnectionLH();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     broker->getTimer().add(timerTask);
 
     if (failover) {
@@ -207,9 +250,12 @@ void Link::setStateLH (int newState)
 
     state = newState;
 
+<<<<<<< HEAD
     if (hideManagement())
         return;
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     switch (state)
     {
     case STATE_WAITING     : mgmtObject->set_state("Waiting");     break;
@@ -217,7 +263,11 @@ void Link::setStateLH (int newState)
     case STATE_OPERATIONAL : mgmtObject->set_state("Operational"); break;
     case STATE_FAILED      : mgmtObject->set_state("Failed");      break;
     case STATE_CLOSED      : mgmtObject->set_state("Closed");      break;
+<<<<<<< HEAD
     case STATE_PASSIVE     : mgmtObject->set_state("Passive");      break;
+=======
+    case STATE_CLOSING     : mgmtObject->set_state("Closing");     break;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -228,13 +278,20 @@ void Link::startConnectionLH ()
         // Set the state before calling connect.  It is possible that connect
         // will fail synchronously and call Link::closed before returning.
         setStateLH(STATE_CONNECTING);
+<<<<<<< HEAD
         broker->connect (host, boost::lexical_cast<std::string>(port), transport,
                          boost::bind (&Link::closed, this, _1, _2));
         QPID_LOG (debug, "Inter-broker link connecting to " << host << ":" << port);
+=======
+        broker->connect (name, host, boost::lexical_cast<std::string>(port), transport,
+                         boost::bind (&Link::closed, this, _1, _2));
+        QPID_LOG (info, "Inter-broker link connecting to " << host << ":" << port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     } catch(const std::exception& e) {
         QPID_LOG(error, "Link connection to " << host << ":" << port << " failed: "
                  << e.what());
         setStateLH(STATE_WAITING);
+<<<<<<< HEAD
         if (!hideManagement())
             mgmtObject->set_lastError (e.what());
     }
@@ -243,10 +300,19 @@ void Link::startConnectionLH ()
 void Link::established(Connection* c)
 {
     if (state == STATE_PASSIVE) return;
+=======
+        mgmtObject->set_lastError (e.what());
+    }
+}
+
+void Link::established(qpid::broker::amqp_0_10::Connection* c)
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     stringstream addr;
     addr << host << ":" << port;
     QPID_LOG (info, "Inter-broker link established to " << addr.str());
 
+<<<<<<< HEAD
     if (!hideManagement() && agent)
         agent->raiseEvent(_qmf::EventBrokerLinkUp(addr.str()));
     bool isClosing = false;
@@ -262,6 +328,24 @@ void Link::established(Connection* c)
         destroy();
     else // Process any IO tasks bridges added before established.
         c->requestIOProcessing (boost::bind(&Link::ioThreadProcessing, this));
+=======
+    if (agent)
+        agent->raiseEvent(_qmf::EventBrokerLinkUp(addr.str()));
+    bool isClosing = true;
+    {
+        Mutex::ScopedLock mutex(lock);
+        if (state != STATE_CLOSING) {
+            isClosing = false;
+            setStateLH(STATE_OPERATIONAL);
+            currentInterval = 1;
+            visitCount      = 0;
+            connection = c;
+            c->requestIOProcessing (boost::bind(&Link::ioThreadProcessing, this));
+        }
+    }
+    if (isClosing)
+        destroy();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
@@ -280,17 +364,30 @@ class DetachedCallback : public SessionHandler::ErrorListener {
     void connectionException(framing::connection::CloseCode, const std::string&) {}
     void channelException(framing::session::DetachCode, const std::string&) {}
     void executionException(framing::execution::ErrorCode, const std::string&) {}
+<<<<<<< HEAD
+=======
+    void incomingExecutionException(framing::execution::ErrorCode, const std::string& ) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void detach() {}
   private:
     const std::string name;
 };
 }
 
+<<<<<<< HEAD
 void Link::opened() {
     Mutex::ScopedLock mutex(lock);
     if (!connection) return;
 
     if (!hideManagement() && connection->GetManagementObject()) {
+=======
+void Link::opened()
+{
+    Mutex::ScopedLock mutex(lock);
+    if (!connection || state != STATE_OPERATIONAL) return;
+
+    if (connection->GetManagementObject()) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         mgmtObject->set_connectionRef(connection->GetManagementObject()->getObjectId());
     }
 
@@ -345,6 +442,7 @@ void Link::opened() {
     }
 }
 
+<<<<<<< HEAD
 void Link::closed(int, std::string text)
 {
     Mutex::ScopedLock mutex(lock);
@@ -353,12 +451,27 @@ void Link::closed(int, std::string text)
     connection = 0;
 
     if (!hideManagement()) {
+=======
+
+// called when connection attempt fails (see startConnectionLH)
+void Link::closed(int, std::string text)
+{
+    QPID_LOG (info, "Inter-broker link disconnected from " << host << ":" << port << " " << text);
+
+    bool isClosing = false;
+    {
+        Mutex::ScopedLock mutex(lock);
+
+        connection = 0;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         mgmtObject->set_connectionRef(qpid::management::ObjectId());
         if (state == STATE_OPERATIONAL && agent) {
             stringstream addr;
             addr << host << ":" << port;
             agent->raiseEvent(_qmf::EventBrokerLinkDown(addr.str()));
         }
+<<<<<<< HEAD
     }
 
     for (Bridges::iterator i = active.begin(); i != active.end(); i++) {
@@ -376,6 +489,27 @@ void Link::closed(int, std::string text)
 }
 
 // Called in connection IO thread, cleans up the connection before destroying Link
+=======
+
+        for (Bridges::iterator i = active.begin(); i != active.end(); i++) {
+            (*i)->closed();
+            created.push_back(*i);
+        }
+        active.clear();
+
+        if (state == STATE_CLOSING) {
+            isClosing = true;
+        } else if (state != STATE_FAILED) {
+            setStateLH(STATE_WAITING);
+            mgmtObject->set_lastError (text);
+        }
+    }
+    if (isClosing) destroy();
+}
+
+// Cleans up the connection before destroying Link.  Must be called in connection thread
+// if the connection is active.  Caller Note well: may call "delete this"!
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void Link::destroy ()
 {
     Bridges toDelete;
@@ -405,7 +539,13 @@ void Link::destroy ()
     for (Bridges::iterator i = toDelete.begin(); i != toDelete.end(); i++)
         (*i)->close();
     toDelete.clear();
+<<<<<<< HEAD
     listener(this); // notify LinkRegistry that this Link has been destroyed
+=======
+    // notify LinkRegistry that this Link has been destroyed.  Will result in "delete
+    // this" if LinkRegistry is holding the last shared pointer to *this
+    listener(this);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Link::add(Bridge::shared_ptr bridge)
@@ -447,7 +587,11 @@ void Link::ioThreadProcessing()
 {
     Mutex::ScopedLock mutex(lock);
 
+<<<<<<< HEAD
     if (state != STATE_OPERATIONAL || closing)
+=======
+    if (state != STATE_OPERATIONAL)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
 
     // check for bridge session errors and recover
@@ -484,9 +628,15 @@ void Link::ioThreadProcessing()
 void Link::maintenanceVisit ()
 {
     Mutex::ScopedLock mutex(lock);
+<<<<<<< HEAD
     if (closing) return;
     if (state == STATE_WAITING)
     {
+=======
+
+    switch (state) {
+    case STATE_WAITING:
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         visitCount++;
         if (visitCount >= currentInterval)
         {
@@ -499,11 +649,25 @@ void Link::maintenanceVisit ()
                 startConnectionLH();
             }
         }
+<<<<<<< HEAD
     }
     else if (state == STATE_OPERATIONAL &&
              (!active.empty() || !created.empty() || !cancellations.empty()) &&
              connection && connection->isOpen())
         connection->requestIOProcessing (boost::bind(&Link::ioThreadProcessing, this));
+=======
+        break;
+
+    case STATE_OPERATIONAL:
+        if ((!active.empty() || !created.empty() || !cancellations.empty()) &&
+            connection && connection->isOpen())
+            connection->requestIOProcessing (boost::bind(&Link::ioThreadProcessing, this));
+        break;
+
+    default:    // no-op for all other states
+        break;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Link::reconnectLH(const Address& a)
@@ -512,6 +676,7 @@ void Link::reconnectLH(const Address& a)
     port = a.port;
     transport = a.protocol;
 
+<<<<<<< HEAD
     if (!hideManagement()) {
         stringstream errorString;
         errorString << "Failing over to " << a;
@@ -520,6 +685,15 @@ void Link::reconnectLH(const Address& a)
         mgmtObject->set_port(port);
         mgmtObject->set_transport(transport);
     }
+=======
+    stringstream errorString;
+    errorString << "Failing over to " << a;
+    mgmtObject->set_lastError(errorString.str());
+    mgmtObject->set_host(host);
+    mgmtObject->set_port(port);
+    mgmtObject->set_transport(transport);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     startConnectionLH();
 }
 
@@ -529,13 +703,18 @@ bool Link::tryFailoverLH() {
     if (url.empty()) return false;
     Address next = url[reconnectNext++];
     if (next.host != host || next.port != port || next.protocol != transport) {
+<<<<<<< HEAD
         QPID_LOG(notice, "Inter-broker link '" << name << "' failing over to " << next);
+=======
+        QPID_LOG(info, "Inter-broker link '" << name << "' failing over to " << next);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         reconnectLH(next);
         return true;
     }
     return false;
 }
 
+<<<<<<< HEAD
 // Management updates for a link are inconsistent in a cluster, so they are
 // suppressed.
 bool Link::hideManagement() const {
@@ -548,14 +727,65 @@ uint Link::nextChannel()
     if (channelCounter >= framing::CHANNEL_MAX)
         channelCounter = 1;
     return channelCounter++;
+=======
+// Allocate channel from link free pool
+framing::ChannelId Link::nextChannel()
+{
+    Mutex::ScopedLock mutex(lock);
+    if (!freeChannels.empty()) {
+        // A free channel exists.
+        for (framing::ChannelId i = 1; i <= framing::CHANNEL_MAX; i++)
+        {
+            // extract proposed free channel
+            framing::ChannelId c = nextFreeChannel;
+            // calculate next free channel
+            if (framing::CHANNEL_MAX == nextFreeChannel)
+                nextFreeChannel = 1;
+            else
+                nextFreeChannel += 1;
+            // if proposed channel is free, use it
+            if (freeChannels.contains(c))
+            {
+                freeChannels -= c;
+                QPID_LOG(debug, "Link " << name << " allocates channel: " << c);
+                return c;
+            }
+        }
+        assert (false);
+    }
+
+    throw Exception(Msg() << "Link " << name << " channel pool is empty");
+}
+
+// Return channel to link free pool
+void Link::returnChannel(framing::ChannelId c)
+{
+    Mutex::ScopedLock mutex(lock);
+    QPID_LOG(debug, "Link " << name << " frees channel: " << c);
+    freeChannels += c;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Link::notifyConnectionForced(const string text)
 {
+<<<<<<< HEAD
     Mutex::ScopedLock mutex(lock);
     setStateLH(STATE_FAILED);
     if (!hideManagement())
         mgmtObject->set_lastError(text);
+=======
+    bool isClosing = false;
+    {
+        Mutex::ScopedLock mutex(lock);
+        if (state == STATE_CLOSING) {
+            isClosing = true;
+        } else {
+            setStateLH(STATE_FAILED);
+            mgmtObject->set_lastError(text);
+        }
+    }
+    if (isClosing) destroy();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Link::setPersistenceId(uint64_t id) const
@@ -638,13 +868,20 @@ uint32_t Link::encodedSize() const
         + password.size() + 1;
 }
 
+<<<<<<< HEAD
 ManagementObject* Link::GetManagementObject (void) const
 {
     return (ManagementObject*) mgmtObject;
+=======
+ManagementObject::shared_ptr Link::GetManagementObject(void) const
+{
+    return mgmtObject;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Link::close() {
     QPID_LOG(debug, "Link::close(), link=" << name );
+<<<<<<< HEAD
     Mutex::ScopedLock mutex(lock);
     if (!closing) {
         closing = true;
@@ -653,6 +890,27 @@ void Link::close() {
             connection->requestIOProcessing(boost::bind(&Link::destroy, this));
         }
     }
+=======
+    bool destroy_now = false;
+    {
+        Mutex::ScopedLock mutex(lock);
+        if (state != STATE_CLOSING) {
+            int old_state = state;
+            setStateLH(STATE_CLOSING);
+            if (connection) {
+                //connection can only be closed on the connections own IO processing thread
+                connection->requestIOProcessing(boost::bind(&Link::destroy, this));
+            } else if (old_state == STATE_CONNECTING) {
+                // cannot destroy Link now since a connection request is outstanding.
+                // destroy the link after we get a response (see Link::established,
+                // Link::closed, Link::notifyConnectionForced, etc).
+            } else {
+                destroy_now = true;
+            }
+        }
+    }
+    if (destroy_now) destroy();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
@@ -684,7 +942,11 @@ Manageable::status_t Link::ManagementMethod (uint32_t op, Args& args, string& te
                               *this, iargs.i_durable,
                               iargs.i_src, iargs.i_dest, iargs.i_key, iargs.i_srcIsQueue,
                               iargs.i_srcIsLocal, iargs.i_tag, iargs.i_excludes,
+<<<<<<< HEAD
                               iargs.i_dynamic, iargs.i_sync);
+=======
+                              iargs.i_dynamic, iargs.i_sync, iargs.i_credit);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (!rc.first) {
                 text = "invalid parameters";
                 return Manageable::STATUS_PARAMETER_INVALID;
@@ -696,6 +958,7 @@ Manageable::status_t Link::ManagementMethod (uint32_t op, Args& args, string& te
     return Manageable::STATUS_UNKNOWN_METHOD;
 }
 
+<<<<<<< HEAD
 void Link::setPassive(bool passive)
 {
     Mutex::ScopedLock mutex(lock);
@@ -712,6 +975,8 @@ void Link::setPassive(bool passive)
 }
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /** utility to clean up connection resources correctly */
 void Link::closeConnection( const std::string& reason)
 {
@@ -747,6 +1012,7 @@ namespace {
     const std::string FAILOVER_INDEX("failover-index");
 }
 
+<<<<<<< HEAD
 void Link::getState(framing::FieldTable& state) const
 {
     state.clear();
@@ -769,6 +1035,8 @@ void Link::setState(const framing::FieldTable& state)
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 std::string Link::createName(const std::string& transport,
                              const std::string& host,
                              uint16_t  port)
@@ -779,6 +1047,7 @@ std::string Link::createName(const std::string& transport,
     return linkName.str();
 }
 
+<<<<<<< HEAD
 
 bool Link::pendingConnection(const std::string& _host, uint16_t _port) const
 {
@@ -787,6 +1056,8 @@ bool Link::pendingConnection(const std::string& _host, uint16_t _port) const
 }
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string Link::exchangeTypeName("qpid.LinkExchange");
 
 }} // namespace qpid::broker

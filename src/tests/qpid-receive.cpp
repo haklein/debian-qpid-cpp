@@ -60,6 +60,10 @@ struct Options : public qpid::Options
     uint tx;
     uint rollbackFrequency;
     bool printContent;
+<<<<<<< HEAD
+=======
+    bool printContentObjectType;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool printHeaders;
     bool failoverUpdates;
     qpid::log::Options log;
@@ -69,11 +73,19 @@ struct Options : public qpid::Options
     string readyAddress;
     uint receiveRate;
     std::string replyto;
+<<<<<<< HEAD
+=======
+    bool noReplies;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Options(const std::string& argv0=std::string())
         : qpid::Options("Options"),
           help(false),
+<<<<<<< HEAD
           url("amqp:tcp:127.0.0.1"),
+=======
+          url("127.0.0.1"),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           timeout(0),
           forever(false),
           messages(0),
@@ -85,13 +97,22 @@ struct Options : public qpid::Options
           tx(0),
           rollbackFrequency(0),
           printContent(true),
+<<<<<<< HEAD
+=======
+          printContentObjectType(false),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           printHeaders(false),
           failoverUpdates(false),
           log(argv0),
           reportTotal(false),
           reportEvery(0),
           reportHeader(true),
+<<<<<<< HEAD
           receiveRate(0)
+=======
+          receiveRate(0),
+          noReplies(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         addOptions()
             ("broker,b", qpid::optValue(url, "URL"), "url of broker to connect to")
@@ -108,6 +129,10 @@ struct Options : public qpid::Options
             ("tx", qpid::optValue(tx, "N"), "batch size for transactions (0 implies transaction are not used)")
             ("rollback-frequency", qpid::optValue(rollbackFrequency, "N"), "rollback frequency (0 implies no transaction will be rolledback)")
             ("print-content", qpid::optValue(printContent, "yes|no"), "print out message content")
+<<<<<<< HEAD
+=======
+            ("print-object-type", qpid::optValue(printContentObjectType, "yes|no"), "print a description of the content's object type if relevant")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             ("print-headers", qpid::optValue(printHeaders, "yes|no"), "print out message headers")
             ("failover-updates", qpid::optValue(failoverUpdates), "Listen for membership updates distributed via amq.failover")
             ("report-total", qpid::optValue(reportTotal), "Report total throughput and latency statistics")
@@ -116,6 +141,10 @@ struct Options : public qpid::Options
             ("ready-address", qpid::optValue(readyAddress, "ADDRESS"), "send a message to this address when ready to receive")
             ("receive-rate", qpid::optValue(receiveRate,"N"), "Receive at rate of N messages/second. 0 means receive as fast as possible.")
             ("reply-to", qpid::optValue(replyto, "REPLY-TO"), "specify reply-to address on response messages")
+<<<<<<< HEAD
+=======
+            ("ignore-reply-to", qpid::optValue(noReplies), "Do not send replies even if reply-to is set")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             ("help", qpid::optValue(help), "print this usage statement");
         add(log);
     }
@@ -133,8 +162,12 @@ struct Options : public qpid::Options
             if (address.empty()) throw qpid::Exception("Address must be specified!");
             qpid::log::Logger::instance().configure(log);
             if (help) {
+<<<<<<< HEAD
                 std::ostringstream msg;
                 std::cout << msg << *this << std::endl << std::endl
+=======
+                std::cout << *this << std::endl << std::endl
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                           << "Drains messages from the specified address" << std::endl;
                 return false;
             } else {
@@ -200,8 +233,16 @@ int main(int argc, char ** argv)
             Duration timeout = opts.getTimeout();
             bool done = false;
             Reporter<ThroughputAndLatency> reporter(std::cout, opts.reportEvery, opts.reportHeader);
+<<<<<<< HEAD
             if (!opts.readyAddress.empty())
                 session.createSender(opts.readyAddress).send(msg);
+=======
+            if (!opts.readyAddress.empty()) {
+                session.createSender(opts.readyAddress).send(msg);
+		if (opts.tx)
+		    session.commit();
+	    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             // For receive rate calculation
             qpid::sys::AbsTime start = qpid::sys::now();
             int64_t interval = 0;
@@ -219,6 +260,7 @@ int main(int argc, char ** argv)
                         if (opts.printHeaders) {
                             if (msg.getSubject().size()) std::cout << "Subject: " << msg.getSubject() << std::endl;
                             if (msg.getReplyTo()) std::cout << "ReplyTo: " << msg.getReplyTo() << std::endl;
+<<<<<<< HEAD
                             if (msg.getCorrelationId().size()) std::cout << "CorrelationId: " << msg.getCorrelationId() << std::endl;
                             if (msg.getUserId().size()) std::cout << "UserId: " << msg.getUserId() << std::endl;
                             if (msg.getTtl().getMilliseconds()) std::cout << "TTL: " << msg.getTtl().getMilliseconds() << std::endl;
@@ -230,6 +272,29 @@ int main(int argc, char ** argv)
                         }
                         if (opts.printContent)
                             std::cout << msg.getContent() << std::endl;//TODO: handle map or list messages
+=======
+                            if (msg.getMessageId().size()) std::cout << "MessageId: " << msg.getMessageId() << std::endl;
+                            if (msg.getCorrelationId().size()) std::cout << "CorrelationId: " << msg.getCorrelationId() << std::endl;
+                            if (msg.getUserId().size()) std::cout << "UserId: " << msg.getUserId() << std::endl;
+                            if (msg.getTtl().getMilliseconds()) std::cout << "TTL: " << msg.getTtl().getMilliseconds() << std::endl;
+                            if (msg.getPriority()) std::cout << "Priority: " << ((uint) msg.getPriority()) << std::endl;
+                            if (msg.getDurable()) std::cout << "Durable: true" << std::endl;
+                            if (msg.getRedelivered()) std::cout << "Redelivered: true" << std::endl;
+                            std::cout << "Properties: " << msg.getProperties() << std::endl;
+                            if (msg.getContentType().size()) std::cout << "ContentType: " << msg.getContentType() << std::endl;
+                            std::cout << std::endl;
+                        }
+                        if (opts.printContent) {
+                            if (!msg.getContentObject().isVoid()) {
+                                if (opts.printContentObjectType) {
+                                    std::cout << "[Object: " << getTypeName(msg.getContentObject().getType()) << "]" << std::endl;
+                                }
+                                std::cout << msg.getContentObject() << std::endl;
+                            } else {
+                                std::cout << msg.getContent() << std::endl;
+                            }
+                        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                         if (opts.messages && count >= opts.messages) done = true;
                     }
                 }
@@ -242,15 +307,25 @@ int main(int argc, char ** argv)
                 } else if (opts.ackFrequency && (count % opts.ackFrequency == 0)) {
                     session.acknowledge();
                 }
+<<<<<<< HEAD
                 if (msg.getReplyTo()) { // Echo message back to reply-to address.
+=======
+                if (msg.getReplyTo() && !opts.noReplies) { // Echo message back to reply-to address.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     Sender& s = replyTo[msg.getReplyTo().str()];
                     if (s.isNull()) {
                         s = session.createSender(msg.getReplyTo());
                         s.setCapacity(opts.capacity);
+<<<<<<< HEAD
                     }
                     if (!opts.replyto.empty()) {
                         msg.setReplyTo(Address(opts.replyto));
                     }
+=======
+                        replyTo[msg.getReplyTo().str()] = s;
+                    }
+                    msg.setReplyTo(Address(opts.replyto));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     s.send(msg);
                 }
                 if (opts.receiveRate) {
@@ -258,8 +333,11 @@ int main(int argc, char ** argv)
                     int64_t delay = qpid::sys::Duration(qpid::sys::now(), waitTill);
                     if (delay > 0) qpid::sys::usleep(delay/qpid::sys::TIME_USEC);
                 }
+<<<<<<< HEAD
                 // Clear out message properties & content for next iteration.
                 msg = Message(); // TODO aconway 2010-12-01: should be done by fetch
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
             if (opts.reportTotal) reporter.report();
             if (opts.tx) {
@@ -268,7 +346,11 @@ int main(int argc, char ** argv)
                 } else {
                     session.commit();
                 }
+<<<<<<< HEAD
             } else {
+=======
+            } else if (opts.ackFrequency) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 session.acknowledge();
             }
             session.close();

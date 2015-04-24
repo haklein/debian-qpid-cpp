@@ -20,27 +20,55 @@
  */
 
 #include "qpid/broker/SessionState.h"
+<<<<<<< HEAD
 #include "qpid/broker/Connection.h"
+=======
+
+#include "qpid/broker/AsyncCommandCallback.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/DeliverableMessage.h"
 #include "qpid/broker/DtxAck.h"
 #include "qpid/broker/DtxTimeout.h"
 #include "qpid/broker/Message.h"
 #include "qpid/broker/Queue.h"
+<<<<<<< HEAD
 #include "qpid/broker/SessionContext.h"
 #include "qpid/broker/SessionOutputException.h"
 #include "qpid/broker/TxAccept.h"
 #include "qpid/broker/TxPublish.h"
+=======
+#include "qpid/broker/Selector.h"
+#include "qpid/broker/SessionContext.h"
+#include "qpid/broker/SessionOutputException.h"
+#include "qpid/broker/TransactionObserver.h"
+#include "qpid/broker/TxAccept.h"
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/SequenceSet.h"
 #include "qpid/framing/IsInSequenceSet.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
 #include "qpid/sys/ClusterSafe.h"
 #include "qpid/ptr_map.h"
 #include "qpid/broker/AclModule.h"
 
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
+=======
+#include "qpid/management/ManagementAgent.h"
+#include "qpid/ptr_map.h"
+#include "qpid/broker/AclModule.h"
+#include "qpid/broker/FedOps.h"
+#include "qpid/sys/ConnectionOutputHandler.h"
+
+#include <boost/bind.hpp>
+#include <boost/format.hpp>
+#include <boost/tuple/tuple_comparison.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <iostream>
 #include <sstream>
@@ -49,11 +77,23 @@
 
 #include <assert.h>
 
+<<<<<<< HEAD
+=======
+namespace {
+const std::string X_SCOPE("x-scope");
+const std::string SESSION("session");
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace broker {
 
 using namespace std;
 using boost::intrusive_ptr;
+<<<<<<< HEAD
+=======
+using boost::shared_ptr;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using boost::bind;
 using namespace qpid::broker;
 using namespace qpid::framing;
@@ -65,6 +105,7 @@ using qpid::management::Manageable;
 using qpid::management::Args;
 namespace _qmf = qmf::org::apache::qpid::broker;
 
+<<<<<<< HEAD
 SemanticState::SemanticState(DeliveryAdapter& da, SessionContext& ss)
     : session(ss),
       deliveryAdapter(da),
@@ -74,6 +115,16 @@ SemanticState::SemanticState(DeliveryAdapter& da, SessionContext& ss)
       userID(getSession().getConnection().getUserId()),
       closeComplete(false),
       connectionId(getSession().getConnection().getUrl())
+=======
+SemanticState::SemanticState(SessionState& ss)
+    : session(ss),
+      tagGenerator("sgen"),
+      dtxSelected(false),
+      authMsg(getSession().getBroker().isAuthenticating() && !getSession().getConnection().isFederationLink()),
+      userID(getSession().getConnection().getUserId()),
+      closeComplete(false),
+      connectionId(getSession().getConnection().getMgmtId())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 SemanticState::~SemanticState() {
@@ -89,7 +140,12 @@ void SemanticState::closed() {
         if (dtxBuffer.get()) {
             dtxBuffer->fail();
         }
+<<<<<<< HEAD
         recover(true);
+=======
+        unbindSessionBindings();
+        requeue();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         //now unsubscribe, which may trigger queue deletion and thus
         //needs to occur after the requeueing of unacked messages
@@ -97,6 +153,10 @@ void SemanticState::closed() {
             cancel(i->second);
         }
         closeComplete = true;
+<<<<<<< HEAD
+=======
+        if (txBuffer) txBuffer->rollback();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -124,9 +184,15 @@ void SemanticState::consume(const string& tag,
                          resumeId, resumeTtl, arguments);
     if (!c)                     // Create plain consumer
         c = ConsumerImpl::shared_ptr(
+<<<<<<< HEAD
             new ConsumerImpl(this, name, queue, ackRequired, acquire, exclusive, tag,
                              resumeId, resumeTtl, arguments));
     queue->consume(c, exclusive);//may throw exception
+=======
+            new ConsumerImpl(this, name, queue, ackRequired, acquire ? CONSUMER : BROWSER, exclusive, tag,
+                             resumeId, resumeTtl, arguments));
+    queue->consume(c, exclusive, arguments, connectionId, userID);//may throw exception
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     consumers[tag] = c;
 }
 
@@ -153,6 +219,7 @@ bool SemanticState::cancel(const string& tag)
 
 void SemanticState::startTx()
 {
+<<<<<<< HEAD
     txBuffer = TxBuffer::shared_ptr(new TxBuffer());
 }
 
@@ -168,15 +235,57 @@ void SemanticState::commit(MessageStore* const store)
     } else {
         throw InternalErrorException(QPID_MSG("Commit failed"));
     }
+=======
+    accumulatedAck.clear();
+    txBuffer = boost::intrusive_ptr<TxBuffer>(new TxBuffer());
+    session.getBroker().getBrokerObservers().startTx(txBuffer);
+    session.startTx(); //just to update statistics
+}
+
+namespace {
+struct StartTxOnExit {
+    SemanticState& session;
+    StartTxOnExit(SemanticState& ss) : session(ss) {}
+    ~StartTxOnExit() { session.startTx(); }
+};
+} // namespace
+
+void SemanticState::commit(MessageStore* const store)
+{
+    if (!txBuffer) throw
+        CommandInvalidException(
+            QPID_MSG("Session has not been selected for use with transactions"));
+    // Start a new TX regardless of outcome of this one.
+    StartTxOnExit e(*this);
+    session.getCurrentCommand().setCompleteSync(false); // Async completion
+    txBuffer->begin();          // Begin async completion.
+    session.commitTx();         //just to update statistics
+    TxOp::shared_ptr txAck(static_cast<TxOp*>(new TxAccept(accumulatedAck, unacked)));
+    txBuffer->enlist(txAck);
+    // In a HA cluster, tx.commit may complete asynchronously.
+    txBuffer->startCommit(store);
+    AsyncCommandCallback callback(
+        session,
+        boost::bind(&TxBuffer::endCommit, txBuffer, store),
+        true                    // This is a sync point
+    );
+    txBuffer->end(callback);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::rollback()
 {
     if (!txBuffer)
         throw CommandInvalidException(QPID_MSG("Session has not been selected for use with transactions"));
+<<<<<<< HEAD
 
     txBuffer->rollback();
     accumulatedAck.clear();
+=======
+    StartTxOnExit e(*this);
+    session.rollbackTx();       // Just to update statistics
+    txBuffer->rollback();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::selectDtx()
@@ -189,8 +298,14 @@ void SemanticState::startDtx(const std::string& xid, DtxManager& mgr, bool join)
     if (!dtxSelected) {
         throw CommandInvalidException(QPID_MSG("Session has not been selected for use with dtx"));
     }
+<<<<<<< HEAD
     dtxBuffer.reset(new DtxBuffer(xid));
     txBuffer = dtxBuffer;
+=======
+    dtxBuffer = new DtxBuffer(xid);
+    txBuffer = dtxBuffer;
+    session.getBroker().getBrokerObservers().startDtx(dtxBuffer);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (join) {
         mgr.join(xid, dtxBuffer);
     } else {
@@ -209,7 +324,11 @@ void SemanticState::endDtx(const std::string& xid, bool fail)
 
     }
 
+<<<<<<< HEAD
     txBuffer.reset();//ops on this session no longer transactional
+=======
+    txBuffer = 0;//ops on this session no longer transactional
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     checkDtxTimeout();
     if (fail) {
@@ -217,7 +336,11 @@ void SemanticState::endDtx(const std::string& xid, bool fail)
     } else {
         dtxBuffer->markEnded();
     }
+<<<<<<< HEAD
     dtxBuffer.reset();
+=======
+    dtxBuffer = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::suspendDtx(const std::string& xid)
@@ -226,12 +349,20 @@ void SemanticState::suspendDtx(const std::string& xid)
         throw CommandInvalidException(
             QPID_MSG("xid specified on start was " << dtxBuffer->getXid() << ", but " << xid << " specified on suspend"));
     }
+<<<<<<< HEAD
     txBuffer.reset();//ops on this session no longer transactional
+=======
+    txBuffer = 0;//ops on this session no longer transactional
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     checkDtxTimeout();
     dtxBuffer->setSuspended(true);
     suspendedXids[xid] = dtxBuffer;
+<<<<<<< HEAD
     dtxBuffer.reset();
+=======
+    dtxBuffer = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::resumeDtx(const std::string& xid)
@@ -264,7 +395,11 @@ void SemanticState::resumeDtx(const std::string& xid)
 void SemanticState::checkDtxTimeout()
 {
     if (dtxBuffer->isExpired()) {
+<<<<<<< HEAD
         dtxBuffer.reset();
+=======
+        dtxBuffer = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         throw DtxTimeoutException();
     }
 }
@@ -276,12 +411,22 @@ void SemanticState::record(const DeliveryRecord& delivery)
 }
 
 const std::string QPID_SYNC_FREQUENCY("qpid.sync_frequency");
+<<<<<<< HEAD
 
 SemanticState::ConsumerImpl::ConsumerImpl(SemanticState* _parent,
                                           const string& _name,
                                           Queue::shared_ptr _queue,
                                           bool ack,
                                           bool _acquire,
+=======
+const std::string APACHE_SELECTOR("x-apache-selector");
+
+SemanticStateConsumerImpl::SemanticStateConsumerImpl(SemanticState* _parent,
+                                          const string& _name,
+                                          Queue::shared_ptr _queue,
+                                          bool ack,
+                                          SubscriptionType type,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                           bool _exclusive,
                                           const string& _tag,
                                           const string& _resumeId,
@@ -289,6 +434,7 @@ SemanticState::ConsumerImpl::ConsumerImpl(SemanticState* _parent,
                                           const framing::FieldTable& _arguments
 
 ) :
+<<<<<<< HEAD
     Consumer(_name, _acquire),
     parent(_parent),
     queue(_queue),
@@ -298,12 +444,27 @@ SemanticState::ConsumerImpl::ConsumerImpl(SemanticState* _parent,
     exclusive(_exclusive),
     resumeId(_resumeId),
     tag(_tag),
+=======
+    Consumer(_name, type, _tag),
+    parent(_parent),
+    queue(_queue),
+    ackExpected(ack),
+    acquire(type == CONSUMER),
+    blocked(true),
+    exclusive(_exclusive),
+    resumeId(_resumeId),
+    selector(returnSelector(_arguments.getAsString(APACHE_SELECTOR))),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     resumeTtl(_resumeTtl),
     arguments(_arguments),
     notifyEnabled(true),
     syncFrequency(_arguments.getAsInt(QPID_SYNC_FREQUENCY)),
     deliveryCount(0),
+<<<<<<< HEAD
     mgmtObject(0)
+=======
+    protocols(parent->getSession().getBroker().getProtocolRegistry())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (parent != 0 && queue.get() != 0 && queue->GetManagementObject() !=0)
     {
@@ -312,20 +473,34 @@ SemanticState::ConsumerImpl::ConsumerImpl(SemanticState* _parent,
 
         if (agent != 0)
         {
+<<<<<<< HEAD
             mgmtObject = new _qmf::Subscription(agent, this, ms , queue->GetManagementObject()->getObjectId(), getTag(),
                                                 !acquire, ackExpected, exclusive, ManagementAgent::toMap(arguments));
+=======
+            mgmtObject = _qmf::Subscription::shared_ptr(new _qmf::Subscription(agent, this, ms , queue->GetManagementObject()->getObjectId(), getTag(),
+                                                                               !acquire, ackExpected, exclusive, ManagementAgent::toMap(arguments)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             agent->addObject (mgmtObject);
             mgmtObject->set_creditMode("WINDOW");
         }
     }
 }
 
+<<<<<<< HEAD
 ManagementObject* SemanticState::ConsumerImpl::GetManagementObject (void) const
 {
     return (ManagementObject*) mgmtObject;
 }
 
 Manageable::status_t SemanticState::ConsumerImpl::ManagementMethod (uint32_t methodId, Args&, string&)
+=======
+ManagementObject::shared_ptr SemanticStateConsumerImpl::GetManagementObject (void) const
+{
+    return mgmtObject;
+}
+
+Manageable::status_t SemanticStateConsumerImpl::ManagementMethod (uint32_t methodId, Args&, string&)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     Manageable::status_t status = Manageable::STATUS_UNKNOWN_METHOD;
 
@@ -335,11 +510,16 @@ Manageable::status_t SemanticState::ConsumerImpl::ManagementMethod (uint32_t met
 }
 
 
+<<<<<<< HEAD
 OwnershipToken* SemanticState::ConsumerImpl::getSession()
+=======
+OwnershipToken* SemanticStateConsumerImpl::getSession()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     return &(parent->session);
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::deliver(QueuedMessage& msg)
 {
     assertClusterSafe();
@@ -349,17 +529,42 @@ bool SemanticState::ConsumerImpl::deliver(QueuedMessage& msg)
     bool sync = syncFrequency && ++deliveryCount >= syncFrequency;
     if (sync) deliveryCount = 0;//reset
     parent->deliver(record, sync);
+=======
+bool SemanticStateConsumerImpl::deliver(const QueueCursor& cursor, const Message& msg)
+{
+    return deliver(cursor, msg, shared_from_this());
+}
+bool SemanticStateConsumerImpl::deliver(const QueueCursor& cursor, const Message& msg, boost::shared_ptr<Consumer> consumer)
+{
+    allocateCredit(msg);
+    boost::intrusive_ptr<const amqp_0_10::MessageTransfer> transfer = protocols.translate(msg);
+    DeliveryRecord record(cursor, msg.getSequence(), msg.getReplicationId(), queue, getTag(),
+                          consumer, acquire, !ackExpected, credit.isWindowMode(), transfer->getRequiredCredit());
+    bool sync = syncFrequency && ++deliveryCount >= syncFrequency;
+    if (sync) deliveryCount = 0;//reset
+
+    record.setId(parent->session.deliver(*transfer, getTag(), msg.isRedelivered(), msg.getTtl(),
+                                         ackExpected ? message::ACCEPT_MODE_EXPLICIT : message::ACCEPT_MODE_NONE,
+                                         acquire ? message::ACQUIRE_MODE_PRE_ACQUIRED : message::ACQUIRE_MODE_NOT_ACQUIRED,
+                                         msg.getAnnotations(),
+                                         sync));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (credit.isWindowMode() || ackExpected || !acquire) {
         parent->record(record);
     }
     if (acquire && !ackExpected) {  // auto acquire && auto accept
+<<<<<<< HEAD
         msg.queue->dequeue(0, msg);
         record.setEnded();
+=======
+        queue->dequeue(0 /*ctxt*/, cursor);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     if (mgmtObject) { mgmtObject->inc_delivered(); }
     return true;
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::filter(intrusive_ptr<Message>)
 {
     return true;
@@ -368,19 +573,37 @@ bool SemanticState::ConsumerImpl::filter(intrusive_ptr<Message>)
 bool SemanticState::ConsumerImpl::accept(intrusive_ptr<Message> msg)
 {
     assertClusterSafe();
+=======
+bool SemanticStateConsumerImpl::filter(const Message& msg)
+{
+    return !selector || selector->filter(msg);
+}
+
+bool SemanticStateConsumerImpl::accept(const Message& msg)
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // TODO aconway 2009-06-08: if we have byte & message credit but
     // checkCredit fails because the message is to big, we should
     // remain on queue's listener list for possible smaller messages
     // in future.
     //
+<<<<<<< HEAD
     blocked = !(filter(msg) && checkCredit(msg));
+=======
+    blocked = !checkCredit(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return !blocked;
 }
 
 namespace {
 struct ConsumerName {
+<<<<<<< HEAD
     const SemanticState::ConsumerImpl& consumer;
     ConsumerName(const SemanticState::ConsumerImpl& ci) : consumer(ci) {}
+=======
+    const SemanticStateConsumerImpl& consumer;
+    ConsumerName(const SemanticStateConsumerImpl& ci) : consumer(ci) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 ostream& operator<<(ostream& o, const ConsumerName& pc) {
@@ -389,52 +612,89 @@ ostream& operator<<(ostream& o, const ConsumerName& pc) {
 }
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::allocateCredit(intrusive_ptr<Message>& msg)
 {
     assertClusterSafe();
     Credit original = credit;
     credit.consume(1, msg->getRequiredCredit());
+=======
+void SemanticStateConsumerImpl::allocateCredit(const Message& msg)
+{
+    Credit original = credit;
+    boost::intrusive_ptr<const amqp_0_10::MessageTransfer> transfer = protocols.translate(msg);
+    credit.consume(1, transfer->getRequiredCredit());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "Credit allocated for " << ConsumerName(*this)
              << ", was " << original << " now " << credit);
 
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::checkCredit(intrusive_ptr<Message>& msg)
 {
     bool enoughCredit = credit.check(1, msg->getRequiredCredit());
     QPID_LOG(debug, "Subscription " << ConsumerName(*this) << " has " << (enoughCredit ? "sufficient " : "insufficient")
              <<  " credit for message of " << msg->getRequiredCredit() << " bytes: "
+=======
+bool SemanticStateConsumerImpl::checkCredit(const Message& msg)
+{
+    boost::intrusive_ptr<const amqp_0_10::MessageTransfer> transfer = protocols.translate(msg);
+    bool enoughCredit = credit.check(1, transfer->getRequiredCredit());
+    QPID_LOG(debug, "Subscription " << ConsumerName(*this) << " has " << (enoughCredit ? "sufficient " : "insufficient")
+             <<  " credit for message of " << transfer->getRequiredCredit() << " bytes: "
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
              << credit);
     return enoughCredit;
 }
 
+<<<<<<< HEAD
 SemanticState::ConsumerImpl::~ConsumerImpl()
 {
     if (mgmtObject != 0)
         mgmtObject->resourceDestroy ();
+=======
+SemanticStateConsumerImpl::~SemanticStateConsumerImpl()
+{
+    if (mgmtObject != 0) {
+        mgmtObject->debugStats("destroying");
+        mgmtObject->resourceDestroy ();
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::disable(ConsumerImpl::shared_ptr c)
 {
     c->disableNotify();
     if (session.isAttached())
+<<<<<<< HEAD
         session.getConnection().outputTasks.removeOutputTask(c.get());
 }
 
 
+=======
+        session.getConnection().removeOutputTask(c.get());
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void SemanticState::cancel(ConsumerImpl::shared_ptr c)
 {
     disable(c);
     Queue::shared_ptr queue = c->getQueue();
     if(queue) {
+<<<<<<< HEAD
         queue->cancel(c);
         if (queue->canAutoDelete() && !queue->hasExclusiveOwner()) {
             Queue::tryAutoDelete(session.getBroker(), queue, connectionId, userID);
         }
+=======
+        queue->cancel(c, connectionId, userID);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     c->cancel();
 }
 
+<<<<<<< HEAD
 void SemanticState::handle(intrusive_ptr<Message> msg) {
     if (txBuffer.get()) {
         TxPublish* deliverable(new TxPublish(msg));
@@ -478,6 +738,20 @@ void SemanticState::route(intrusive_ptr<Message> msg, Deliverable& strategy) {
     /* verify the userid if specified: */
     std::string id =
     	msg->hasProperties<MessageProperties>() ? msg->getProperties<MessageProperties>()->getUserId() : nullstring;
+=======
+TxBuffer* SemanticState::getTxBuffer()
+{
+    return txBuffer.get();
+}
+
+void SemanticState::route(Message& msg, Deliverable& strategy) {
+    std::string exchangeName = qpid::broker::amqp_0_10::MessageTransfer::get(msg).getExchangeName();
+    if (!cacheExchange || cacheExchange->getName() != exchangeName || cacheExchange->isDestroyed())
+        cacheExchange = session.getBroker().getExchanges().get(exchangeName);
+
+    /* verify the userid if specified: */
+    std::string id = msg.getUserId();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (authMsg &&  !id.empty() && !session.getConnection().isAuthenticatedUser(id))
     {
         QPID_LOG(debug, "authorised user id : " << userID << " but user id in message declared as " << id);
@@ -487,9 +761,15 @@ void SemanticState::route(intrusive_ptr<Message> msg, Deliverable& strategy) {
     AclModule* acl = getSession().getBroker().getAcl();
     if (acl && acl->doTransferAcl())
     {
+<<<<<<< HEAD
         if (!acl->authorise(getSession().getConnection().getUserId(),acl::ACT_PUBLISH,acl::OBJ_EXCHANGE,exchangeName, msg->getRoutingKey() ))
             throw UnauthorizedAccessException(QPID_MSG(userID << " cannot publish to " <<
                                                exchangeName << " with routing-key " << msg->getRoutingKey()));
+=======
+        if (!acl->authorise(getSession().getConnection().getUserId(),acl::ACT_PUBLISH,acl::OBJ_EXCHANGE,exchangeName, msg.getRoutingKey() ))
+            throw UnauthorizedAccessException(QPID_MSG(userID << " cannot publish to " <<
+                                               exchangeName << " with routing-key " << msg.getRoutingKey()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     cacheExchange->route(strategy);
@@ -501,9 +781,12 @@ void SemanticState::route(intrusive_ptr<Message> msg, Deliverable& strategy) {
         if (cacheExchange->getAlternate()) {
             cacheExchange->getAlternate()->route(strategy);
         }
+<<<<<<< HEAD
         if (!strategy.delivered) {
             msg->destroy();
         }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
 }
@@ -514,12 +797,20 @@ void SemanticState::requestDispatch()
         i->second->requestDispatch();
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::requestDispatch()
 {
     assertClusterSafe();
     if (blocked) {
         parent->session.getConnection().outputTasks.addOutputTask(this);
         parent->session.getConnection().outputTasks.activateOutput();
+=======
+void SemanticStateConsumerImpl::requestDispatch()
+{
+    if (blocked) {
+        parent->session.getConnection().addOutputTask(this);
+        parent->session.getConnection().activateOutput();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         blocked = false;
     }
 }
@@ -533,7 +824,11 @@ bool SemanticState::complete(DeliveryRecord& delivery)
     return delivery.isRedundant();
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::complete(DeliveryRecord& delivery)
+=======
+void SemanticStateConsumerImpl::complete(DeliveryRecord& delivery)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (!delivery.isComplete()) {
         delivery.complete();
@@ -543,6 +838,7 @@ void SemanticState::ConsumerImpl::complete(DeliveryRecord& delivery)
     }
 }
 
+<<<<<<< HEAD
 void SemanticState::recover(bool requeue)
 {
     if(requeue){
@@ -567,6 +863,24 @@ void SemanticState::deliver(DeliveryRecord& msg, bool sync)
 }
 
 const SemanticState::ConsumerImpl::shared_ptr SemanticState::find(const std::string& destination) const
+=======
+void SemanticState::requeue()
+{
+    //take copy and clear unacked as requeue may result in redelivery to this session
+    //which will in turn result in additions to unacked
+    DeliveryRecords copy = unacked;
+    unacked.clear();
+    for_each(copy.rbegin(), copy.rend(), mem_fun_ref(&DeliveryRecord::requeue));
+    getSession().setUnackedCount(unacked.size());
+}
+
+
+SessionContext& SemanticState::getSession() { return session; }
+const SessionContext& SemanticState::getSession() const { return session; }
+
+
+const SemanticStateConsumerImpl::shared_ptr SemanticState::find(const std::string& destination) const
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     ConsumerImpl::shared_ptr consumer;
     if (!find(destination, consumer)) {
@@ -623,24 +937,35 @@ void SemanticState::stop(const std::string& destination)
     find(destination)->stop();
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::setWindowMode()
 {
     assertClusterSafe();
+=======
+void SemanticStateConsumerImpl::setWindowMode()
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     credit.setWindowMode(true);
     if (mgmtObject){
         mgmtObject->set_creditMode("WINDOW");
     }
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::setCreditMode()
 {
     assertClusterSafe();
+=======
+void SemanticStateConsumerImpl::setCreditMode()
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     credit.setWindowMode(false);
     if (mgmtObject){
         mgmtObject->set_creditMode("CREDIT");
     }
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::addByteCredit(uint32_t value)
 {
     assertClusterSafe();
@@ -654,6 +979,19 @@ void SemanticState::ConsumerImpl::addMessageCredit(uint32_t value)
 }
 
 bool SemanticState::ConsumerImpl::haveCredit()
+=======
+void SemanticStateConsumerImpl::addByteCredit(uint32_t value)
+{
+    credit.addByteCredit(value);
+}
+
+void SemanticStateConsumerImpl::addMessageCredit(uint32_t value)
+{
+    credit.addMessageCredit(value);
+}
+
+bool SemanticStateConsumerImpl::haveCredit()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (credit) {
         return true;
@@ -663,21 +1001,34 @@ bool SemanticState::ConsumerImpl::haveCredit()
     }
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::doDispatch()
+=======
+bool SemanticStateConsumerImpl::doDispatch()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     return queue->dispatch(shared_from_this());
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::flush()
+=======
+void SemanticStateConsumerImpl::flush()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     while(haveCredit() && doDispatch())
         ;
     credit.cancel();
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::stop()
 {
     assertClusterSafe();
+=======
+void SemanticStateConsumerImpl::stop()
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     credit.cancel();
 }
 
@@ -686,9 +1037,13 @@ Queue::shared_ptr SemanticState::getQueue(const string& name) const {
     if (name.empty()) {
         throw NotAllowedException(QPID_MSG("No queue name specified."));
     } else {
+<<<<<<< HEAD
         queue = session.getBroker().getQueues().find(name);
         if (!queue)
             throw NotFoundException(QPID_MSG("Queue not found: "<<name));
+=======
+        queue = session.getBroker().getQueues().get(name);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     return queue;
 }
@@ -731,7 +1086,11 @@ void SemanticState::reject(DeliveryId first, DeliveryId last)
     getSession().setUnackedCount(unacked.size());
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::doOutput()
+=======
+bool SemanticStateConsumerImpl::doOutput()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     try {
         return haveCredit() && doDispatch();
@@ -740,6 +1099,7 @@ bool SemanticState::ConsumerImpl::doOutput()
     }
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::enableNotify()
 {
     Mutex::ScopedLock l(lock);
@@ -748,16 +1108,30 @@ void SemanticState::ConsumerImpl::enableNotify()
 }
 
 void SemanticState::ConsumerImpl::disableNotify()
+=======
+void SemanticStateConsumerImpl::enableNotify()
+{
+    Mutex::ScopedLock l(lock);
+    notifyEnabled = true;
+}
+
+void SemanticStateConsumerImpl::disableNotify()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     Mutex::ScopedLock l(lock);
     notifyEnabled = false;
 }
 
+<<<<<<< HEAD
 bool SemanticState::ConsumerImpl::isNotifyEnabled() const {
+=======
+bool SemanticStateConsumerImpl::isNotifyEnabled() const {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Mutex::ScopedLock l(lock);
     return notifyEnabled;
 }
 
+<<<<<<< HEAD
 void SemanticState::ConsumerImpl::notify()
 {
     Mutex::ScopedLock l(lock);
@@ -765,6 +1139,14 @@ void SemanticState::ConsumerImpl::notify()
     if (notifyEnabled) {
         parent->session.getConnection().outputTasks.addOutputTask(this);
         parent->session.getConnection().outputTasks.activateOutput();
+=======
+void SemanticStateConsumerImpl::notify()
+{
+    Mutex::ScopedLock l(lock);
+    if (notifyEnabled) {
+        parent->session.getConnection().addOutputTask(this);
+        parent->session.getConnection().activateOutput();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -786,7 +1168,10 @@ isInSequenceSetAnd(const SequenceSet& s, Predicate p) {
 }
 
 void SemanticState::accepted(const SequenceSet& commands) {
+<<<<<<< HEAD
     assertClusterSafe();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (txBuffer.get()) {
         //in transactional mode, don't dequeue or remove, just
         //maintain set of acknowledged messages:
@@ -798,7 +1183,10 @@ void SemanticState::accepted(const SequenceSet& commands) {
             TxOp::shared_ptr txAck(new DtxAck(accumulatedAck, unacked));
             accumulatedAck.clear();
             dtxBuffer->enlist(txAck);
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             //mark the relevant messages as 'ended' in unacked
             //if the messages are already completed, they can be
             //removed from the record
@@ -833,17 +1221,87 @@ void SemanticState::attached()
 {
     for (ConsumerImplMap::iterator i = consumers.begin(); i != consumers.end(); i++) {
         i->second->enableNotify();
+<<<<<<< HEAD
         session.getConnection().outputTasks.addOutputTask(i->second.get());
     }
     session.getConnection().outputTasks.activateOutput();
+=======
+        session.getConnection().addOutputTask(i->second.get());
+    }
+    session.getConnection().activateOutput();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SemanticState::detached()
 {
     for (ConsumerImplMap::iterator i = consumers.begin(); i != consumers.end(); i++) {
         i->second->disableNotify();
+<<<<<<< HEAD
         session.getConnection().outputTasks.removeOutputTask(i->second.get());
     }
+=======
+        session.getConnection().removeOutputTask(i->second.get());
+    }
+}
+
+void SemanticState::addBinding(const string& queueName, const string& exchangeName,
+                               const string& routingKey, const framing::FieldTable& arguments)
+{
+    QPID_LOG (debug, "SemanticState::addBinding ["
+              << "queue=" << queueName << ", "
+              << "exchange=" << exchangeName << ", "
+              << "key=" << routingKey << ", "
+              << "args=" << arguments << "]");
+    std::string fedOp = arguments.getAsString(qpidFedOp);
+    if ((arguments.isSet(qpidFedOp)) && (fedOp.empty())) {
+      fedOp = fedOpBind;
+    }
+    std::string fedOrigin = arguments.getAsString(qpidFedOrigin);
+    if ((arguments.getAsString(X_SCOPE) == SESSION) || (fedOp == fedOpBind)) {
+        bindings.insert(boost::make_tuple(queueName, exchangeName, routingKey, fedOrigin));
+    }
+    else if (fedOp == fedOpUnbind) {
+        bindings.erase(boost::make_tuple(queueName, exchangeName, routingKey, fedOrigin));
+    }
+}
+
+void SemanticState::removeBinding(const string& queueName, const string& exchangeName,
+                                  const string& routingKey)
+{
+    QPID_LOG (debug, "SemanticState::removeBinding ["
+              << "queue=" << queueName << ", "
+              << "exchange=" << exchangeName << ", "
+              << "key=" << routingKey)
+    bindings.erase(boost::make_tuple(queueName, exchangeName, routingKey, ""));
+}
+
+void SemanticState::unbindSessionBindings()
+{
+    //unbind session-scoped bindings
+    for (Bindings::iterator i = bindings.begin(); i != bindings.end(); i++) {
+        QPID_LOG (debug, "SemanticState::unbindSessionBindings ["
+                  << "queue=" << i->get<0>() << ", "
+                  << "exchange=" << i->get<1>()<< ", "
+                  << "key=" << i->get<2>() << ", "
+                  << "fedOrigin=" << i->get<3>() << "]");
+        try {
+            std::string fedOrigin = i->get<3>();
+            if (!fedOrigin.empty()) {
+                framing::FieldTable fedArguments;
+                fedArguments.setString(qpidFedOp, fedOpUnbind);
+                fedArguments.setString(qpidFedOrigin, fedOrigin);
+                session.getBroker().bind(i->get<0>(), i->get<1>(), i->get<2>(), fedArguments,
+                                         &session, userID, connectionId);
+            } else {
+                session.getBroker().unbind(i->get<0>(), i->get<1>(), i->get<2>(),
+                                           &session, userID, connectionId);
+            }
+        }
+        catch (...) {
+        }
+    }
+    bindings.clear();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::broker

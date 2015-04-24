@@ -19,6 +19,7 @@
  *
  */
 #include "qpid/broker/MessageDeque.h"
+<<<<<<< HEAD
 #include "qpid/broker/QueuedMessage.h"
 #include "qpid/log/Statement.h"
 #include "assert.h"
@@ -208,10 +209,68 @@ void MessageDeque::clean()
         count += 1;
     }
     head = (head > count) ? head - count : 0;
+=======
+#include "assert.h"
+#include "qpid/broker/Message.h"
+#include "qpid/broker/QueueCursor.h"
+#include "qpid/framing/SequenceNumber.h"
+#include "qpid/log/Statement.h"
+
+namespace qpid {
+namespace broker {
+namespace {
+Message padding(qpid::framing::SequenceNumber id) {
+    Message m;
+    m.setState(DELETED);
+    m.setSequence(id);
+    return m;
+}
+}
+
+using qpid::framing::SequenceNumber;
+
+MessageDeque::MessageDeque() : messages(&padding) {}
+
+
+bool MessageDeque::deleted(const QueueCursor& cursor)
+{
+    return messages.deleted(cursor);
+}
+
+void MessageDeque::publish(const Message& added)
+{
+    messages.publish(added);
+}
+
+Message* MessageDeque::release(const QueueCursor& cursor)
+{
+    return messages.release(cursor);
+}
+
+Message* MessageDeque::next(QueueCursor& cursor)
+{
+    return messages.next(cursor);
+}
+
+size_t MessageDeque::size()
+{
+    return messages.size();
+}
+
+Message* MessageDeque::find(const framing::SequenceNumber& position, QueueCursor* cursor)
+{
+    return messages.find(position, cursor);
+}
+
+Message* MessageDeque::find(const QueueCursor& cursor)
+{
+    return messages.find(cursor);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void MessageDeque::foreach(Functor f)
 {
+<<<<<<< HEAD
     for (Deque::iterator i = messages.begin(); i != messages.end(); ++i) {
         if (i->status == QueuedMessage::AVAILABLE) {
             f(*i);
@@ -231,6 +290,14 @@ void MessageDeque::removeIf(Predicate p)
         }
     }
     clean();
+=======
+    messages.foreach(f);
+}
+
+void MessageDeque::resetCursors()
+{
+    messages.resetCursors();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::broker

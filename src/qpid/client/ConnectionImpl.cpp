@@ -42,9 +42,13 @@
 #include <limits>
 #include <vector>
 
+<<<<<<< HEAD
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #endif
+=======
+#include "config.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace client {
@@ -128,6 +132,7 @@ public:
     // and we can't do that before we're unloaded as we can't
     // restart the Poller after shutting it down
     ~IOThread() {
+<<<<<<< HEAD
         std::vector<Thread> threads;
         {
             ScopedLock<Mutex> l(threadLock);
@@ -137,6 +142,19 @@ public:
         }
         for (std::vector<Thread>::iterator i = threads.begin(); i != threads.end(); ++i) {
             i->join();
+=======
+        if (SystemInfo::threadSafeShutdown()) {
+            std::vector<Thread> threads;
+            {
+                ScopedLock<Mutex> l(threadLock);
+                if (poller_)
+                    poller_->shutdown();
+                t.swap(threads);
+            }
+            for (std::vector<Thread>::iterator i = threads.begin(); i != threads.end(); ++i) {
+                i->join();
+            }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 };
@@ -147,16 +165,28 @@ IOThread& theIO() {
 }
 
 class HeartbeatTask : public TimerTask {
+<<<<<<< HEAD
     TimeoutHandler& timeout;
+=======
+    ConnectionImpl& timeout;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     void fire() {
         // If we ever get here then we have timed out
         QPID_LOG(debug, "Traffic timeout");
+<<<<<<< HEAD
         timeout.idleIn();
     }
 
 public:
     HeartbeatTask(Duration p, TimeoutHandler& t) :
+=======
+        timeout.timeout();
+    }
+
+public:
+    HeartbeatTask(Duration p, ConnectionImpl& t) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         TimerTask(p,"Heartbeat"),
         timeout(t)
     {}
@@ -190,7 +220,11 @@ ConnectionImpl::ConnectionImpl(framing::ProtocolVersion v, const ConnectionSetti
       released(false)
 {
     handler.in = boost::bind(&ConnectionImpl::incoming, this, _1);
+<<<<<<< HEAD
     handler.out = boost::bind(&Connector::send, boost::ref(connector), _1);
+=======
+    handler.out = boost::bind(&Connector::handle, boost::ref(connector), _1);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     handler.onClose = boost::bind(&ConnectionImpl::closed, this,
                                   CLOSE_CODE_NORMAL, std::string());
     //only set error handler once  open
@@ -302,17 +336,24 @@ void ConnectionImpl::open()
     }
 }
 
+<<<<<<< HEAD
 void ConnectionImpl::idleIn()
+=======
+void ConnectionImpl::timeout()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     connector->abort();
 }
 
+<<<<<<< HEAD
 void ConnectionImpl::idleOut()
 {
     AMQFrame frame((AMQHeartbeatBody()));
     connector->send(frame);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void ConnectionImpl::close()
 {
     if (heartbeatTask) 

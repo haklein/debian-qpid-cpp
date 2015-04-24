@@ -38,19 +38,29 @@ const std::string QueueOptions::strFLOW_TO_DISK("flow_to_disk");
 const std::string QueueOptions::strRING("ring");
 const std::string QueueOptions::strRING_STRICT("ring_strict");
 const std::string QueueOptions::strLastValueQueue("qpid.last_value_queue");
+<<<<<<< HEAD
 const std::string QueueOptions::strPersistLastNode("qpid.persist_last_node");
 const std::string QueueOptions::strLVQMatchProperty("qpid.LVQ_key");
 const std::string QueueOptions::strLastValueQueueNoBrowse("qpid.last_value_queue_no_browse");
 const std::string QueueOptions::strQueueEventMode("qpid.queue_event_generation");
 
+=======
+const std::string QueueOptions::strLVQMatchProperty("qpid.LVQ_key");
+const std::string QueueOptions::strLastValueQueueNoBrowse("qpid.last_value_queue_no_browse");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 QueueOptions::~QueueOptions()
 {}
 	
 void QueueOptions::setSizePolicy(QueueSizePolicy sp, uint64_t maxSize, uint32_t maxCount)
 {
+<<<<<<< HEAD
     if (maxCount) setInt(strMaxCountKey, maxCount);
     if (maxSize) setInt(strMaxSizeKey, maxSize);
+=======
+    if (maxCount) setUInt64(strMaxCountKey, maxCount);
+    if (maxSize) setUInt64(strMaxSizeKey, maxSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (maxSize || maxCount){
         switch (sp)
         {
@@ -74,11 +84,14 @@ void QueueOptions::setSizePolicy(QueueSizePolicy sp, uint64_t maxSize, uint32_t 
 }
 
 
+<<<<<<< HEAD
 void QueueOptions::setPersistLastNode()
 {
     setInt(strPersistLastNode, 1);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void QueueOptions::setOrdering(QueueOrderingPolicy op)
 {
     if (op == LVQ){
@@ -102,21 +115,27 @@ void QueueOptions::clearSizePolicy()
     erase(strTypeKey);
 }
 
+<<<<<<< HEAD
 void QueueOptions::clearPersistLastNode()
 {
     erase(strPersistLastNode);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void QueueOptions::clearOrdering()
 {
     erase(strLastValueQueue);
 }
 
+<<<<<<< HEAD
 void QueueOptions::enableQueueEvents(bool enqueueOnly)
 {
     setInt(strQueueEventMode, enqueueOnly ? ENQUEUE_ONLY : ENQUEUE_AND_DEQUEUE);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 }
 

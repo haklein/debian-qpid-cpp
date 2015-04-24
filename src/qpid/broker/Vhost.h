@@ -32,7 +32,11 @@ class Vhost : public management::Manageable
 {
   private:
 
+<<<<<<< HEAD
     qmf::org::apache::qpid::broker::Vhost* mgmtObject;
+=======
+    qmf::org::apache::qpid::broker::Vhost::shared_ptr mgmtObject;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
   public:
 
@@ -40,7 +44,13 @@ class Vhost : public management::Manageable
 
     Vhost (management::Manageable* parentBroker, Broker* broker = 0);
 
+<<<<<<< HEAD
     management::ManagementObject* GetManagementObject (void) const
+=======
+    ~Vhost ();
+
+    management::ManagementObject::shared_ptr GetManagementObject (void) const
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     { return mgmtObject; }
     void setFederationTag(const std::string& tag);
 };

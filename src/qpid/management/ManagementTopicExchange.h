@@ -37,7 +37,11 @@ class ManagementTopicExchange : public virtual TopicExchange
     static const std::string typeName;
 
     ManagementTopicExchange(const std::string& name, Manageable* _parent = 0, Broker* broker = 0);
+<<<<<<< HEAD
     ManagementTopicExchange(const std::string& _name, bool _durable, 
+=======
+    ManagementTopicExchange(const std::string& _name, bool _durable,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                             const qpid::framing::FieldTable& _args,
                             Manageable* _parent = 0, Broker* broker = 0);
 

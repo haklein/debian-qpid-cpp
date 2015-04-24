@@ -21,6 +21,11 @@
 
 #include "types.h"
 #include "qpid/Msg.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/broker/Queue.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/Exception.h"
 #include <algorithm>
 #include <iostream>
@@ -33,6 +38,18 @@ namespace ha {
 using namespace std;
 
 const string QPID_REPLICATE("qpid.replicate");
+<<<<<<< HEAD
+=======
+const string QPID_HA_UUID("qpid.ha-uuid");
+
+const char* QPID_HA_PREFIX = "qpid.ha-";
+const char* QUEUE_REPLICATOR_PREFIX = "qpid.ha-q:";
+const char* TRANSACTION_REPLICATOR_PREFIX = "qpid.ha-tx:";
+
+bool startsWith(const string& name, const string& prefix) {
+    return name.compare(0, prefix.size(), prefix) == 0;
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 string EnumBase::str() const {
     assert(value < count);
@@ -55,6 +72,14 @@ template <> const char* Enum<ReplicateLevel>::NAMES[] = { "none", "configuration
 template <> const size_t Enum<ReplicateLevel>::N = 3;
 
 template <> const char* Enum<BrokerStatus>::NAME = "HA broker status";
+<<<<<<< HEAD
+=======
+
+// NOTE: Changing status names will  have an impact on qpid-ha and
+// the qpidd-primary init script.
+// Don't change them unless you are going to  update all dependent code.
+//
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 template <> const char* Enum<BrokerStatus>::NAMES[] = {
     "joining", "catchup", "ready", "recovering", "active", "standalone"
 };
@@ -71,10 +96,62 @@ istream& operator>>(istream& i, EnumBase& e) {
     return i;
 }
 
+<<<<<<< HEAD
 ostream& operator<<(ostream& o, const IdSet& ids) {
     ostream_iterator<qpid::types::Uuid> out(o, " ");
     copy(ids.begin(), ids.end(), out);
     return o;
 }
 
+=======
+ostream& operator<<(ostream& o, const UuidSet& ids) {
+    ostream_iterator<qpid::types::Uuid> out(o, " ");
+    o << "{ ";
+    for (UuidSet::const_iterator i = ids.begin(); i != ids.end(); ++i)
+        o << shortStr(*i) << " ";
+    o << "}";
+    return o;
+}
+
+
+std::string logMessageId(const std::string& q, QueuePosition pos, ReplicationId id) {
+    return Msg() << q << "[" << pos << "]" << "=" << id;
+}
+std::string logMessageId(const std::string& q, ReplicationId id) {
+    return Msg() << q << "[]" << "=" << id;
+}
+std::string logMessageId(const std::string& q, const broker::Message& m)  {
+    return logMessageId(q, m.getSequence(), m.getReplicationId());
+}
+std::string logMessageId(const broker::Queue& q, QueuePosition pos, ReplicationId id) {
+    return logMessageId(q.getName(), pos, id);
+}
+std::string logMessageId(const broker::Queue& q, ReplicationId id) {
+    return logMessageId(q.getName(), id);
+}
+std::string logMessageId(const broker::Queue& q, const broker::Message& m) {
+    return logMessageId(q.getName(), m);
+}
+
+void UuidSet::encode(framing::Buffer& b) const {
+    b.putLong(size());
+    for (const_iterator i = begin(); i != end(); ++i)
+        b.putRawData(i->data(), i->size());
+}
+
+void UuidSet::decode(framing::Buffer& b) {
+    size_t n = b.getLong();
+    for ( ; n > 0; --n) {
+        types::Uuid id;
+        b.getRawData(const_cast<unsigned char*>(id.data()), id.size());
+        insert(id);
+    }
+}
+
+size_t UuidSet::encodedSize() const {
+    return sizeof(uint32_t) + size()*16;
+}
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::ha

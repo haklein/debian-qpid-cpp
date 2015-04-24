@@ -53,14 +53,25 @@ template <class T> class Handle {
 
     void swap(Handle<T>& h) { T* t = h.impl; h.impl = impl; impl = t; }
 
+<<<<<<< HEAD
+=======
+  private:
+    // Not implemented, subclasses must implement.
+    Handle(const Handle&);
+    Handle& operator=(const Handle&);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   protected:
     typedef T Impl;
     QPID_MESSAGING_INLINE_EXTERN Handle() :impl() {}
 
+<<<<<<< HEAD
     // Not implemented,subclasses must implement.
     QPID_MESSAGING_EXTERN Handle(const Handle&);
     QPID_MESSAGING_EXTERN Handle& operator=(const Handle&);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Impl* impl;
 
   friend class PrivateImplRef<T>;

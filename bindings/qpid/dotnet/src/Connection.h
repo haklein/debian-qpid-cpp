@@ -129,6 +129,23 @@ namespace Messaging {
             }
         }
 
+<<<<<<< HEAD
+=======
+        void Reconnect(System::String ^ url);
+        void Reconnect();
+        
+        property System::String ^ Url
+        {
+            System::String ^ get()
+            {
+                msclr::lock lk(privateLock);
+                ThrowIfDisposed();
+
+                return gcnew System::String(nativeObjPtr->getUrl().c_str());
+            }
+        }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         // CreateTransactionalSession()
         Session ^ CreateTransactionalSession();
         Session ^ CreateTransactionalSession(System::String ^ name);

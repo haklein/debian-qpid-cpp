@@ -7,9 +7,15 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
  * 
  *   http://www.apache.org/licenses/LICENSE-2.0
  * 
+=======
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,6 +25,11 @@
  *
  */
 #include "qpid/broker/TxAccept.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/TransactionObserver.h"
+#include "qpid/broker/Queue.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 
 using std::bind1st;
@@ -28,6 +39,7 @@ using namespace qpid::broker;
 using qpid::framing::SequenceSet;
 using qpid::framing::SequenceNumber;
 
+<<<<<<< HEAD
 TxAccept::RangeOp::RangeOp(const AckRange& r) : range(r) {}
 
 void TxAccept::RangeOp::prepare(TransactionContext* ctxt)
@@ -76,6 +88,31 @@ bool TxAccept::prepare(TransactionContext* ctxt) throw()
 {
     try{
         ops.prepare(ctxt);
+=======
+
+TxAccept::TxAccept(const SequenceSet& _acked, DeliveryRecords& _unacked) :
+    acked(_acked), unacked(_unacked)
+{}
+
+void TxAccept::each(boost::function<void(DeliveryRecord&)> f) {
+    DeliveryRecords::iterator dr = unacked.begin();
+    SequenceSet::iterator seq = acked.begin();
+    while(dr != unacked.end() && seq != acked.end()) {
+        if (dr->getId() == *seq) {
+            f(*dr);
+            ++dr;
+            ++seq;
+        }
+        else if (dr->getId() < *seq) ++dr;
+        else if (dr->getId() > *seq) ++seq;
+    }
+}
+
+bool TxAccept::prepare(TransactionContext* ctxt) throw()
+{
+    try{
+        each(bind(&DeliveryRecord::dequeue, _1, ctxt));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return true;
     }catch(const std::exception& e){
         QPID_LOG(error, "Failed to prepare: " << e.what());
@@ -86,10 +123,25 @@ bool TxAccept::prepare(TransactionContext* ctxt) throw()
     }
 }
 
+<<<<<<< HEAD
 void TxAccept::commit() throw() 
 {
     try {
         ops.commit();
+=======
+void TxAccept::commit() throw()
+{
+    try {
+        each(bind(&DeliveryRecord::committed, _1));
+        each(bind(&DeliveryRecord::setEnded, _1));
+        //now remove if isRedundant():
+        if (!acked.empty()) {
+            AckRange r = DeliveryRecord::findRange(unacked, acked.front(), acked.back());
+            DeliveryRecords::iterator removed =
+                remove_if(r.start, r.end, mem_fun_ref(&DeliveryRecord::isRedundant));
+            unacked.erase(removed, r.end);
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     } catch (const std::exception& e) {
         QPID_LOG(error, "Failed to commit: " << e.what());
     } catch(...) {
@@ -98,3 +150,16 @@ void TxAccept::commit() throw()
 }
 
 void TxAccept::rollback() throw() {}
+<<<<<<< HEAD
+=======
+
+namespace {
+void callObserverDR(boost::shared_ptr<TransactionObserver> observer, DeliveryRecord& dr) {
+    observer->dequeue(dr.getQueue(), dr.getMessageId(), dr.getReplicationId());
+}
+} // namespace
+
+void TxAccept::callObserver(const ObserverPtr& observer) {
+    each(boost::bind(&callObserverDR, observer, _1));
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

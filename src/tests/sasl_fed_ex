@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #! /bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -25,7 +29,13 @@
 # transport-layer security.
 #===============================================================================
 
+<<<<<<< HEAD
 source ./test_env.sh
+=======
+source $QPID_TEST_COMMON
+
+ensure_python_tests
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 script_name=`basename $0`
 
@@ -34,17 +44,24 @@ then
   echo
   # These are the four different ways of creating links ( or routes+links ) 
   # that the qpid-route command provides.
+<<<<<<< HEAD
   echo "Usage: ${script_name} dynamic|link|queue|route [cluster]"
+=======
+  echo "Usage: ${script_name} dynamic|link|queue|route"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   echo
   exit 1
 fi
 
+<<<<<<< HEAD
 # Has the user told us to do clustering ? -----------
 clustering_flag=
 if [ $# -eq "2" ] && [ "$2" == "cluster" ]; then
   clustering_flag=true
 fi
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 qpid_route_method=$1
 
 # Debugging print. --------------------------
@@ -71,12 +88,15 @@ if [ "$sasl_version" -lt  "$minimum_sasl_version" ]; then
   exit 0
 fi
 
+<<<<<<< HEAD
 # In a distribution, the python tools will be absent.
 if [ ! -f $QPID_CONFIG_EXEC ] || [ ! -f $QPID_ROUTE_EXEC ] ; then
     echo "python tools absent - skipping sasl_fed_ex."
     exit 0
 fi
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 CERT_DIR=`pwd`/test_cert_db
 CERT_PW_FILE=`pwd`/cert.password
 TEST_HOSTNAME=127.0.0.1
@@ -85,7 +105,11 @@ create_certs() {
     #create certificate and key databases with single, simple, self-signed certificate in it
     mkdir ${CERT_DIR}
     certutil -N -d ${CERT_DIR} -f ${CERT_PW_FILE}
+<<<<<<< HEAD
     certutil -S -d ${CERT_DIR} -n ${TEST_HOSTNAME} -s "CN=${TEST_HOSTNAME}" -t "CT,," -x -f ${CERT_PW_FILE} -z /usr/bin/certutil 2> /dev/null
+=======
+    certutil -S -d ${CERT_DIR} -n ${TEST_HOSTNAME} -s "CN=${TEST_HOSTNAME}" -t "CT,," -x -f ${CERT_PW_FILE} -z /bin/sh 2> /dev/null
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 delete_certs() {
@@ -109,9 +133,15 @@ if [ ! $? ]; then
   exit 1
 fi
 
+<<<<<<< HEAD
 sasl_config_dir=$builddir/sasl_config
 
 tmp_root=${builddir}/sasl_fed_ex_temp
+=======
+sasl_config_dir=$QPID_TEST_EXEC_DIR/sasl_config
+
+tmp_root=$QPID_TEST_EXEC_DIR/sasl_fed_ex_temp
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 print "results dir is ${tmp_root}"
 rm -rf ${tmp_root}
 mkdir -p $tmp_root
@@ -128,6 +158,7 @@ DST_TCP_PORT=5807
 SRC_TCP_PORT_2=5802
 DST_TCP_PORT_2=5803
 
+<<<<<<< HEAD
 CLUSTER_NAME_SUFFIX=`hostname | tr '.' ' ' | awk '{print $1}'`
 CLUSTER_1_NAME=sasl_fed_ex_cluster_1_${CLUSTER_NAME_SUFFIX}
 CLUSTER_2_NAME=sasl_fed_ex_cluster_2_${CLUSTER_NAME_SUFFIX}
@@ -142,6 +173,11 @@ export QPID_SSL_CERT_NAME=${TEST_HOSTNAME}
 
 export QPID_NO_MODULE_DIR=1
 export QPID_LOAD_MODULE=$SSLCONNECTOR_LIB
+=======
+export QPID_SSL_CERT_NAME=${TEST_HOSTNAME}
+
+export QPID_NO_MODULE_DIR=1
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 export QPID_SSL_CERT_DB=${CERT_DIR}
 export QPID_SSL_CERT_PASSWORD_FILE=${CERT_PW_FILE}
 export QPID_SSL_CERT_NAME=${TEST_HOSTNAME}
@@ -175,7 +211,10 @@ COMMON_BROKER_OPTIONS="                          \
       --ssl-cert-name $TEST_HOSTNAME             \
       --no-data-dir                              \
       --no-module-dir                            \
+<<<<<<< HEAD
       --load-module ${SSL_LIB}                   \
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       --mgmt-enable=yes                          \
       --log-enable info+                         \
       --log-source yes                           \
@@ -183,6 +222,7 @@ COMMON_BROKER_OPTIONS="                          \
                       
 
 function start_brokers {
+<<<<<<< HEAD
   if [ $1 ]; then
     # clustered ----------------------------------------
     print "Starting SRC cluster"
@@ -242,11 +282,21 @@ function start_brokers {
       --ssl-port ${SRC_SSL_PORT}                 \
       ${COMMON_BROKER_OPTIONS}                   \
       --log-to-file $tmp_root/qpidd_src.log 2> /dev/null
+=======
+    # vanilla brokers --------------------------------
+    print "Starting SRC broker"
+    $QPIDD_EXEC                                  \
+	--port=${SRC_TCP_PORT}                     \
+	--ssl-port ${SRC_SSL_PORT}                 \
+	${COMMON_BROKER_OPTIONS}                   \
+	--log-to-file $tmp_root/qpidd_src.log 2> /dev/null
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     broker_ports[0]=${SRC_TCP_PORT}
 
     print "Starting DST broker"
     $QPIDD_EXEC                                  \
+<<<<<<< HEAD
       --port=${DST_TCP_PORT}                     \
       --ssl-port ${DST_SSL_PORT}                 \
       ${COMMON_BROKER_OPTIONS}                   \
@@ -257,6 +307,16 @@ function start_brokers {
 }
 
 
+=======
+	--port=${DST_TCP_PORT}                     \
+	--ssl-port ${DST_SSL_PORT}                 \
+	${COMMON_BROKER_OPTIONS}                   \
+	--log-to-file $tmp_root/qpidd_dst.log 2> /dev/null
+
+    broker_ports[1]=${DST_TCP_PORT}
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 function halt_brokers {
   n_brokers=${#broker_ports[@]}
   print "Halting ${n_brokers} brokers."
@@ -270,7 +330,11 @@ function halt_brokers {
 }
 
 
+<<<<<<< HEAD
 start_brokers $clustering_flag
+=======
+start_brokers
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 
 # I am not randomizing these names, because this test creates its own brokers.
@@ -329,9 +393,13 @@ fi
 # to avoid false negatives.
 sleep 5
 
+<<<<<<< HEAD
 # This should work the same whether or not we are running a clustered test.
 # In the case of clustered tests, the status is not printed by qpid_route.
 # So in either case, I will look only at the transport field, which should be "ssl".
+=======
+# Look only at the transport field, which should be "ssl".
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 print "check the link"
 link_status=$($QPID_ROUTE_EXEC link list localhost:${DST_TCP_PORT} | tail -1 | awk '{print $3}')
 

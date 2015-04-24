@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #! /bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -19,6 +23,7 @@
 # under the License.
 #
 
+<<<<<<< HEAD
 source ./test_env.sh
 
 script_name=`basename $0`
@@ -130,12 +135,18 @@ exit 1
 
 source ./test_env.sh
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 script_name=`basename $0`
 
 # This minimum value corresponds to sasl version 2.1.22
 minimum_sasl_version=131350
 
+<<<<<<< HEAD
 sasl_version=`$QPID_TEST_EXEC_DIR/sasl_version`
+=======
+sasl_version=$($QPID_TEST_EXEC_DIR/sasl_version)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 # This test is necessary because this sasl version is the first one that permits 
 # redirection of the sasl config file path.
@@ -145,7 +156,11 @@ if [ "$sasl_version" -lt  "$minimum_sasl_version" ]; then
 fi
 
 
+<<<<<<< HEAD
 sasl_config_dir=$builddir/sasl_config
+=======
+sasl_config_dir=$QPID_TEST_EXEC_DIR/sasl_config
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 
 # Debugging print. --------------------------
@@ -173,7 +188,11 @@ mv ${sasl_config_dir} ${sasl_config_dir}-
 print " Starting broker"
 #--------------------------------------------------
 $QPIDD_EXEC                                  \
+<<<<<<< HEAD
   -p 0                                       \
+=======
+  -p 0  --interface 127.0.0.1                \
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   --no-data-dir                              \
   --auth=yes                                 \
   --mgmt-enable=yes                          \
@@ -215,4 +234,7 @@ rm -rf $tmp_root
 
 print "result: fail"
 exit 1
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

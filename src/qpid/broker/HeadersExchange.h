@@ -38,24 +38,43 @@ class HeadersExchange : public virtual Exchange {
     struct BoundKey
     {
         Binding::shared_ptr binding;
+<<<<<<< HEAD
         FedBinding fedBinding;
         BoundKey(Binding::shared_ptr binding_) : binding(binding_) {}
+=======
+        qpid::framing::FieldTable args;
+        FedBinding fedBinding;
+        BoundKey(Binding::shared_ptr binding_, const qpid::framing::FieldTable& args_) : binding(binding_), args(args_) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 
     struct MatchArgs
     {
+<<<<<<< HEAD
         const Queue::shared_ptr queue;        
         const qpid::framing::FieldTable* args;
         MatchArgs(Queue::shared_ptr q, const qpid::framing::FieldTable* a);
         bool operator()(BoundKey & bk);
     };
     
+=======
+        const Queue::shared_ptr queue;
+        const qpid::framing::FieldTable* args;
+        MatchArgs(Queue::shared_ptr q, const qpid::framing::FieldTable* a);
+        bool operator()(const BoundKey & bk);
+    };
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     struct MatchKey
     {
         const Queue::shared_ptr queue;
         const std::string& key;
         MatchKey(Queue::shared_ptr q, const std::string& k);
+<<<<<<< HEAD
         bool operator()(BoundKey & bk);
+=======
+        bool operator()(const BoundKey & bk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 
     struct FedUnbindModifier
@@ -73,6 +92,7 @@ class HeadersExchange : public virtual Exchange {
 
     Bindings bindings;
     qpid::sys::Mutex lock;
+<<<<<<< HEAD
 
     static std::string getMatch(const framing::FieldTable* args);
 
@@ -82,16 +102,34 @@ class HeadersExchange : public virtual Exchange {
 
   public:
     static const std::string typeName;
+=======
+  protected:
+    void getNonFedArgs(const framing::FieldTable* args,
+                       framing::FieldTable& nonFedArgs);
+    bool hasBindings();
+
+  public:
+    QPID_BROKER_EXTERN static const std::string typeName;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     QPID_BROKER_EXTERN HeadersExchange(const std::string& name,
                                        management::Manageable* parent = 0, Broker* broker = 0);
     QPID_BROKER_EXTERN HeadersExchange(const std::string& _name,
+<<<<<<< HEAD
                                        bool _durable, 
                                        const qpid::framing::FieldTable& _args,
                                        management::Manageable* parent = 0, Broker* broker = 0);
     
     virtual std::string getType() const { return typeName; }            
         
+=======
+                                       bool _durable, bool autodelete,
+                                       const qpid::framing::FieldTable& _args,
+                                       management::Manageable* parent = 0, Broker* broker = 0);
+
+    virtual std::string getType() const { return typeName; }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_BROKER_EXTERN virtual bool bind(Queue::shared_ptr queue,
                                          const std::string& routingKey,
                                          const qpid::framing::FieldTable* args);
@@ -108,7 +146,11 @@ class HeadersExchange : public virtual Exchange {
 
     virtual bool supportsDynamicBinding() { return true; }
 
+<<<<<<< HEAD
     static QPID_BROKER_EXTERN bool match(const qpid::framing::FieldTable& bindArgs, const qpid::framing::FieldTable& msgArgs);
+=======
+    static QPID_BROKER_EXTERN bool match(const qpid::framing::FieldTable& bindArgs, const qpid::broker::Message& msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     static bool equal(const qpid::framing::FieldTable& bindArgs, const qpid::framing::FieldTable& msgArgs);
 };
 

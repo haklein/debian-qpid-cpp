@@ -20,9 +20,17 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/SaslFactory.h"
 #include "qpid/broker/ConnectionHandler.h"
 #include "qpid/broker/Connection.h"
+=======
+#include "qpid/broker/ConnectionHandler.h"
+
+#include "qpid/SaslFactory.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/SecureConnection.h"
 #include "qpid/Url.h"
 #include "qpid/framing/AllInvoker.h"
@@ -30,8 +38,17 @@
 #include "qpid/framing/enum.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
 #include "qpid/sys/SecurityLayer.h"
 #include "qpid/broker/AclModule.h"
+=======
+#include "qpid/management/ManagementAgent.h"
+#include "qpid/sys/ConnectionOutputHandler.h"
+#include "qpid/sys/SecurityLayer.h"
+#include "qpid/sys/Time.h"
+#include "qpid/broker/AclModule.h"
+#include "qpid/amqp_0_10/Codecs.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qmf/org/apache/qpid/broker/EventClientConnectFail.h"
 
 using namespace qpid;
@@ -81,23 +98,36 @@ bool ConnectionHandler::handle(const framing::AMQMethodBody& method)
 void ConnectionHandler::handle(framing::AMQFrame& frame)
 {
     AMQMethodBody* method=frame.getBody()->getMethod();
+<<<<<<< HEAD
     Connection::ErrorListener* errorListener = handler->connection.getErrorListener();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     try{
         if (method && handle(*method)) {
             // This is a connection control frame, nothing more to do.
         } else if (isOpen()) {
             handler->connection.getChannel(frame.getChannel()).in(frame);
         } else {
+<<<<<<< HEAD
             handler->proxy.close(
+=======
+            handler->connection.close(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 connection::CLOSE_CODE_FRAMING_ERROR,
                 "Connection not yet open, invalid frame received.");
         }
     }catch(ConnectionException& e){
+<<<<<<< HEAD
         if (errorListener) errorListener->connectionError(e.what());
         handler->proxy.close(e.code, e.what());
     }catch(std::exception& e){
         if (errorListener) errorListener->connectionError(e.what());
         handler->proxy.close(541/*internal error*/, e.what());
+=======
+        handler->connection.close(e.code, e.what());
+    }catch(std::exception& e){
+        handler->connection.close(connection::CLOSE_CODE_CONNECTION_FORCED, e.what());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -106,10 +136,17 @@ void ConnectionHandler::setSecureConnection(SecureConnection* secured)
     handler->secured = secured;
 }
 
+<<<<<<< HEAD
 ConnectionHandler::ConnectionHandler(Connection& connection, bool isClient)  :
     handler(new Handler(connection, isClient)) {}
 
 ConnectionHandler::Handler::Handler(Connection& c, bool isClient) :
+=======
+ConnectionHandler::ConnectionHandler(qpid::broker::amqp_0_10::Connection& connection, bool isClient)  :
+    handler(new Handler(connection, isClient)) {}
+
+ConnectionHandler::Handler::Handler(qpid::broker::amqp_0_10::Connection& c, bool isClient) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     proxy(c.getOutput()),
     connection(c), serverMode(!isClient), secured(0),
     isOpen(false)
@@ -148,15 +185,44 @@ void ConnectionHandler::Handler::startOk(const framing::FieldTable& /*clientProp
 
 void ConnectionHandler::Handler::startOk(const ConnectionStartOkBody& body)
 {
+<<<<<<< HEAD
+=======
+    const framing::FieldTable& clientProperties = body.getClientProperties();
+    qmf::org::apache::qpid::broker::Connection::shared_ptr mgmtObject = connection.getMgmtObject();
+    types::Variant::Map properties;
+    qpid::amqp_0_10::translate(clientProperties, properties);
+
+    if (mgmtObject != 0) {
+        string procName = clientProperties.getAsString(CLIENT_PROCESS_NAME);
+        uint32_t pid = clientProperties.getAsInt(CLIENT_PID);
+        uint32_t ppid = clientProperties.getAsInt(CLIENT_PPID);
+
+        mgmtObject->set_remoteProperties(properties);
+        if (!procName.empty())
+            mgmtObject->set_remoteProcessName(procName);
+        if (pid != 0)
+            mgmtObject->set_remotePid(pid);
+        if (ppid != 0)
+            mgmtObject->set_remoteParentPid(ppid);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     try {
         authenticator->start(body.getMechanism(), body.hasResponse() ? &body.getResponse() : 0);
     } catch (std::exception& /*e*/) {
         management::ManagementAgent* agent = connection.getAgent();
+<<<<<<< HEAD
         if (agent) {
+=======
+        bool logEnabled;
+        QPID_LOG_TEST_CAT(debug, model, logEnabled);
+        if (logEnabled || agent)
+        {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             string error;
             string uid;
             authenticator->getError(error);
             authenticator->getUid(uid);
+<<<<<<< HEAD
             agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error));
         }
         throw;
@@ -192,6 +258,23 @@ void ConnectionHandler::Handler::startOk(const ConnectionStartOkBody& body)
         if (ppid != 0)
             connection.getMgmtObject()->set_remoteParentPid(ppid);
     }
+=======
+            if (agent && mgmtObject) {
+                agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error,
+                                                               mgmtObject->get_remoteProperties()));
+            }
+            QPID_LOG_CAT(debug, model, "Failed connection. rhost:" << connection.getMgmtId()
+                << " user:" << uid
+                << " reason:" << error );
+        }
+        throw;
+    }
+
+    connection.setClientProperties(properties);
+    if (clientProperties.isSet(QPID_FED_TAG)) {
+        connection.setFederationPeerTag(clientProperties.getAsString(QPID_FED_TAG));
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void ConnectionHandler::Handler::secureOk(const string& response)
@@ -200,12 +283,29 @@ void ConnectionHandler::Handler::secureOk(const string& response)
         authenticator->step(response);
     } catch (std::exception& /*e*/) {
         management::ManagementAgent* agent = connection.getAgent();
+<<<<<<< HEAD
         if (agent) {
+=======
+        bool logEnabled;
+        QPID_LOG_TEST_CAT(debug, model, logEnabled);
+        if (logEnabled || agent)
+        {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             string error;
             string uid;
             authenticator->getError(error);
             authenticator->getUid(uid);
+<<<<<<< HEAD
             agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error));
+=======
+            if (agent && connection.getMgmtObject()) {
+                agent->raiseEvent(_qmf::EventClientConnectFail(connection.getMgmtId(), uid, error,
+                                                               connection.getMgmtObject()->get_remoteProperties()));
+            }
+            QPID_LOG_CAT(debug, model, "Failed connection. rhost:" << connection.getMgmtId()
+                << " user:" << uid
+                << " reason:" << error );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
         throw;
     }
@@ -221,7 +321,35 @@ void ConnectionHandler::Handler::tuneOk(uint16_t /*channelmax*/,
 void ConnectionHandler::Handler::open(const string& /*virtualHost*/,
                                       const framing::Array& /*capabilities*/, bool /*insist*/)
 {
+<<<<<<< HEAD
     std::vector<Url> urls = connection.broker.getKnownBrokers();
+=======
+    if (connection.getUserId().empty()) {
+        throw ConnectionForcedException("Not authenticated!");
+    }
+
+    if (connection.isFederationLink()) {
+        AclModule* acl =  connection.getBroker().getAcl();
+        if (acl && acl->userAclRules()) {
+            if (!acl->authorise(connection.getUserId(),acl::ACT_CREATE,acl::OBJ_LINK,"")){
+                connection.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                                 QPID_MSG("ACL denied " << connection.getUserId()
+                                          << " creating a federation link"));
+                return;
+            }
+        } else {
+            if (connection.getBroker().isAuthenticating()) {
+                connection.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                                 QPID_MSG("User " << connection.getUserId()
+                                          << " federation connection denied. Systems with authentication "
+                                          "enabled must specify ACL create link rules."));
+                return;
+            }
+        }
+        QPID_LOG(info, "Connection is a federation link");
+    }
+    std::vector<Url> urls = connection.getBroker().getKnownBrokers();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::Array array(0x95); // str16 array
     for (std::vector<Url>::iterator i = urls.begin(); i < urls.end(); ++i)
         array.add(boost::shared_ptr<Str16Value>(new Str16Value(i->str())));
@@ -269,6 +397,14 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
                                        const framing::Array& supportedMechanisms,
                                        const framing::Array& /*locales*/)
 {
+<<<<<<< HEAD
+=======
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     string requestedMechanism = connection.getAuthMechanism();
 
     std::string username = connection.getUsername();
@@ -283,7 +419,11 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
                                                   service,
                                                   host,
                                                   0,   // TODO -- mgoulish Fri Sep 24 2010
+<<<<<<< HEAD
                                                   256,  
+=======
+                                                  256,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                                   false ); // disallow interaction
     }
     std::string supportedMechanismsList;
@@ -355,6 +495,13 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
 
 void ConnectionHandler::Handler::secure(const string& challenge )
 {
+<<<<<<< HEAD
+=======
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (sasl.get()) {
         string response = sasl->step(challenge);
         proxy.secureOk(response);
@@ -369,13 +516,26 @@ void ConnectionHandler::Handler::tune(uint16_t channelMax,
                                       uint16_t /*heartbeatMin*/,
                                       uint16_t heartbeatMax)
 {
+<<<<<<< HEAD
+=======
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     maxFrameSize = std::min(maxFrameSize, maxFrameSizeProposed);
     connection.setFrameMax(maxFrameSize);
 
     // this method is only ever called when this Connection
     // is a federation link where this Broker is acting as
     // a client to another Broker
+<<<<<<< HEAD
     uint16_t hb = std::min(connection.getBroker().getOptions().linkHeartbeatInterval, heartbeatMax);
+=======
+    sys::Duration interval = connection.getBroker().getLinkHeartbeatInterval();
+    uint16_t intervalSec = static_cast<uint16_t>(interval/sys::TIME_SEC);
+    uint16_t hb = std::min(intervalSec, heartbeatMax);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     connection.setHeartbeat(hb);
     connection.startLinkHeartbeatTimeoutTask();
 
@@ -385,6 +545,13 @@ void ConnectionHandler::Handler::tune(uint16_t channelMax,
 
 void ConnectionHandler::Handler::openOk(const framing::Array& knownHosts)
 {
+<<<<<<< HEAD
+=======
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     for (Array::ValueVector::const_iterator i = knownHosts.begin(); i != knownHosts.end(); ++i) {
         Url url((*i)->get<std::string>());
         connection.getKnownHosts().push_back(url);

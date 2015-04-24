@@ -88,12 +88,20 @@ class PollerHandlePrivate {
     };
 
     short events;
+<<<<<<< HEAD
     const IOHandlePrivate* ioHandle;
+=======
+    const IOHandle* ioHandle;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     PollerHandle* pollerHandle;
     FDStat stat;
     Mutex lock;
 
+<<<<<<< HEAD
     PollerHandlePrivate(const IOHandlePrivate* h, PollerHandle* p) :
+=======
+    PollerHandlePrivate(const IOHandle* h, PollerHandle* p) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       events(0),
       ioHandle(h),
       pollerHandle(p),
@@ -101,7 +109,11 @@ class PollerHandlePrivate {
     }
 
     int fd() const {
+<<<<<<< HEAD
         return toFd(ioHandle);
+=======
+        return ioHandle->fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     bool isActive() const {
@@ -162,7 +174,11 @@ class PollerHandlePrivate {
 };
 
 PollerHandle::PollerHandle(const IOHandle& h) :
+<<<<<<< HEAD
     impl(new PollerHandlePrivate(h.impl, this))
+=======
+    impl(new PollerHandlePrivate(&h, this))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 PollerHandle::~PollerHandle() {

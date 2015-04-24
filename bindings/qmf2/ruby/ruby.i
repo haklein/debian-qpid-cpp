@@ -18,8 +18,15 @@
  */
 
 %module cqmf2
+<<<<<<< HEAD
 %include "std_string.i"
 %include "../../swig_ruby_typemaps.i"
+=======
+/* Ruby doesn't have a != operator*/
+#pragma SWIG nowarn=378
+%include "std_string.i"
+%include "qpid/swig_ruby_typemaps.i"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /* Define the general-purpose exception handling */
 %exception {
@@ -28,8 +35,16 @@
     }
     catch (qpid::types::Exception& mex) {
         static VALUE qmferror = rb_define_class("QmfError", rb_eStandardError);
+<<<<<<< HEAD
         rb_raise(qmferror, mex.what());
     }
 }
 
 %include "../qmf2.i"
+=======
+        rb_raise(qmferror, "%s", mex.what());
+    }
+}
+
+%include "qmf/qmf2.i"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

@@ -21,6 +21,10 @@
 #include "qpid/broker/DtxTimeout.h"
 #include "qpid/broker/DtxManager.h"
 #include "qpid/sys/Time.h"
+<<<<<<< HEAD
+=======
+#include "qpid/log/Statement.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 using namespace qpid::broker;
 
@@ -31,5 +35,9 @@ DtxTimeout::DtxTimeout(uint32_t _timeout, DtxManager& _mgr, const std::string& _
 
 void DtxTimeout::fire()
 {
+<<<<<<< HEAD
+=======
+    QPID_LOG(debug, "DTX transaction timeouted, XID=" << xid << ", timeout=" << timeout);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     mgr.timedout(xid);
 }

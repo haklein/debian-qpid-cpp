@@ -29,6 +29,10 @@
 #include "QpidMarshal.h"
 #include "Address.h"
 #include "Duration.h"
+<<<<<<< HEAD
+=======
+#include "QpidException.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "TypeTranslator.h"
 
 namespace Org {
@@ -376,6 +380,7 @@ namespace Messaging {
                 msclr::lock lk(privateLock);
                 ThrowIfDisposed();
 
+<<<<<<< HEAD
                 ::qpid::types::Variant::Map map;
 
                 map = nativeObjPtr->getProperties();
@@ -387,6 +392,29 @@ namespace Messaging {
 
 
                 TypeTranslator::NativeToManaged(map, dict);
+=======
+                System::Exception ^ newException = nullptr;
+
+                System::Collections::Generic::Dictionary<System::String^, System::Object^> ^ dict =
+                    gcnew System::Collections::Generic::Dictionary<System::String^, System::Object^> ;
+
+                try
+                {
+                    ::qpid::types::Variant::Map map;
+                    map = nativeObjPtr->getProperties();
+                    TypeTranslator::NativeToManaged(map, dict);
+                }
+                catch (const ::qpid::types::Exception & error)
+                {
+                    String ^ errmsg = gcnew String(error.what());
+                    newException    = gcnew QpidException(errmsg);
+                }
+
+                if (newException != nullptr)
+                {
+                    throw newException;
+                }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
                 return dict;
             }
@@ -398,10 +426,30 @@ namespace Messaging {
                 msclr::lock lk(privateLock);
                 ThrowIfDisposed();
 
+<<<<<<< HEAD
                 for each (System::Collections::Generic::KeyValuePair
                     <System::String^, System::Object^> kvp in properties)
                 {
                     SetProperty(kvp.Key, kvp.Value);
+=======
+                System::Exception ^ newException = nullptr;
+
+                try
+                {
+                    ::qpid::types::Variant::Map variantMap;
+                    TypeTranslator::ManagedToNative(properties, variantMap);
+                    nativeObjPtr->setProperties(variantMap);
+                }
+                catch (const ::qpid::types::Exception & error)
+                {
+                    String ^ errmsg = gcnew String(error.what());
+                    newException    = gcnew QpidException(errmsg);
+                }
+
+                if (newException != nullptr)
+                {
+                    throw newException;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 }
             }
         }
@@ -413,7 +461,11 @@ namespace Messaging {
 
         void SetContent(cli::array<System::Byte> ^ bytes, int offset, int size);
 
+<<<<<<< HEAD
         //TODO:: void setContent(Bytes{} bytes, offset, length);
+=======
+        void SetContentObject(System::Object ^ managedObject);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         // get content as string
         System::String ^ GetContent();
@@ -430,6 +482,12 @@ namespace Messaging {
         // get content as bytes
         void GetContent(cli::array<System::Byte> ^ arr);
 
+<<<<<<< HEAD
+=======
+        // get content as object
+        System::Object ^ GetContentObject();
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         //
         // ContentSize
         //

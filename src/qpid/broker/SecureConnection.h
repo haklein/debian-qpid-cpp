@@ -43,7 +43,11 @@ class SecureConnection : public qpid::sys::ConnectionCodec
   public:
     SecureConnection();
     size_t decode(const char* buffer, size_t size);
+<<<<<<< HEAD
     size_t encode(const char* buffer, size_t size);
+=======
+    size_t encode(char* buffer, size_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool canEncode();
     void closed();
     bool isClosed() const;

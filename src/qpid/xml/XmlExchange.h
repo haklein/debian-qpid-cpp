@@ -58,20 +58,35 @@ struct XmlBinding : public Exchange::Binding {
         
 };
 
+<<<<<<< HEAD
+=======
+class XmlNullResolver;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class XmlExchange : public virtual Exchange {
 
     typedef std::map<std::string, XmlBinding::vector> XmlBindingsMap;
     XmlBindingsMap bindingsMap;
 
     qpid::sys::RWlock lock;
+<<<<<<< HEAD
 
     bool matches(Query& query, Deliverable& msg, const qpid::framing::FieldTable* args, bool parse_message_content);
+=======
+    boost::shared_ptr<XmlNullResolver> resolver;
+
+    bool matches(Query& query, Deliverable& msg, bool parse_message_content);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
   public:
     static const std::string typeName;
 
     XmlExchange(const std::string& name, management::Manageable* parent = 0, Broker* broker = 0);
+<<<<<<< HEAD
     XmlExchange(const std::string& _name, bool _durable,
+=======
+    XmlExchange(const std::string& _name, bool _durable, bool autodelete,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 		const qpid::framing::FieldTable& _args, management::Manageable* parent = 0, Broker* broker = 0);
 
     virtual std::string getType() const { return typeName; }
@@ -107,6 +122,13 @@ class XmlExchange : public virtual Exchange {
         bool operator()(XmlBinding::shared_ptr b);
     };
 
+<<<<<<< HEAD
+=======
+  protected:
+    bool hasBindings();
+  private:
+    bool unbindLH(Queue::shared_ptr queue, const std::string& routingKey, const qpid::framing::FieldTable* args);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 

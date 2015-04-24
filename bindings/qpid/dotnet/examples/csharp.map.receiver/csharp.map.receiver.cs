@@ -43,7 +43,11 @@ namespace Org.Apache.Qpid.Messaging.examples
             if (args.Length > 1)
                 address = args[1];
             if (args.Length > 2)
+<<<<<<< HEAD
                 connectionOptions = args[3];
+=======
+                connectionOptions = args[2];
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             //
             // Create and open an AMQP connection to the broker URL

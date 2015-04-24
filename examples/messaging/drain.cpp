@@ -21,6 +21,10 @@
 
 #include <qpid/messaging/Connection.h>
 #include <qpid/messaging/Message.h>
+<<<<<<< HEAD
+=======
+#include <qpid/messaging/Message_io.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qpid/messaging/Receiver.h>
 #include <qpid/messaging/Session.h>
 
@@ -81,8 +85,14 @@ int main(int argc, char** argv)
 {
     Options options;
     if (options.parse(argc, argv) && options.checkAddress()) {
+<<<<<<< HEAD
         Connection connection(options.url, options.connectionOptions);
         try {
+=======
+        Connection connection;
+        try {
+            connection = Connection(options.url, options.connectionOptions);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             connection.open();
             Session session = connection.createSession();
             Receiver receiver = session.createReceiver(options.address);
@@ -90,6 +100,7 @@ int main(int argc, char** argv)
             int count = options.getCount();
             Message message;
             int i = 0;
+<<<<<<< HEAD
             
             while (receiver.fetch(message, timeout)) {
                 std::cout << "Message(properties=" << message.getProperties() << ", content='" ;
@@ -101,11 +112,17 @@ int main(int argc, char** argv)
                     std::cout << message.getContent();
                 }
                 std::cout  << "')" << std::endl;
+=======
+
+            while (receiver.fetch(message, timeout)) {
+                std::cout << message << std::endl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 session.acknowledge();
                 if (count && (++i == count))
                     break;
             }
             receiver.close();
+<<<<<<< HEAD
             session.close();            
             connection.close();
             return 0;
@@ -115,4 +132,15 @@ int main(int argc, char** argv)
         }
     }
     return 1;   
+=======
+            session.close();
+            connection.close();
+            return 0;
+        } catch(const std::exception& error) {
+            std::cout << "Error: " << error.what() << std::endl;
+            connection.close();
+        }
+    }
+    return 1;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }

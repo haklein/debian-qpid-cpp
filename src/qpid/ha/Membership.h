@@ -24,23 +24,55 @@
 
 #include "BrokerInfo.h"
 #include "types.h"
+<<<<<<< HEAD
 #include "qpid/framing/Uuid.h"
 #include "qpid/log/Statement.h"
+=======
+#include "qpid/log/Statement.h"
+#include "qpid/sys/Mutex.h"
+#include "qpid/sys/Time.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/types/Variant.h"
 #include <boost/function.hpp>
 #include <set>
 #include <vector>
 #include <iosfwd>
+<<<<<<< HEAD
 namespace qpid {
 namespace ha {
 
 /**
  * Keep track of the brokers in the membership.
  * THREAD UNSAFE: caller must serialize
+=======
+
+namespace qmf { namespace org { namespace apache { namespace qpid { namespace ha {
+class HaBroker;
+}}}}}
+
+namespace qpid {
+
+namespace broker {
+class Broker;
+}
+
+namespace types {
+class Uuid;
+}
+
+namespace ha {
+class HaBroker;
+
+/**
+ * Keep track of the brokers in the membership.
+ * Send management when events on membership changes.
+ * THREAD SAFE
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  */
 class Membership
 {
   public:
+<<<<<<< HEAD
     Membership(const types::Uuid& self_) : self(self_) {}
 
     void reset(const BrokerInfo& b); ///< Reset to contain just one member.
@@ -63,6 +95,48 @@ class Membership
 
 std::ostream& operator<<(std::ostream&, const Membership&);
 
+=======
+    Membership(const BrokerInfo& info, HaBroker&);
+
+    void setMgmtObject(boost::shared_ptr<qmf::org::apache::qpid::ha::HaBroker>);
+
+    void clear();               ///< Clear all but self.
+    void add(const BrokerInfo& b);
+    void remove(const types::Uuid& id);
+    bool contains(const types::Uuid& id);
+
+    /** Return IDs of all READY backups other than self */
+    BrokerInfo::Set otherBackups() const;
+
+    /** Return IDs of all brokers */
+    BrokerInfo::Set getBrokers() const;
+
+    void assign(const types::Variant::List&);
+    types::Variant::List asList() const;
+
+    bool get(const types::Uuid& id, BrokerInfo& result) const;
+
+    BrokerInfo getSelf() const;
+    BrokerStatus getStatus() const;
+    void setStatus(BrokerStatus s);
+
+    void setSelfAddress(const Address&);
+
+  private:
+    void setPrefix();
+    void update(bool log, sys::Mutex::ScopedLock&);
+    BrokerStatus getStatus(sys::Mutex::ScopedLock&) const;
+    types::Variant::List asList(sys::Mutex::ScopedLock&) const;
+
+    mutable sys::Mutex lock;
+    HaBroker& haBroker;
+    boost::shared_ptr<qmf::org::apache::qpid::ha::HaBroker> mgmtObject;
+    const types::Uuid self;
+    BrokerInfo::Map brokers;
+    BrokerStatus oldStatus;
+};
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::ha
 
 #endif  /*!QPID_HA_MEMBERSHIP_H*/

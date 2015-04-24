@@ -21,6 +21,7 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
 
 #include <memory>
 #include <sstream>
@@ -235,5 +236,35 @@ class Connection : public sys::ConnectionInputHandler,
 };
 
 }}
+=======
+#include "OwnershipToken.h"
+#include <map>
+#include <string>
+
+namespace qpid {
+namespace management {
+class ObjectId;
+}
+namespace types {
+class Variant;
+}
+
+namespace broker {
+
+/**
+ * Protocol independent connection abstraction.
+ */
+class Connection : public OwnershipToken {
+public:
+    virtual ~Connection() {}
+    virtual const management::ObjectId getObjectId() const = 0;
+    virtual const std::string& getUserId() const = 0;
+    virtual const std::string& getMgmtId() const = 0;
+    virtual const std::map<std::string, types::Variant>& getClientProperties() const = 0;
+    virtual bool isLink() const = 0;
+    virtual void abort() = 0;
+};
+}} // namespace qpid::broker
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #endif  /*!QPID_BROKER_CONNECTION_H*/

@@ -37,9 +37,15 @@ namespace cyrus {
 class CyrusSecurityLayer : public qpid::sys::SecurityLayer
 {
   public:
+<<<<<<< HEAD
     CyrusSecurityLayer(sasl_conn_t*, uint16_t maxFrameSize);
     size_t decode(const char* buffer, size_t size);
     size_t encode(const char* buffer, size_t size);
+=======
+    CyrusSecurityLayer(sasl_conn_t*, uint16_t maxFrameSize, int ssf);
+    size_t decode(const char* buffer, size_t size);
+    size_t encode(char* buffer, size_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool canEncode();
     void init(qpid::sys::Codec*);
   private:

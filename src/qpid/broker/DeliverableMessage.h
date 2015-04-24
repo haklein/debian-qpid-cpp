@@ -25,6 +25,7 @@
 #include "qpid/broker/Deliverable.h"
 #include "qpid/broker/Message.h"
 
+<<<<<<< HEAD
 #include <boost/intrusive_ptr.hpp>
 
 namespace qpid {
@@ -36,6 +37,19 @@ namespace qpid {
             QPID_BROKER_EXTERN virtual void deliverTo(const boost::shared_ptr<Queue>& queue);
             QPID_BROKER_EXTERN Message& getMessage();
             QPID_BROKER_EXTERN uint64_t contentSize();
+=======
+namespace qpid {
+    namespace broker {
+    class TxBuffer;
+        class QPID_BROKER_CLASS_EXTERN DeliverableMessage : public Deliverable
+        {
+            Message msg;
+            TxBuffer* txn;
+        public:
+            QPID_BROKER_EXTERN DeliverableMessage(const Message& msg, TxBuffer* txn);
+            QPID_BROKER_EXTERN virtual void deliverTo(const boost::shared_ptr<Queue>& queue);
+            QPID_BROKER_EXTERN Message& getMessage();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             virtual ~DeliverableMessage(){}
         };
     }

@@ -22,6 +22,10 @@
 #define _RecoveryManagerImpl_
 
 #include <list>
+<<<<<<< HEAD
+=======
+#include <vector>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/DtxManager.h"
 #include "qpid/broker/ExchangeRegistry.h"
 #include "qpid/broker/QueueRegistry.h"
@@ -30,15 +34,32 @@
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 
     class RecoveryManagerImpl : public RecoveryManager{
+=======
+class Broker;
+class PersistableObject;
+class ProtocolRegistry;
+class RecoveredObjects;
+
+    class RecoveryManagerImpl : public RecoveryManager {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QueueRegistry& queues;
         ExchangeRegistry& exchanges;
         LinkRegistry& links;
         DtxManager& dtxMgr;
+<<<<<<< HEAD
     public:
         RecoveryManagerImpl(QueueRegistry& queues, ExchangeRegistry& exchanges, LinkRegistry& links,
                             DtxManager& dtxMgr);
+=======
+        ProtocolRegistry& protocols;
+        RecoveredObjects& objects;
+    public:
+        RecoveryManagerImpl(QueueRegistry& queues, ExchangeRegistry& exchanges, LinkRegistry& links,
+                            DtxManager& dtxMgr, ProtocolRegistry&, RecoveredObjects&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         ~RecoveryManagerImpl();
 
         RecoverableExchange::shared_ptr recoverExchange(framing::Buffer& buffer);

@@ -166,7 +166,11 @@ class QPID_BROKER_CLASS_EXTERN TopicKeyNode {
     bool isHash;
 
     // children
+<<<<<<< HEAD
     typedef std::map<const std::string, typename TopicKeyNode::shared_ptr> ChildMap;
+=======
+    typedef std::map<std::string, typename TopicKeyNode::shared_ptr> ChildMap;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ChildMap childTokens;
     typename TopicKeyNode::shared_ptr starChild;  // "*" subtree
     typename TopicKeyNode::shared_ptr hashChild;  // "#" subtree

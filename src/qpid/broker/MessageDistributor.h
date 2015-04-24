@@ -21,11 +21,16 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
 
+=======
+#include "qpid/types/Variant.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /** Abstraction used by Queue to determine the next "most desirable" message to provide to
  * a particular consuming client
  */
 
+<<<<<<< HEAD
 
 #include "qpid/broker/Consumer.h"
 
@@ -33,12 +38,19 @@ namespace qpid {
 namespace broker {
 
 struct QueuedMessage;
+=======
+namespace qpid {
+namespace broker {
+
+class Message;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 class MessageDistributor
 {
  public:
     virtual ~MessageDistributor() {};
 
+<<<<<<< HEAD
     /** Locking Note: all methods assume the caller is holding the Queue::messageLock
      * during the method call.
      */
@@ -66,6 +78,15 @@ class MessageDistributor
      */
     virtual bool nextBrowsableMessage( Consumer::shared_ptr& consumer,
                                        QueuedMessage& next ) = 0;
+=======
+    /**
+     * Determine whether the named consumer can take ownership of the specified message.
+     * @param consumer the name of the consumer that is attempting to acquire the message
+     * @param target the message to be acquired
+     * @return true if ownership is permitted, false if ownership cannot be assigned.
+     */
+    virtual bool acquire(const std::string& consumer, Message& target) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** hook to add any interesting management state to the status map */
     virtual void query(qpid::types::Variant::Map&) const = 0;

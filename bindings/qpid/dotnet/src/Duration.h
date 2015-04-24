@@ -42,6 +42,7 @@ namespace Messaging {
 
     public:
 
+<<<<<<< HEAD
         Duration(const Duration % rhs) :
             milliseconds(rhs.milliseconds) {}
 
@@ -50,6 +51,16 @@ namespace Messaging {
 
         Duration()                           :
             milliseconds(System::UInt64::MaxValue) {}
+=======
+        Duration(const Duration % rhs)
+            : milliseconds(rhs.milliseconds) {}
+
+        explicit Duration(System::UInt64 mS)
+            : milliseconds(mS) {}
+
+        Duration()
+            : milliseconds(System::UInt64::MaxValue) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         property System::UInt64 Milliseconds
         {

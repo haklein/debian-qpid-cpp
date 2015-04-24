@@ -147,7 +147,11 @@ MessageRecordset::recover(qpid::broker::RecoveryManager& recoverer,
 
         // Now, do we need the rest of the content?
         long contentLength = blobSize - headerFieldLength - headerSize;
+<<<<<<< HEAD
         if (msg->loadContent(contentLength)) {
+=======
+        if (contentLength > 0 && msg->loadContent(contentLength)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             BlobAdapter content(contentLength);
              content =
                 rs->Fields->Item["fieldTableBlob"]->GetChunk(contentLength);

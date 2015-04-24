@@ -21,8 +21,11 @@
 
 #include "qpid/broker/HandlerImpl.h"
 
+<<<<<<< HEAD
 #include "qpid/broker/ConnectionToken.h"
 #include "qpid/broker/OwnershipToken.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/Exception.h"
 #include "qpid/framing/AMQP_ServerOperations.h"
 #include "qpid/framing/reply_exceptions.h"
@@ -128,7 +131,11 @@ class Queue;
       public:
         QueueHandlerImpl(SemanticState& session);
         ~QueueHandlerImpl();
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         void declare(const std::string& queue,
                      const std::string& alternateExchange, 
                      bool passive, bool durable, bool exclusive, 
@@ -138,7 +145,11 @@ class Queue;
                      bool ifUnused, bool ifEmpty);
         void purge(const std::string& queue); 
         framing::QueueQueryResult query(const std::string& queue);
+<<<<<<< HEAD
         bool isLocal(const ConnectionToken* t) const; 
+=======
+        bool isLocal(const OwnershipToken* t) const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         void destroyExclusiveQueues();
         void checkDelete(boost::shared_ptr<Queue> queue, bool ifUnused, bool ifEmpty);

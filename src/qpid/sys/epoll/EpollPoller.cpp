@@ -20,7 +20,10 @@
  */
 
 #include "qpid/sys/Poller.h"
+<<<<<<< HEAD
 #include "qpid/sys/IOHandle.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Mutex.h"
 #include "qpid/sys/AtomicCount.h"
 #include "qpid/sys/DeletionManager.h"
@@ -64,12 +67,20 @@ class PollerHandlePrivate {
     };
 
     ::__uint32_t events;
+<<<<<<< HEAD
     const IOHandlePrivate* ioHandle;
+=======
+    const IOHandle* ioHandle;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     PollerHandle* pollerHandle;
     FDStat stat;
     Mutex lock;
 
+<<<<<<< HEAD
     PollerHandlePrivate(const IOHandlePrivate* h, PollerHandle* p) :
+=======
+    PollerHandlePrivate(const IOHandle* h, PollerHandle* p) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       events(0),
       ioHandle(h),
       pollerHandle(p),
@@ -77,7 +88,11 @@ class PollerHandlePrivate {
     }
 
     int fd() const {
+<<<<<<< HEAD
         return toFd(ioHandle);
+=======
+        return ioHandle->fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     bool isActive() const {
@@ -138,7 +153,11 @@ class PollerHandlePrivate {
 };
 
 PollerHandle::PollerHandle(const IOHandle& h) :
+<<<<<<< HEAD
     impl(new PollerHandlePrivate(h.impl, this))
+=======
+    impl(new PollerHandlePrivate(&h, this))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 PollerHandle::~PollerHandle() {
@@ -221,8 +240,13 @@ class PollerPrivate {
         }
     };
 
+<<<<<<< HEAD
     static ReadablePipe alwaysReadable;
     static int alwaysReadableFd;
+=======
+    ReadablePipe alwaysReadable;
+    int alwaysReadableFd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     class InterruptHandle: public PollerHandle {
         std::queue<PollerHandle*> handles;
@@ -290,6 +314,10 @@ class PollerPrivate {
     }
 
     PollerPrivate() :
+<<<<<<< HEAD
+=======
+        alwaysReadableFd(alwaysReadable.getFD()),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         epollFd(::epoll_create(DefaultFds)),
         isShutdown(false) {
         QPID_POSIX_CHECK(epollFd);
@@ -328,9 +356,12 @@ class PollerPrivate {
     }
 };
 
+<<<<<<< HEAD
 PollerPrivate::ReadablePipe PollerPrivate::alwaysReadable;
 int PollerPrivate::alwaysReadableFd = alwaysReadable.getFD();
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void Poller::registerHandle(PollerHandle& handle) {
     PollerHandlePrivate& eh = *handle.impl;
     ScopedLock<Mutex> l(eh.lock);
@@ -387,6 +418,10 @@ void PollerPrivate::resetMode(PollerHandlePrivate& eh) {
         int rc = ::epoll_ctl(epollFd, EPOLL_CTL_MOD, eh.fd(), &epe);
         // If something has closed the fd in the meantime try adding it back
         if (rc ==-1 && errno == ENOENT) {
+<<<<<<< HEAD
+=======
+            eh.setIdle(); // Reset our handle as if starting from scratch
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             rc = ::epoll_ctl(epollFd, EPOLL_CTL_ADD, eh.fd(), &epe);
         }
         QPID_POSIX_CHECK(rc);

@@ -7,9 +7,15 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
  * 
  *   http://www.apache.org/licenses/LICENSE-2.0
  * 
+=======
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -26,6 +32,10 @@
 #include "qpid/sys/SecurityLayer.h"
 #include "qpid/sys/SecuritySettings.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
+=======
+#include "qpid/NullSaslServer.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include "boost/tokenizer.hpp"
 
@@ -107,6 +117,7 @@ std::auto_ptr<Sasl> SaslFactory::create( const std::string & username, const std
     return sasl;
 }
 
+<<<<<<< HEAD
 namespace {
     const std::string ANONYMOUS = "ANONYMOUS";
     const std::string PLAIN = "PLAIN";
@@ -118,6 +129,26 @@ WindowsSasl::WindowsSasl( const std::string & username, const std::string & pass
 }
 
 WindowsSasl::~WindowsSasl() 
+=======
+std::auto_ptr<SaslServer> SaslFactory::createServer( const std::string& realm, bool /*encryptionRequired*/, const qpid::sys::SecuritySettings& )
+{
+    std::auto_ptr<SaslServer> server(new NullSaslServer(realm));
+    return server;
+}
+
+namespace {
+    const std::string ANONYMOUS = "ANONYMOUS";
+    const std::string PLAIN = "PLAIN";
+    const std::string EXTERNAL = "EXTERNAL";
+}
+
+WindowsSasl::WindowsSasl( const std::string & username, const std::string & password, const std::string & serviceName, const std::string & hostName, int minSsf, int maxSsf )
+  : settings(username, password, serviceName, hostName, minSsf, maxSsf)
+{
+}
+
+WindowsSasl::~WindowsSasl()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
 }
 
@@ -128,21 +159,42 @@ bool WindowsSasl::start(const std::string& mechanisms, std::string& response,
 
     typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
     boost::char_separator<char> sep(" ");
+<<<<<<< HEAD
+=======
+    bool haveExt = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool havePlain = false;
     bool haveAnon = false;
     tokenizer mechs(mechanisms, sep);
     for (tokenizer::iterator mech = mechs.begin();
          mech != mechs.end();
          ++mech) {
+<<<<<<< HEAD
         if (*mech == ANONYMOUS)
+=======
+        if (*mech == EXTERNAL)
+            haveExt = true;
+        else if (*mech == ANONYMOUS)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             haveAnon = true;
         else if (*mech == PLAIN)
             havePlain = true;
     }
+<<<<<<< HEAD
     if (!haveAnon && !havePlain)
         throw InternalErrorException(QPID_MSG("Sasl error: no common mechanism"));
 
     if (havePlain) {
+=======
+    if (!haveAnon && !havePlain && !haveExt)
+        throw InternalErrorException(QPID_MSG("Sasl error: no common mechanism"));
+
+    if (haveExt) {
+        mechanism = EXTERNAL;
+        response = ((char)0) + settings.username.c_str();
+    }
+    else if (havePlain) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         mechanism = PLAIN;
         response = ((char)0) + settings.username + ((char)0) + settings.password;
     }

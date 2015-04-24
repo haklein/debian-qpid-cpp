@@ -54,6 +54,18 @@ class FileSysDir
 
     void mkdir(void);
 
+<<<<<<< HEAD
+=======
+    typedef void Callback(const std::string&);
+
+    /**
+     * Call the Callback function for every regular file in the directory
+     *
+     * @param cb Callback function that receives the full path to the file
+     */
+    void forEachFile(Callback cb) const;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     std::string getPath   () { return dirPath; }
 };
  

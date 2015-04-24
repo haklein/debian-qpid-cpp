@@ -38,10 +38,24 @@ void ProtocolInitiation::encode(Buffer& buffer) const {
     buffer.putOctet('M');
     buffer.putOctet('Q');
     buffer.putOctet('P');
+<<<<<<< HEAD
     buffer.putOctet(1);//class
     buffer.putOctet(1);//instance
     buffer.putOctet(version.getMajor());
     buffer.putOctet(version.getMinor());    
+=======
+    if (version.getMajor() == 1) {
+        buffer.putOctet(version.getProtocol());
+        buffer.putOctet(version.getMajor());
+        buffer.putOctet(version.getMinor());
+        buffer.putOctet(0);//revision
+    } else {
+        buffer.putOctet(1);//class
+        buffer.putOctet(1);//instance
+        buffer.putOctet(version.getMajor());
+        buffer.putOctet(version.getMinor());
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool ProtocolInitiation::decode(Buffer& buffer){
@@ -50,10 +64,25 @@ bool ProtocolInitiation::decode(Buffer& buffer){
 	buffer.getOctet();//M
 	buffer.getOctet();//Q
 	buffer.getOctet();//P
+<<<<<<< HEAD
 	buffer.getOctet();//class
 	buffer.getOctet();//instance
 	version.setMajor(buffer.getOctet());
 	version.setMinor(buffer.getOctet());
+=======
+	uint8_t protocolClass = buffer.getOctet();//class
+        version.setProtocol(protocolClass);
+        if (protocolClass == 1) {
+            //old (pre-1.0) style
+            buffer.getOctet();//instance
+            version.setMajor(buffer.getOctet());
+            version.setMinor(buffer.getOctet());
+        } else {
+            version.setMajor(buffer.getOctet());
+            version.setMinor(buffer.getOctet());
+            buffer.getOctet();//revision
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 	return true;
     }else{
 	return false;

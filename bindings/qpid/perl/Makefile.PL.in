@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/usr/bin/perl -w
+=======
+#!/usr/bin/env perl -w
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 use strict;
 

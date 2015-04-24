@@ -96,7 +96,11 @@ struct Options : public qpid::Options
     Options(const std::string& argv0=std::string())
         : qpid::Options("Options"),
           help(false),
+<<<<<<< HEAD
           url("amqp:tcp:127.0.0.1"),
+=======
+          url("127.0.0.1"),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           messages(1),
           sendEos(0),
           durable(false),
@@ -165,9 +169,14 @@ struct Options : public qpid::Options
             if (address.empty()) throw qpid::Exception("Address must be specified!");
             qpid::log::Logger::instance().configure(log);
             if (help) {
+<<<<<<< HEAD
                 std::ostringstream msg;
                 std::cout << msg << *this << std::endl << std::endl
                           << "Drains messages from the specified address" << std::endl;
+=======
+                std::cout << *this << std::endl << std::endl
+                          << "Sends messages to the specified address" << std::endl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return false;
             } else {
                 return true;
@@ -200,7 +209,11 @@ struct Options : public qpid::Options
         std::string name;
         std::string value;
         if (nameval(property, name, value)) {
+<<<<<<< HEAD
             message.getProperties()[name] = value;
+=======
+            message.getProperties()[name].parse(value);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             message.getProperties()[name] = Variant();
         }
@@ -241,8 +254,13 @@ class GetlineContentGenerator : public ContentGenerator {
   public:
     virtual bool setContent(Message& msg) {
         string content;
+<<<<<<< HEAD
         bool got = getline(std::cin, content);
         if (got) msg.setContent(content);
+=======
+        bool got = !!getline(std::cin, content);
+        if (got) msg.setContentObject(content);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return got;
     }
 };
@@ -251,7 +269,11 @@ class FixedContentGenerator   : public ContentGenerator {
   public:
     FixedContentGenerator(const string& s) : content(s) {}
     virtual bool setContent(Message& msg) {
+<<<<<<< HEAD
         msg.setContent(content);
+=======
+        msg.setContentObject(content);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return true;
     }
   private:
@@ -262,9 +284,14 @@ class MapContentGenerator   : public ContentGenerator {
   public:
     MapContentGenerator(const Options& opt) : opts(opt) {}
     virtual bool setContent(Message& msg) {
+<<<<<<< HEAD
         Variant::Map map;
         opts.setEntries(map);
         encode(map, msg);
+=======
+        msg.getContentObject() = qpid::types::Variant::Map();
+        opts.setEntries(msg.getContentObject().asMap());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return true;
     }
   private:
@@ -350,8 +377,13 @@ using qpid::tests::EOS;
 int main(int argc, char ** argv)
 {
     Connection connection;
+<<<<<<< HEAD
     Options opts;
     try {
+=======
+    try {
+        Options opts;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (opts.parse(argc, argv)) {
              connection = Connection(opts.url, opts.connectionOptions);
             connection.open();
@@ -371,6 +403,10 @@ int main(int argc, char ** argv)
                 msg.setReplyTo(Address(opts.replyto));
             }
             if (!opts.userid.empty()) msg.setUserId(opts.userid);
+<<<<<<< HEAD
+=======
+            if (!opts.id.empty()) msg.setMessageId(opts.id);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (!opts.correlationid.empty()) msg.setCorrelationId(opts.correlationid);
             opts.setProperties(msg);
             uint sent = 0;
@@ -410,7 +446,11 @@ int main(int argc, char ** argv)
 
                 if (opts.timestamp)
                     msg.getProperties()[TS] = int64_t(
+<<<<<<< HEAD
                         qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+=======
+                        qpid::sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 sender.send(msg);
                 reporter.message(msg);
 

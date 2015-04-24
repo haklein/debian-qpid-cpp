@@ -23,6 +23,11 @@
 #include "qpid/sys/IntegerTypes.h"
 #include <sstream>
 #include <iostream>
+<<<<<<< HEAD
+=======
+#include <iomanip>
+#include <stdio.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <string.h>
 
 namespace qpid {
@@ -31,7 +36,11 @@ namespace types {
 using namespace std;
 
 const size_t Uuid::SIZE=16;
+<<<<<<< HEAD
 static const size_t UNPARSED_SIZE=36; 
+=======
+static const int UNPARSED_SIZE=36;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 Uuid::Uuid(bool unique)
 {
@@ -52,6 +61,14 @@ Uuid::Uuid(const unsigned char* uuid)
     ::memcpy(bytes, uuid, Uuid::SIZE);
 }
 
+<<<<<<< HEAD
+=======
+Uuid::Uuid(const char* uuid)
+{
+    ::memcpy(bytes, uuid, Uuid::SIZE);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Uuid& Uuid::operator=(const Uuid& other)
 {
     if (this == &other) return *this;
@@ -61,11 +78,16 @@ Uuid& Uuid::operator=(const Uuid& other)
 
 void Uuid::generate()
 {
+<<<<<<< HEAD
     uuid_generate(bytes);
+=======
+    sys::uuid_generate(bytes);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Uuid::clear()
 {
+<<<<<<< HEAD
     uuid_clear(bytes);
 }
 
@@ -74,6 +96,15 @@ bool Uuid::isNull() const
 {
     // This const cast is for Solaris which has non const arguments
     return !!uuid_is_null(const_cast<uint8_t*>(bytes));
+=======
+    ::memset(bytes, 0, Uuid::SIZE);
+}
+
+bool Uuid::isNull() const
+{
+    static Uuid nullUuid;
+    return *this == nullUuid;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 Uuid::operator bool() const { return !isNull(); }
@@ -88,8 +119,12 @@ const unsigned char* Uuid::data() const
 
 bool operator==(const Uuid& a, const Uuid& b)
 {
+<<<<<<< HEAD
     // This const cast is for Solaris which has non const arguments
     return uuid_compare(const_cast<uint8_t*>(a.bytes), const_cast<uint8_t*>(b.bytes)) == 0;
+=======
+    return ::memcmp(a.bytes, b.bytes, Uuid::SIZE) == 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool operator!=(const Uuid& a, const Uuid& b)
@@ -99,41 +134,122 @@ bool operator!=(const Uuid& a, const Uuid& b)
 
 bool operator<(const Uuid& a, const Uuid& b)
 {
+<<<<<<< HEAD
     // This const cast is for Solaris which has non const arguments
     return uuid_compare(const_cast<uint8_t*>(a.bytes), const_cast<uint8_t*>(b.bytes)) < 0;
+=======
+    return ::memcmp(a.bytes, b.bytes, Uuid::SIZE) < 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool operator>(const Uuid& a, const Uuid& b)
 {
+<<<<<<< HEAD
     // This const cast is for Solaris which has non const arguments
     return uuid_compare(const_cast<uint8_t*>(a.bytes), const_cast<uint8_t*>(b.bytes)) > 0;
+=======
+    return ::memcmp(a.bytes, b.bytes, Uuid::SIZE) > 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool operator<=(const Uuid& a, const Uuid& b)
 {
+<<<<<<< HEAD
     // This const cast is for Solaris which has non const arguments
     return uuid_compare(const_cast<uint8_t*>(a.bytes), const_cast<uint8_t*>(b.bytes)) <= 0;
+=======
+    return ::memcmp(a.bytes, b.bytes, Uuid::SIZE) <= 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool operator>=(const Uuid& a, const Uuid& b)
 {
+<<<<<<< HEAD
     // This const cast is for Solaris which has non const arguments
     return uuid_compare(const_cast<uint8_t*>(a.bytes), const_cast<uint8_t*>(b.bytes)) >= 0;
+=======
+    return ::memcmp(a.bytes, b.bytes, Uuid::SIZE) >= 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 ostream& operator<<(ostream& out, Uuid uuid)
 {
+<<<<<<< HEAD
     char unparsed[UNPARSED_SIZE + 1];
     uuid_unparse(uuid.bytes, unparsed);
     return out << unparsed;
+=======
+    const uint8_t* bytes = uuid.bytes;
+
+    ios_base::fmtflags f = out.flags();
+    out << hex << setfill('0')
+        << setw(2) << int(bytes[0])
+        << setw(2) << int(bytes[1])
+        << setw(2) << int(bytes[2])
+        << setw(2) << int(bytes[3])
+        << "-"
+        << setw(2) << int(bytes[4])
+        << setw(2) << int(bytes[5])
+        << "-"
+        << setw(2) << int(bytes[6])
+        << setw(2) << int(bytes[7])
+        << "-"
+        << setw(2) << int(bytes[8])
+        << setw(2) << int(bytes[9])
+        << "-"
+        << setw(2) << int(bytes[10])
+        << setw(2) << int(bytes[11])
+        << setw(2) << int(bytes[12])
+        << setw(2) << int(bytes[13])
+        << setw(2) << int(bytes[14])
+        << setw(2) << int(bytes[15]);
+    out.flags(f);
+    return out;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 istream& operator>>(istream& in, Uuid& uuid)
 {
+<<<<<<< HEAD
     char unparsed[UNPARSED_SIZE + 1] = {0};
     in.get(unparsed, sizeof(unparsed));
     if (uuid_parse(unparsed, uuid.bytes) != 0) 
         in.setstate(ios::failbit);
+=======
+    unsigned bytes[16];
+    char unparsed[UNPARSED_SIZE + 1] = {0};
+
+    istream::sentry s(in);
+    if ( !s ) return in;
+
+    in.get(unparsed, UNPARSED_SIZE+1);
+
+    // Check if we read enough characters
+    if ( in.gcount()!=UNPARSED_SIZE ) {
+        in.setstate(ios::failbit);
+        return in;
+    }
+    int r = ::sscanf(unparsed, "%2x%2x%2x%2x-"
+                               "%2x%2x-"
+                               "%2x%2x-"
+                               "%2x%2x-"
+                               "%2x%2x%2x%2x%2x%2x",
+                     &bytes[0], &bytes[1], &bytes[2], &bytes[3],
+                     &bytes[4], &bytes[5],
+                     &bytes[6], &bytes[7],
+                     &bytes[8], &bytes[9],
+                     &bytes[10], &bytes[11], &bytes[12], &bytes[13], &bytes[14], &bytes[15]
+                    );
+    // Check if we got enough converted input
+    if ( r!=int(Uuid::SIZE) ) {
+        in.setstate(ios::failbit);
+        return in;
+    }
+
+    for (unsigned i=0; i<16; ++i) {
+      uuid.bytes[i] = bytes[i];
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return in;
 }
 
@@ -144,4 +260,15 @@ std::string Uuid::str() const
     return os.str();
 }
 
+<<<<<<< HEAD
+=======
+size_t Uuid::hash() const {
+    std::size_t seed = 0;
+    for(size_t i = 0; i < SIZE; ++i)
+        seed ^= static_cast<std::size_t>(bytes[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    return seed;
+}
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::types

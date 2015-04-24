@@ -20,6 +20,10 @@
  */
 
 #include "qpid/sys/ssl/SslSocket.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/SocketAddress.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/ssl/check.h"
 #include "qpid/sys/ssl/util.h"
 #include "qpid/Exception.h"
@@ -44,6 +48,10 @@
 #include <pk11pub.h>
 #include <ssl.h>
 #include <key.h>
+<<<<<<< HEAD
+=======
+#include <sslerr.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <boost/format.hpp>
 
@@ -52,6 +60,7 @@ namespace sys {
 namespace ssl {
 
 namespace {
+<<<<<<< HEAD
 std::string getService(int fd, bool local)
 {
     ::sockaddr_storage name; // big enough for any socket address
@@ -74,6 +83,8 @@ std::string getService(int fd, bool local)
     return servName;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string DOMAIN_SEPARATOR("@");
 const std::string DC_SEPARATOR(".");
 const std::string DC("DC");
@@ -101,6 +112,7 @@ std::string getDomainFromSubject(std::string subject)
     }
     return domain;
 }
+<<<<<<< HEAD
 
 }
 
@@ -109,6 +121,20 @@ SslSocket::SslSocket() : socket(0), prototype(0)
     impl->fd = ::socket (PF_INET, SOCK_STREAM, 0);
     if (impl->fd < 0) throw QPID_POSIX_ERROR(errno);
     socket = SSL_ImportFD(0, PR_ImportTCPSocket(impl->fd));
+=======
+}
+
+SslSocket::SslSocket(const std::string& certName, bool clientAuth) :
+    nssSocket(0), certname(certName), prototype(0), hostnameVerification(true)
+{
+    //configure prototype socket:
+    prototype = SSL_ImportFD(0, PR_NewTCPSocket());
+
+    if (clientAuth) {
+        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUEST_CERTIFICATE, PR_TRUE));
+        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUIRE_CERTIFICATE, PR_TRUE));
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 /**
@@ -116,14 +142,27 @@ SslSocket::SslSocket() : socket(0), prototype(0)
  * returned from accept. Because we use posix accept rather than
  * PR_Accept, we have to reset the handshake.
  */
+<<<<<<< HEAD
 SslSocket::SslSocket(IOHandlePrivate* ioph, PRFileDesc* model) : Socket(ioph), socket(0), prototype(0)
 {
     socket = SSL_ImportFD(model, PR_ImportTCPSocket(impl->fd));
     NSS_CHECK(SSL_ResetHandshake(socket, true));
+=======
+SslSocket::SslSocket(int fd, PRFileDesc* model) : BSDSocket(fd), nssSocket(0), prototype(0)
+{
+    nssSocket = SSL_ImportFD(model, PR_ImportTCPSocket(fd));
+    NSS_CHECK(SSL_ResetHandshake(nssSocket, PR_TRUE));
+}
+
+void SslSocket::ignoreHostnameVerificationFailure()
+{
+    hostnameVerification = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslSocket::setNonblocking() const
 {
+<<<<<<< HEAD
     PRSocketOptionData option;
     option.option = PR_SockOpt_Nonblocking;
     option.value.non_blocking = true;
@@ -135,6 +174,50 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     std::stringstream namestream;
     namestream << host << ":" << port;
     connectname = namestream.str();
+=======
+    if (!nssSocket) {
+        BSDSocket::setNonblocking();
+        return;
+    }
+    PRSocketOptionData option;
+    option.option = PR_SockOpt_Nonblocking;
+    option.value.non_blocking = true;
+    PR_SetSocketOption(nssSocket, &option);
+}
+
+void SslSocket::setTcpNoDelay() const
+{
+    if (!nssSocket) {
+        BSDSocket::setTcpNoDelay();
+        return;
+    }
+    PRSocketOptionData option;
+    option.option = PR_SockOpt_NoDelay;
+    option.value.no_delay = true;
+    PR_SetSocketOption(nssSocket, &option);
+}
+
+void SslSocket::connect(const SocketAddress& addr) const
+{
+    BSDSocket::connect(addr);
+}
+
+namespace {
+SECStatus bad_certificate(void* arg, PRFileDesc* /*fd*/) {
+    switch (PR_GetError()) {
+      case SSL_ERROR_BAD_CERT_DOMAIN:
+        QPID_LOG(info, "Ignoring hostname verification failure for " << (const char*) arg);
+        return SECSuccess;
+      default:
+        return SECFailure;
+    }
+}
+}
+
+void SslSocket::finishConnect(const SocketAddress& addr) const
+{
+    nssSocket = SSL_ImportFD(0, PR_ImportTCPSocket(fd));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     void* arg;
     // Use the connection's cert-name if it has one; else use global cert-name
@@ -145,6 +228,7 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     } else {
         arg = const_cast<char*>(SslOptions::global.certName.c_str());
     }
+<<<<<<< HEAD
     NSS_CHECK(SSL_GetClientAuthDataHook(socket, NSS_GetClientAuthData, arg));
     NSS_CHECK(SSL_SetURL(socket, host.data()));
 
@@ -160,10 +244,23 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     }
     PR_CHECK(PR_Connect(socket, &address, PR_INTERVAL_NO_TIMEOUT));
     NSS_CHECK(SSL_ForceHandshake(socket));
+=======
+    NSS_CHECK(SSL_GetClientAuthDataHook(nssSocket, NSS_GetClientAuthData, arg));
+
+    url = addr.getHost();
+    if (!hostnameVerification) {
+        NSS_CHECK(SSL_BadCertHook(nssSocket, bad_certificate, const_cast<char*>(url.data())));
+    }
+    NSS_CHECK(SSL_SetURL(nssSocket, url.data()));
+
+    NSS_CHECK(SSL_ResetHandshake(nssSocket, PR_FALSE));
+    NSS_CHECK(SSL_ForceHandshake(nssSocket));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslSocket::close() const
 {
+<<<<<<< HEAD
     if (impl->fd > 0) {
         PR_Close(socket);
         impl->fd = -1;
@@ -182,12 +279,31 @@ int SslSocket::listen(uint16_t port, int backlog, const std::string& certName, b
     //get certificate and key (is this the correct way?)
     CERTCertificate *cert = PK11_FindCertFromNickname(const_cast<char*>(certName.c_str()), 0);
     if (!cert) throw Exception(QPID_MSG("Failed to load certificate '" << certName << "'"));
+=======
+    if (!nssSocket) {
+        BSDSocket::close();
+        return;
+    }
+    if (fd > 0) {
+        PR_Close(nssSocket);
+        fd = -1;
+    }
+}
+
+int SslSocket::listen(const SocketAddress& sa, int backlog) const
+{
+    //get certificate and key (is this the correct way?)
+    std::string cName( (certname == "") ? "localhost.localdomain" : certname);
+    CERTCertificate *cert = PK11_FindCertFromNickname(const_cast<char*>(cName.c_str()), 0);
+    if (!cert) throw Exception(QPID_MSG("Failed to load certificate '" << cName << "'"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     SECKEYPrivateKey *key = PK11_FindKeyByAnyCert(cert, 0);
     if (!key) throw Exception(QPID_MSG("Failed to retrieve private key from certificate"));
     NSS_CHECK(SSL_ConfigSecureServer(prototype, cert, key, NSS_FindCertKEAType(cert)));
     SECKEY_DestroyPrivateKey(key);
     CERT_DestroyCertificate(cert);
 
+<<<<<<< HEAD
     //bind and listen
     const int& socket = impl->fd;
     int yes=1;
@@ -214,6 +330,17 @@ SslSocket* SslSocket::accept() const
     int afd = ::accept(impl->fd, 0, 0);
     if ( afd >= 0) {
         return new SslSocket(new IOHandlePrivate(afd), prototype);
+=======
+    return BSDSocket::listen(sa, backlog);
+}
+
+Socket* SslSocket::accept() const
+{
+    QPID_LOG(trace, "Accepting SSL connection.");
+    int afd = ::accept(fd, 0, 0);
+    if ( afd >= 0) {
+        return new SslSocket(afd, prototype);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     } else if (errno == EAGAIN) {
         return 0;
     } else {
@@ -297,17 +424,35 @@ static bool isSslStream(int afd) {
     return isSSL2Handshake || isSSL3Handshake;
 }
 
+<<<<<<< HEAD
 Socket* SslMuxSocket::accept() const
 {
     int afd = ::accept(impl->fd, 0, 0);
+=======
+SslMuxSocket::SslMuxSocket(const std::string& certName, bool clientAuth) :
+    SslSocket(certName, clientAuth)
+{
+}
+
+Socket* SslMuxSocket::accept() const
+{
+    int afd = ::accept(fd, 0, 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (afd >= 0) {
         QPID_LOG(trace, "Accepting connection with optional SSL wrapper.");
         if (isSslStream(afd)) {
             QPID_LOG(trace, "Accepted SSL connection.");
+<<<<<<< HEAD
             return new SslSocket(new IOHandlePrivate(afd), prototype);
         } else {
             QPID_LOG(trace, "Accepted Plaintext connection.");
             return new Socket(new IOHandlePrivate(afd));
+=======
+            return new SslSocket(afd, prototype);
+        } else {
+            QPID_LOG(trace, "Accepted Plaintext connection.");
+            return new BSDSocket(afd);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     } else if (errno == EAGAIN) {
         return 0;
@@ -318,11 +463,16 @@ Socket* SslMuxSocket::accept() const
 
 int SslSocket::read(void *buf, size_t count) const
 {
+<<<<<<< HEAD
     return PR_Read(socket, buf, count);
+=======
+    return PR_Read(nssSocket, buf, count);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 int SslSocket::write(const void *buf, size_t count) const
 {
+<<<<<<< HEAD
     return PR_Write(socket, buf, count);
 }
 
@@ -344,6 +494,9 @@ void SslSocket::setTcpNoDelay(bool nodelay) const
         option.value.no_delay = true;
         PR_SetSocketOption(socket, &option);
     }
+=======
+    return PR_Write(nssSocket, buf, count);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslSocket::setCertName(const std::string& name)
@@ -359,7 +512,11 @@ int SslSocket::getKeyLen() const
     int keySize = 0;
     SECStatus   rc;
 
+<<<<<<< HEAD
     rc = SSL_SecurityStatus( socket,
+=======
+    rc = SSL_SecurityStatus( nssSocket,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                              &enabled,
                              NULL,
                              NULL,
@@ -374,6 +531,7 @@ int SslSocket::getKeyLen() const
 std::string SslSocket::getClientAuthId() const
 {
     std::string authId;
+<<<<<<< HEAD
     CERTCertificate* cert = SSL_PeerCertificate(socket);
     if (cert) {
         authId = CERT_GetCommonName(&(cert->subject));
@@ -386,6 +544,23 @@ std::string SslSocket::getClientAuthId() const
         if (!domain.empty()) {
             authId += DOMAIN_SEPARATOR;
             authId += domain;
+=======
+    CERTCertificate* cert = SSL_PeerCertificate(nssSocket);
+    if (cert) {
+        char *cn = CERT_GetCommonName(&(cert->subject));
+        if (cn) {
+            authId = std::string(cn);
+            /*
+             * The NSS function CERT_GetDomainComponentName only returns
+             * the last component of the domain name, so we have to parse
+             * the subject manually to extract the full domain.
+             */
+            std::string domain = getDomainFromSubject(cert->subjectName);
+            if (!domain.empty()) {
+                authId += DOMAIN_SEPARATOR;
+                authId += domain;
+            }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
         CERT_DestroyCertificate(cert);
     }

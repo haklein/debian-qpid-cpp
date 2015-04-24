@@ -46,7 +46,11 @@ QPID_AUTO_TEST_SUITE(MessagingSessionTests)
 using namespace qpid::messaging;
 using namespace qpid::types;
 using namespace qpid;
+<<<<<<< HEAD
 using qpid::broker::Broker;
+=======
+using qpid::broker::BrokerOptions;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using qpid::framing::Uuid;
 
 
@@ -86,6 +90,14 @@ QPID_AUTO_TEST_CASE(testSendReceiveHeaders)
         out.setProperty("b", i + 100);
         sender.send(out);
     }
+<<<<<<< HEAD
+=======
+    uint8_t v1(255u);
+    int8_t v2(-120);
+    out.getProperties()["c"] = v1;
+    out.getProperties()["d"] = v2;
+    sender.send(out);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Receiver receiver = fix.session.createReceiver(fix.queue);
     Message in;
     for (uint i = 0; i < 10; ++i) {
@@ -95,6 +107,16 @@ QPID_AUTO_TEST_CASE(testSendReceiveHeaders)
         BOOST_CHECK_EQUAL(in.getProperties()["b"].asUint32(), i + 100);
         fix.session.acknowledge();
     }
+<<<<<<< HEAD
+=======
+    BOOST_CHECK(receiver.fetch(in, Duration::SECOND * 5));
+    Variant& c = in.getProperties()["c"];
+    BOOST_CHECK_EQUAL(c.getType(), VAR_UINT8);
+    BOOST_CHECK_EQUAL(c.asUint8(), v1);
+    Variant& d = in.getProperties()["d"];
+    BOOST_CHECK_EQUAL(d.getType(), VAR_INT8);
+    BOOST_CHECK_EQUAL(d.asInt8(), v2);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_CASE(testSenderError)
@@ -385,6 +407,17 @@ QPID_AUTO_TEST_CASE(testBrowse)
     receive(browser1, 10);
     Receiver browser2 = fix.session.createReceiver(fix.queue + "; {mode:browse}");
     receive(browser2, 10);
+<<<<<<< HEAD
+=======
+    Receiver releaser1 = fix.session.createReceiver(fix.queue);
+    Message m1 = releaser1.fetch(messaging::Duration::SECOND*5);
+    BOOST_CHECK(!m1.getRedelivered());
+    fix.session.release(m1);
+    Receiver releaser2 = fix.session.createReceiver(fix.queue);
+    Message m2 = releaser2.fetch(messaging::Duration::SECOND*5);
+    BOOST_CHECK(m2.getRedelivered());
+    fix.session.release(m2);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Receiver consumer = fix.session.createReceiver(fix.queue);
     receive(consumer, 10);
     fix.session.acknowledge();
@@ -509,7 +542,11 @@ struct DeletePolicyFixture : public MessagingFixture
 
     void test(Mode mode)
     {
+<<<<<<< HEAD
         qpid::messaging::Address address("#; " + getPolicy(mode));
+=======
+        qpid::messaging::Address address("testqueue#; " + getPolicy(mode));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         create(address);
 
         Sender s = session.createSender(address);
@@ -726,6 +763,10 @@ QPID_AUTO_TEST_CASE(testRelease)
     Message m2 = receiver.fetch(Duration::SECOND * 1);
     BOOST_CHECK_EQUAL(m1.getContent(), out.getContent());
     BOOST_CHECK_EQUAL(m1.getContent(), m2.getContent());
+<<<<<<< HEAD
+=======
+    BOOST_CHECK(m2.getRedelivered());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     fix.session.acknowledge(true);
 }
 
@@ -914,7 +955,11 @@ QPID_AUTO_TEST_CASE(testAcknowledge)
 
 QPID_AUTO_TEST_CASE(testQmfCreateAndDelete)
 {
+<<<<<<< HEAD
     MessagingFixture fix(Broker::Options(), true/*enable management*/);
+=======
+    MessagingFixture fix(BrokerOptions(), true/*enable management*/);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     MethodInvoker control(fix.session);
     control.createQueue("my-queue");
     control.createExchange("my-exchange", "topic");
@@ -1164,6 +1209,314 @@ QPID_AUTO_TEST_CASE(testAlternateExchangeInLinkDeclare)
     }
 }
 
+<<<<<<< HEAD
+=======
+QPID_AUTO_TEST_CASE(testBrowseOnly)
+{
+    /* Set up a queue browse-only, and try to receive
+       the same messages twice with two different receivers. 
+       This works because the browse-only queue does not
+       allow message acquisition. */
+
+    QueueFixture fix;
+    std::string addr = "q; {create:always, node:{type:queue, durable:false, x-declare:{arguments:{qpid.browse-only:1}}}}";
+    Sender sender = fix.session.createSender(addr);
+    Message out("test-message");
+
+    int count = 10;
+    for ( int i = 0; i < count; ++ i ) {
+        sender.send(out);
+    }
+
+    Message m;
+
+    Receiver receiver_1 = fix.session.createReceiver(addr);
+    for ( int i = 0; i < count; ++ i ) {
+      BOOST_CHECK(receiver_1.fetch(m, Duration::SECOND));
+    }
+
+    Receiver receiver_2 = fix.session.createReceiver(addr);
+    for ( int i = 0; i < count; ++ i ) {
+      BOOST_CHECK(receiver_2.fetch(m, Duration::SECOND));
+    }
+
+    fix.session.acknowledge();
+}
+
+QPID_AUTO_TEST_CASE(testLinkBindingCleanup)
+{
+    MessagingFixture fix;
+
+    Sender sender = fix.session.createSender("test.ex;{create:always,node:{type:topic}}");
+
+    Connection connection = fix.newConnection();
+    connection.open();
+
+    Session session(connection.createSession());
+    Receiver receiver1 = session.createReceiver("test.q;{create:always, node:{type:queue, x-bindings:[{exchange:test.ex,queue:test.q,key:#,arguments:{x-scope:session}}]}}");
+    Receiver receiver2 = fix.session.createReceiver("test.q;{create:never, delete:always}");
+    connection.close();
+
+    sender.send(Message("test-message"), true);
+
+    // The session-scoped binding should be removed when receiver1's network connection is lost
+    Message in;
+    BOOST_CHECK(!receiver2.fetch(in, Duration::IMMEDIATE));
+}
+
+namespace {
+struct Fetcher : public qpid::sys::Runnable {
+    Receiver receiver;
+    Message message;
+    bool result;
+    qpid::messaging::Duration timeout;
+    bool timedOut;
+
+    Fetcher(Receiver r) : receiver(r), result(false), timeout(Duration::SECOND*10), timedOut(false) {}
+    void run()
+    {
+        qpid::sys::AbsTime start(qpid::sys::now());
+        try {
+            result = receiver.fetch(message, timeout);
+        } catch (const MessagingException&) {}
+        qpid::sys::Duration timeTaken(start, qpid::sys::now());
+        timedOut = (uint64_t) timeTaken >= timeout.getMilliseconds() * qpid::sys::TIME_MSEC;
+    }
+};
+}
+
+QPID_AUTO_TEST_CASE(testConcurrentFetch)
+{
+    MessagingFixture fix;
+    Sender sender = fix.session.createSender("my-test-queue;{create:always, node : { x-declare : { auto-delete: true}}}");
+    Receiver receiver = fix.session.createReceiver("my-test-queue");
+    Fetcher fetcher(fix.session.createReceiver("amq.fanout"));
+    qpid::sys::Thread runner(fetcher);
+    Message out("test-message");
+    for (int i = 0; i < 10; i++) {//try several times to make sure
+        sender.send(out, true);
+        //since the message is now on the queue, it should take less than the timeout to actually fetch it
+        qpid::sys::AbsTime start = qpid::sys::AbsTime::now();
+        Message in;
+        BOOST_CHECK(receiver.fetch(in, qpid::messaging::Duration::SECOND*2));
+        qpid::sys::Duration time(start, qpid::sys::AbsTime::now());
+        BOOST_CHECK(time < qpid::sys::TIME_SEC*2);
+        if (time >= qpid::sys::TIME_SEC*2) break;//if we failed, no need to keep testing
+    }
+    fix.session.createSender("amq.fanout").send(out);
+    runner.join();
+    BOOST_CHECK(fetcher.result);
+}
+
+QPID_AUTO_TEST_CASE(testSimpleRequestResponse)
+{
+    QueueFixture fix;
+    //create receiver on temp queue for responses (using shorthand for temp queue)
+    Receiver r1 = fix.session.createReceiver("#");
+    //send request
+    Sender s1 = fix.session.createSender(fix.queue);
+    Message original("test-message");
+    original.setSubject("test-subject");
+    original.setReplyTo(r1.getAddress());
+    s1.send(original);
+
+    //receive request and send response
+    Receiver r2 = fix.session.createReceiver(fix.queue);
+    Message m = r2.fetch(Duration::SECOND * 5);
+    Sender s2 = fix.session.createSender(m.getReplyTo());
+    s2.send(m);
+    m = r1.fetch(Duration::SECOND * 5);
+    fix.session.acknowledge();
+    BOOST_CHECK_EQUAL(m.getContent(), original.getContent());
+    BOOST_CHECK_EQUAL(m.getSubject(), original.getSubject());
+}
+
+QPID_AUTO_TEST_CASE(testSelfDestructQueue)
+{
+    MessagingFixture fix;
+    Session other = fix.connection.createSession();
+    Receiver r1 = other.createReceiver("amq.fanout; {link:{reliability:at-least-once, x-declare:{arguments:{qpid.max_count:10,qpid.policy_type:self-destruct}}}}");
+    Receiver r2 = fix.session.createReceiver("amq.fanout");
+    //send request
+    Sender s = fix.session.createSender("amq.fanout");
+    for (uint i = 0; i < 20; ++i) {
+        s.send(Message((boost::format("MSG_%1%") % (i+1)).str()));
+    }
+    try {
+        ScopedSuppressLogging sl;
+        for (uint i = 0; i < 20; ++i) {
+            r1.fetch(Duration::SECOND);
+        }
+        BOOST_FAIL("Expected exception.");
+    } catch (const qpid::messaging::MessagingException&) {
+    }
+
+    for (uint i = 0; i < 20; ++i) {
+        BOOST_CHECK_EQUAL(r2.fetch(Duration::SECOND).getContent(), (boost::format("MSG_%1%") % (i+1)).str());
+    }
+}
+
+QPID_AUTO_TEST_CASE(testReroutingRingQueue)
+{
+    MessagingFixture fix;
+    Receiver r1 = fix.session.createReceiver("my-queue; {create:always, node:{x-declare:{alternate-exchange:amq.fanout, auto-delete:True, arguments:{qpid.max_count:10,qpid.policy_type:ring}}}}");
+    Receiver r2 = fix.session.createReceiver("amq.fanout");
+
+    Sender s = fix.session.createSender("my-queue");
+    for (uint i = 0; i < 20; ++i) {
+        s.send(Message((boost::format("MSG_%1%") % (i+1)).str()));
+    }
+    for (uint i = 10; i < 20; ++i) {
+        BOOST_CHECK_EQUAL(r1.fetch(Duration::SECOND).getContent(), (boost::format("MSG_%1%") % (i+1)).str());
+    }
+    for (uint i = 0; i < 10; ++i) {
+        BOOST_CHECK_EQUAL(r2.fetch(Duration::SECOND).getContent(), (boost::format("MSG_%1%") % (i+1)).str());
+    }
+}
+
+QPID_AUTO_TEST_CASE(testReleaseOnPriorityQueue)
+{
+    MessagingFixture fix;
+    std::string queue("queue; {create:always, node:{x-declare:{auto-delete:True, arguments:{qpid.priorities:10}}}}");
+    std::string text("my message");
+    Sender sender = fix.session.createSender(queue);
+    sender.send(Message(text));
+    Receiver receiver = fix.session.createReceiver(queue);
+    Message msg;
+    for (uint i = 0; i < 10; ++i) {
+        if (receiver.fetch(msg, Duration::SECOND)) {
+            BOOST_CHECK_EQUAL(msg.getContent(), text);
+            fix.session.release(msg);
+        } else {
+            BOOST_FAIL("Released message not redelivered as expected.");
+        }
+    }
+    fix.session.acknowledge();
+}
+
+QPID_AUTO_TEST_CASE(testRollbackWithFullPrefetch)
+{
+    QueueFixture fix;
+    std::string first("first");
+    std::string second("second");
+    Sender sender = fix.session.createSender(fix.queue);
+    for (uint i = 0; i < 10; ++i) {
+        sender.send(Message((boost::format("MSG_%1%") % (i+1)).str()));
+    }
+    Session txsession = fix.connection.createTransactionalSession();
+    Receiver receiver = txsession.createReceiver(fix.queue);
+    receiver.setCapacity(9);
+    Message msg;
+    for (uint i = 0; i < 10; ++i) {
+        if (receiver.fetch(msg, Duration::SECOND)) {
+            BOOST_CHECK_EQUAL(msg.getContent(), std::string("MSG_1"));
+            txsession.rollback();
+        } else {
+            BOOST_FAIL("Released message not redelivered as expected.");
+            break;
+        }
+    }
+    txsession.acknowledge();
+    txsession.commit();
+}
+
+QPID_AUTO_TEST_CASE(testCloseAndConcurrentFetch)
+{
+    QueueFixture fix;
+    Receiver receiver = fix.session.createReceiver(fix.queue);
+    Fetcher fetcher(receiver);
+    qpid::sys::Thread runner(fetcher);
+    qpid::sys::usleep(500);
+    receiver.close();
+    runner.join();
+    BOOST_CHECK(!fetcher.timedOut);
+}
+
+QPID_AUTO_TEST_CASE(testCloseAndMultipleConcurrentFetches)
+{
+    QueueFixture fix;
+    Receiver receiver = fix.session.createReceiver(fix.queue);
+    Receiver receiver2 = fix.session.createReceiver("amq.fanout");
+    Receiver receiver3 = fix.session.createReceiver("amq.fanout");
+    Fetcher fetcher(receiver);
+    Fetcher fetcher2(receiver2);
+    Fetcher fetcher3(receiver3);
+    qpid::sys::Thread runner(fetcher);
+    qpid::sys::Thread runner2(fetcher2);
+    qpid::sys::Thread runner3(fetcher3);
+    qpid::sys::usleep(500);
+    receiver.close();
+    Message message("Test");
+    fix.session.createSender("amq.fanout").send(message);
+    runner2.join();
+    BOOST_CHECK(fetcher2.result);
+    BOOST_CHECK_EQUAL(fetcher2.message.getContent(), message.getContent());
+    runner3.join();
+    BOOST_CHECK(fetcher3.result);
+    BOOST_CHECK_EQUAL(fetcher3.message.getContent(), message.getContent());
+    runner.join();
+    BOOST_CHECK(!fetcher.timedOut);
+}
+
+QPID_AUTO_TEST_CASE(testSessionCheckError)
+{
+    MessagingFixture fix;
+    Session session = fix.connection.createSession();
+    Sender sender = session.createSender("q; {create:always, node:{x-declare:{auto-delete:True, arguments:{qpid.max_count:1}}}}");
+    ScopedSuppressLogging sl;
+    for (uint i = 0; i < 2; ++i) {
+        sender.send(Message((boost::format("A_%1%") % (i+1)).str()));
+    }
+    try {
+        while (true) session.checkError();
+    } catch (const qpid::types::Exception&) {
+        //this is ok
+    } catch (const qpid::Exception&) {
+        BOOST_FAIL("Wrong exception type thrown");
+    }
+}
+
+QPID_AUTO_TEST_CASE(testImmediateNextReceiver)
+{
+    QueueFixture fix;
+    Sender sender = fix.session.createSender(fix.queue);
+    Message out("test message");
+    sender.send(out);
+    fix.session.createReceiver(fix.queue).setCapacity(1);
+    Receiver next;
+    qpid::sys::AbsTime start = qpid::sys::now();
+    try {
+        while (!fix.session.nextReceiver(next, qpid::messaging::Duration::IMMEDIATE)) {
+            qpid::sys::Duration running(start, qpid::sys::now());
+            if (running > 5*qpid::sys::TIME_SEC) {
+                throw qpid::types::Exception("Timed out spinning on nextReceiver(IMMEDIATE)");
+            }
+            qpid::sys::usleep(1); // for valgrind
+        }
+        Message in;
+        BOOST_CHECK(next.fetch(in, qpid::messaging::Duration::IMMEDIATE));
+        BOOST_CHECK_EQUAL(in.getContent(), out.getContent());
+        next.close();
+    } catch (const std::exception& e) {
+        BOOST_FAIL(e.what());
+    }
+}
+
+QPID_AUTO_TEST_CASE(testImmediateNextReceiverNoMessage)
+{
+    QueueFixture fix;
+    Receiver r = fix.session.createReceiver(fix.queue);
+    r.setCapacity(1);
+    Receiver next;
+    try {
+        BOOST_CHECK(!fix.session.nextReceiver(next, qpid::messaging::Duration::IMMEDIATE));
+        r.close();
+    } catch (const std::exception& e) {
+        BOOST_FAIL(e.what());
+    }
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

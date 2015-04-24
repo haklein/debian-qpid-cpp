@@ -21,21 +21,37 @@
 #ifndef _Consumer_
 #define _Consumer_
 
+<<<<<<< HEAD
 #include "qpid/broker/Message.h"
 #include "qpid/broker/QueuedMessage.h"
 #include "qpid/broker/OwnershipToken.h"
+=======
+#include "qpid/broker/QueueCursor.h"
+#include "qpid/broker/OwnershipToken.h"
+#include <boost/shared_ptr.hpp>
+#include <string>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
+=======
+class DeliveryRecord;
+class Message;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class Queue;
 class QueueListeners;
 
 /**
  * Base class for consumers which represent a subscription to a queue.
  */
+<<<<<<< HEAD
 class Consumer
 {
+=======
+class Consumer : public QueueCursor {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const bool acquires;
     // inListeners allows QueueListeners to efficiently track if this
     // instance is registered for notifications without having to
@@ -47,13 +63,19 @@ class Consumer
  public:
     typedef boost::shared_ptr<Consumer> shared_ptr;
 
+<<<<<<< HEAD
     Consumer(const std::string& _name, bool preAcquires = true)
       : acquires(preAcquires), inListeners(false), name(_name), position(0) {}
+=======
+    Consumer(const std::string& _name, SubscriptionType type, const std::string& _tag)
+        : QueueCursor(type), acquires(type == CONSUMER), inListeners(false), name(_name), tag(_tag) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual ~Consumer(){}
 
     bool preAcquires() const { return acquires; }
     const std::string& getName() const { return name; }
 
+<<<<<<< HEAD
     /**@return the position of the last message seen by this consumer */
     virtual framing::SequenceNumber getPosition() const  { return position; }
 
@@ -63,6 +85,12 @@ class Consumer
     virtual void notify() = 0;
     virtual bool filter(boost::intrusive_ptr<Message>) { return true; }
     virtual bool accept(boost::intrusive_ptr<Message>) { return true; }
+=======
+    virtual bool deliver(const QueueCursor& cursor, const Message& msg) = 0;
+    virtual void notify() = 0;
+    virtual bool filter(const Message&) { return true; }
+    virtual bool accept(const Message&) { return true; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual OwnershipToken* getSession() = 0;
     virtual void cancel() = 0;
 
@@ -75,15 +103,40 @@ class Consumer
      * Not to be confused with accept() above, which is asking if
      * this consumer will consume/browse the message.
      */
+<<<<<<< HEAD
     virtual void acknowledged(const QueuedMessage&) = 0;
+=======
+    virtual void acknowledged(const DeliveryRecord&) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Called if queue has been deleted, if true suppress the error message.
      * Used by HA ReplicatingSubscriptions where such errors are normal.
      */
     virtual bool hideDeletedError() { return false; }
 
+<<<<<<< HEAD
   protected:
     framing::SequenceNumber position;
+=======
+    /** If false, the consumer is not counted for purposes of auto-deletion or
+     * immediate messages. This is used for "system" consumers that are created
+     * by the broker for internal purposes as opposed to consumers that are
+     * created by normal clients.
+     */
+    virtual bool isCounted() { return true; }
+
+    QueueCursor getCursor() const { return *this; }
+    void setCursor(const QueueCursor& qc) { static_cast<QueueCursor&>(*this) = qc; }
+
+    const std::string& getTag() const { return tag; }
+
+    /** Called when there are no more messages immediately available for this consumer on the queue */
+    virtual void stopped() {}
+
+  protected:
+    //framing::SequenceNumber position;
+    const std::string tag;  // <destination> from AMQP 0-10 Message.subscribe command
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
   private:
     friend class QueueListeners;

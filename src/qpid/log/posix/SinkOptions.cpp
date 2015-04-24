@@ -20,6 +20,10 @@
 #include "qpid/log/SinkOptions.h"
 #include "qpid/log/Logger.h"
 #include "qpid/log/OstreamOutput.h"
+<<<<<<< HEAD
+=======
+#include "qpid/OptionsTemplates.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/memory.h"
 #include "qpid/Exception.h"
 
@@ -34,6 +38,12 @@ using std::string;
 using qpid::Exception;
 
 namespace qpid {
+<<<<<<< HEAD
+=======
+
+template po::value_semantic* create_value(log::posix::SyslogFacility& val, const std::string& arg);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace log {
 namespace posix {
 

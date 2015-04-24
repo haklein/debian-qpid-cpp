@@ -25,6 +25,10 @@
 #include <limits>
 
 #include "qpid/messaging/Sender.h"
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/Address.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/Session.h"
 #include "qpid/messaging/Message.h"
 
@@ -43,6 +47,10 @@ namespace Messaging {
     /// Sender is a managed wrapper for a ::qpid::messaging::Sender
     /// </summary>
 
+<<<<<<< HEAD
+=======
+    ref class Address;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ref class Session;
     ref class Message;
 
@@ -188,5 +196,13 @@ namespace Messaging {
                 return parentSession;
             }
         }
+<<<<<<< HEAD
+=======
+
+        //
+        // Address
+        //
+        Org::Apache::Qpid::Messaging::Address ^ GetAddress();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 }}}}

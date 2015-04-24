@@ -17,6 +17,7 @@
 # under the License.
 #
 
+<<<<<<< HEAD
 # Support library for tests that start multiple brokers, e.g. cluster
 # or federation
 
@@ -25,13 +26,57 @@ import qpid, traceback, signal
 from qpid import connection, messaging, util
 from qpid.compat import format_exc
 from qpid.harness import Skipped
+=======
+# Support library for tests that start multiple brokers, e.g. HA or federation
+
+import os, signal, string, tempfile, subprocess, socket, threading, time, imp, re
+import qpid, traceback, signal
+from qpid import connection, util
+from qpid.compat import format_exc
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 from unittest import TestCase
 from copy import copy
 from threading import Thread, Lock, Condition
 from logging import getLogger
+<<<<<<< HEAD
 import qmf.console
 
 log = getLogger("qpid.brokertest")
+=======
+from qpidtoollibs import BrokerAgent
+
+# NOTE: Always import native client qpid.messaging, import swigged client
+# qpid_messaging if possible. qpid_messaing is set to None if not available.
+#
+# qm is set to qpid_messaging if it is available, qpid.messaging if not.
+# Use qm.X to specify names from the default messaging module.
+#
+# Set environment variable QPID_PY_NO_SWIG=1 to prevent qpid_messaging from loading.
+#
+# BrokerTest can be configured to determine which protocol is used by default:
+#
+# -DPROTOCOL="amqpX": Use protocol "amqpX". Defaults to amqp1.0 if available.
+#
+# The configured defaults can be over-ridden on BrokerTest.connect and some
+# other methods by specifying native=True|False and protocol="amqpX"
+#
+
+import qpid.messaging
+qm = qpid.messaging
+qpid_messaging = None
+if not os.environ.get("QPID_PY_NO_SWIG"):
+    try:
+        import qpid_messaging
+        from qpid.datatypes import uuid4
+        qm = qpid_messaging
+        # Silence warnings from swigged messaging library unless enabled in environment.
+        if "QPID_LOG_ENABLE" not in os.environ and "QPID_TRACE" not in os.environ:
+            qm.Logger.configure(["--log-enable=error"])
+    except ImportError:
+        print "Cannot load python SWIG bindings, falling back to native qpid.messaging."
+
+log = getLogger("brokertest")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 # Values for expected outcome of process at end of test
 EXPECT_EXIT_OK=1           # Expect to exit with 0 status before end of test.
@@ -76,7 +121,11 @@ def error_line(filename, n=1):
     except: return ""
     return ":\n" + "".join(result)
 
+<<<<<<< HEAD
 def retry(function, timeout=10, delay=.01, max_delay=1):
+=======
+def retry(function, timeout=10, delay=.001, max_delay=1):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     """Call function until it returns a true value or timeout expires.
     Double the delay for each retry up to max_delay.
     Returns what function returns if true, None if timeout expires."""
@@ -132,6 +181,7 @@ class Popen(subprocess.Popen):
         self.pname = "%s-%d" % (os.path.split(self.cmd[0])[1], self.id)
         if stdout == FILE: stdout = open(self.outfile("out"), "w")
         if stderr == FILE: stderr = open(self.outfile("err"), "w")
+<<<<<<< HEAD
         try:
             subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
                                       stdin=stdin, stdout=stdout, stderr=stderr,
@@ -140,12 +190,20 @@ class Popen(subprocess.Popen):
             subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
                                       stdin=stdin, stdout=stdout, stderr=stderr)
 
+=======
+        subprocess.Popen.__init__(self, self.cmd, bufsize=0, executable=None,
+                                  stdin=stdin, stdout=stdout, stderr=stderr)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         f = open(self.outfile("cmd"), "w")
         try: f.write("%s\n%d"%(self.cmd_str(), self.pid))
         finally: f.close()
         log.debug("Started process %s: %s" % (self.pname, " ".join(self.cmd)))
 
+<<<<<<< HEAD
     def __str__(self): return "Popen<%s>"%(self.pname)
+=======
+    def __repr__(self): return "Popen<%s>"%(self.pname)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def outfile(self, ext): return "%s.%s" % (self.pname, ext)
 
@@ -153,6 +211,7 @@ class Popen(subprocess.Popen):
         err = error_line(self.outfile("err")) or error_line(self.outfile("out"))
         raise BadProcessStatus("%s %s%s" % (self.pname, msg, err))
 
+<<<<<<< HEAD
     def stop(self):                  # Clean up at end of test.
         try:
             if self.expect == EXPECT_UNKNOWN:
@@ -177,6 +236,31 @@ class Popen(subprocess.Popen):
                     self.unexpected("expected error")
         finally:
             self.wait()                 # Clean up the process.
+=======
+    def teardown(self):         # Clean up at end of test.
+        if self.expect == EXPECT_UNKNOWN:
+            try: self.kill()            # Just make sure its dead
+            except: pass
+        elif self.expect == EXPECT_RUNNING:
+                if self.poll() != None:
+                    self.unexpected("expected running, exit code %d" % self.returncode)
+                else:
+                    try:
+                        self.kill()
+                    except Exception,e:
+                        self.unexpected("exception from kill: %s" % str(e))
+        else:
+            retry(lambda: self.poll() is not None)
+            if self.returncode is None: # Still haven't stopped
+                self.kill()
+                self.unexpected("still running")
+            elif self.expect == EXPECT_EXIT_OK and self.returncode != 0:
+                self.unexpected("exit code %d" % self.returncode)
+            elif self.expect == EXPECT_EXIT_FAIL and self.returncode == 0:
+                self.unexpected("expected error")
+        self.wait()
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def communicate(self, input=None):
         ret = subprocess.Popen.communicate(self, input)
@@ -193,6 +277,12 @@ class Popen(subprocess.Popen):
         self._cleanup()
         return ret
 
+<<<<<<< HEAD
+=======
+    def assert_exit_ok(self):
+        if self.wait() != 0: self.unexpected("Exit code %d" % self.returncode)
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     def terminate(self):
         try: subprocess.Popen.terminate(self)
         except AttributeError:          # No terminate method
@@ -203,8 +293,15 @@ class Popen(subprocess.Popen):
         self.wait()
 
     def kill(self):
+<<<<<<< HEAD
         try:
             subprocess.Popen.kill(self)
+=======
+        # Set to EXPECT_UNKNOWN, EXPECT_EXIT_FAIL creates a race condition
+        # if the process exits normally concurrent with the call to kill.
+        self.expect = EXPECT_UNKNOWN
+        try: subprocess.Popen.kill(self)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         except AttributeError:          # No terminate method
             try:
                 os.kill( self.pid , signal.SIGKILL)
@@ -243,21 +340,30 @@ class Broker(Popen):
     _broker_count = 0
     _log_count = 0
 
+<<<<<<< HEAD
     def __str__(self): return "Broker<%s %s :%d>"%(self.log, self.pname, self.port())
 
     def find_log(self):
         self.log = "%03d:%s.log" % (Broker._log_count, self.name)
         Broker._log_count += 1
+=======
+    def __repr__(self): return "<Broker:%s:%d>"%(self.log, self.port())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def get_log(self):
         return os.path.abspath(self.log)
 
+<<<<<<< HEAD
     def __init__(self, test, args=[], name=None, expect=EXPECT_RUNNING, port=0, log_level=None, wait=None, show_cmd=False):
+=======
+    def __init__(self, test, args=[], test_store=False, name=None, expect=EXPECT_RUNNING, port=0, wait=None, show_cmd=False):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         """Start a broker daemon. name determines the data-dir and log
         file names."""
 
         self.test = test
         self._port=port
+<<<<<<< HEAD
         if BrokerTest.store_lib:
             args = args + ['--load-module', BrokerTest.store_lib]
             if BrokerTest.sql_store_lib:
@@ -267,6 +373,19 @@ class Broker(Popen):
                 args = args + ['--load-module', BrokerTest.sql_clfs_store_lib]
                 args = args + ['--catalog', BrokerTest.sql_catalog]
         cmd = [BrokerTest.qpidd_exec, "--port", port, "--no-module-dir"] + args
+=======
+        args = copy(args)
+        if BrokerTest.amqp_lib: args += ["--load-module", BrokerTest.amqp_lib]
+        if BrokerTest.store_lib and not test_store:
+            args += ['--load-module', BrokerTest.store_lib]
+            if BrokerTest.sql_store_lib:
+                args += ['--load-module', BrokerTest.sql_store_lib]
+                args += ['--catalog', BrokerTest.sql_catalog]
+            if BrokerTest.sql_clfs_store_lib:
+                args += ['--load-module', BrokerTest.sql_clfs_store_lib]
+                args += ['--catalog', BrokerTest.sql_catalog]
+        cmd = [BrokerTest.qpidd_exec, "--port", port, "--interface", "127.0.0.1", "--no-module-dir"] + args
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if not "--auth" in args: cmd.append("--auth=no")
         if wait != None:
             cmd += ["--wait", str(wait)]
@@ -274,6 +393,7 @@ class Broker(Popen):
         else:
             self.name = "broker%d" % Broker._broker_count
             Broker._broker_count += 1
+<<<<<<< HEAD
         self.find_log()
         cmd += ["--log-to-file", self.log]
         cmd += ["--log-to-stderr=no"]
@@ -291,6 +411,32 @@ class Broker(Popen):
     def startQmf(self, handler=None):
         self.qmf_session = qmf.console.Session(handler)
         self.qmf_broker = self.qmf_session.addBroker("%s:%s" % (self.host(), self.port()))
+=======
+
+        self.log = "%03d:%s.log" % (Broker._log_count, self.name)
+        self.store_log = "%03d:%s.store.log" % (Broker._log_count, self.name)
+        Broker._log_count += 1
+
+        cmd += ["--log-to-file", self.log]
+        cmd += ["--log-to-stderr=no"]
+
+        # Add default --log-enable arguments unless args already has --log arguments.
+        if not [l for l in args if l.startswith("--log")]:
+            args += ["--log-enable=info+"]
+
+        if test_store: cmd += ["--load-module", BrokerTest.test_store_lib,
+                               "--test-store-events", self.store_log]
+
+        self.datadir = os.path.abspath(self.name)
+        cmd += ["--data-dir", self.datadir]
+        if show_cmd: print cmd
+        Popen.__init__(self, cmd, expect, stdout=PIPE)
+        test.teardown_add(self)
+        self._host = "127.0.0.1"
+        self._agent = None
+
+        log.debug("Started broker %s" % self)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def host(self): return self._host
 
@@ -306,6 +452,7 @@ class Broker(Popen):
     def unexpected(self,msg):
         raise BadProcessStatus("%s: %s (%s)" % (msg, self.name, self.pname))
 
+<<<<<<< HEAD
     def connect(self, **kwargs):
         """New API connection to the broker."""
         return messaging.Connection.establish(self.host_port(), **kwargs)
@@ -322,6 +469,29 @@ class Broker(Popen):
         s = c.session(str(qpid.datatypes.uuid4()))
         s.queue_declare(queue=queue)
         c.close()
+=======
+    def connect(self, timeout=5, native=False, **kwargs):
+        """New API connection to the broker.
+        @param native if True force use of the native qpid.messaging client
+        even if swig client is available.
+        """
+        if native: connection_class = qpid.messaging.Connection
+        else:
+          connection_class = qm.Connection
+          if (self.test.protocol and qm == qpid_messaging):
+            kwargs.setdefault("protocol", self.test.protocol)
+        return connection_class.establish(self.host_port(), timeout=timeout, **kwargs)
+
+    @property
+    def agent(self, **kwargs):
+        """Return a BrokerAgent for this broker"""
+        if not self._agent: self._agent = BrokerAgent(self.connect(**kwargs))
+        return self._agent
+
+
+    def declare_queue(self, queue):
+        self.agent.addQueue(queue)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def _prep_sender(self, queue, durable, xprops):
         s = queue + "; {create:always, node:{durable:" + str(durable)
@@ -364,6 +534,7 @@ class Broker(Popen):
 
     def host_port(self): return "%s:%s" % (self.host(), self.port())
 
+<<<<<<< HEAD
     def log_contains(self, str, timeout=1):
         """Wait for str to appear in the log file up to timeout. Return true if found"""
         return retry(lambda: find_in_file(str, self.log), timeout)
@@ -436,18 +607,59 @@ class Cluster:
     def __getitem__(self,index): return self._brokers[index]
     def __iter__(self): return self._brokers.__iter__()
 
+=======
+    def ready(self, timeout=10, **kwargs):
+        """Wait till broker is ready to serve clients"""
+        deadline = time.time()+timeout
+        while True:
+            try:
+                c = self.connect(timeout=timeout, **kwargs)
+                try:
+                    c.session()
+                    return      # All good
+                finally: c.close()
+            except Exception,e: # Retry up to timeout
+                if time.time() > deadline:
+                    raise RethrownException(
+                        "Broker %s not responding: (%s)%s"%(
+                            self.name,e,error_line(self.log, 5)))
+
+    def assert_log_clean(self, ignore=None):
+        log = open(self.get_log())
+        try:
+            error = re.compile("] error|] critical")
+            if ignore: ignore = re.compile(ignore)
+            else: ignore = re.compile("\000") # Won't match anything
+            for line in log.readlines():
+                assert not error.search(line) or ignore.search(line), "Errors in log file %s: %s"%(log, line)
+        finally: log.close()
+
+def receiver_iter(receiver, timeout=0):
+    """Make an iterator out of a receiver. Returns messages till Empty is raised."""
+    try:
+        while True:
+            yield receiver.fetch(timeout=timeout)
+    except qm.Empty:
+        pass
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 def browse(session, queue, timeout=0, transform=lambda m: m.content):
     """Return a list with the contents of each message on queue."""
     r = session.receiver("%s;{mode:browse}"%(queue))
     r.capacity = 100
     try:
+<<<<<<< HEAD
         contents = []
         try:
             while True: contents.append(transform(r.fetch(timeout=timeout)))
         except messaging.Empty: pass
     finally: r.close()
     return contents
+=======
+        return [transform(m) for m in receiver_iter(r, timeout)]
+    finally:
+        r.close()
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 def assert_browse(session, queue, expect_contents, timeout=0, transform=lambda m: m.content, msg="browse failed"):
     """Assert that the contents of messages on queue (as retrieved
@@ -457,7 +669,11 @@ def assert_browse(session, queue, expect_contents, timeout=0, transform=lambda m
     if msg: msg = "%s: %r != %r"%(msg, expect_contents, actual_contents)
     assert expect_contents == actual_contents, msg
 
+<<<<<<< HEAD
 def assert_browse_retry(session, queue, expect_contents, timeout=1, delay=.01, transform=lambda m:m.content, msg="browse failed"):
+=======
+def assert_browse_retry(session, queue, expect_contents, timeout=1, delay=.001, transform=lambda m:m.content, msg="browse failed"):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     """Wait up to timeout for contents of queue to match expect_contents"""
     test = lambda: browse(session, queue, 0, transform=transform) == expect_contents
     retry(test, timeout, delay)
@@ -471,11 +687,23 @@ class BrokerTest(TestCase):
     Provides a well-known working directory for each test.
     """
 
+<<<<<<< HEAD
     # Environment settings.
     qpidd_exec = os.path.abspath(checkenv("QPIDD_EXEC"))
     cluster_lib = os.getenv("CLUSTER_LIB")
     ha_lib = os.getenv("HA_LIB")
     xml_lib = os.getenv("XML_LIB")
+=======
+    def __init__(self, *args, **kwargs):
+        self.longMessage = True # Enable long messages for assert*(..., msg=xxx)
+        TestCase.__init__(self, *args, **kwargs)
+
+    # Environment settings.
+    qpidd_exec = os.path.abspath(checkenv("QPIDD_EXEC"))
+    ha_lib = os.getenv("HA_LIB")
+    xml_lib = os.getenv("XML_LIB")
+    amqp_lib = os.getenv("AMQP_LIB")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     qpid_config_exec = os.getenv("QPID_CONFIG_EXEC")
     qpid_route_exec = os.getenv("QPID_ROUTE_EXEC")
     receiver_exec = os.getenv("RECEIVER_EXEC")
@@ -490,6 +718,7 @@ class BrokerTest(TestCase):
     def configure(self, config): self.config=config
 
     def setUp(self):
+<<<<<<< HEAD
         outdir = self.config.defines.get("OUTDIR") or "brokertest.tmp"
         self.dir = os.path.join(self.rootdir, outdir, self.id())
         os.makedirs(self.dir)
@@ -508,33 +737,89 @@ class BrokerTest(TestCase):
     def cleanup_stop(self, stopable):
         """Call thing.stop at end of test"""
         self.stopem.append(stopable)
+=======
+        defs = self.config.defines
+        outdir = defs.get("OUTDIR") or "brokertest.tmp"
+        self.dir = os.path.join(self.rootdir, outdir, self.id())
+        os.makedirs(self.dir)
+        os.chdir(self.dir)
+        self.teardown_list = []                # things to tear down at end of test
+        if qpid_messaging and self.amqp_lib: default_protocol="amqp1.0"
+        else: default_protocol="amqp0-10"
+        self.protocol = defs.get("PROTOCOL") or default_protocol
+        self.tx_protocol = "amqp0-10" # Transactions not yet supported over 1.0
+
+
+    def tearDown(self):
+        err = []
+        self.teardown_list.reverse() # Tear down in reverse order
+        for p in self.teardown_list:
+            log.debug("Tearing down %s", p)
+            try:
+                # Call the first of the methods that is available on p.
+                for m in ["teardown", "close"]:
+                    a = getattr(p, m, None)
+                    if a: a(); break
+                else: raise Exception("Don't know how to tear down %s", p)
+            except Exception, e:
+                if m != "close": # Ignore connection close errors.
+                    err.append("%s: %s"%(e.__class__.__name__, str(e)))
+        self.teardown_list = []                # reset in case more processes start
+        os.chdir(self.rootdir)
+        if err: raise Exception("Unexpected process status:\n    "+"\n    ".join(err))
+
+    def teardown_add(self, thing):
+        """Call thing.teardown() or thing.close() at end of test"""
+        self.teardown_list.append(thing)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def popen(self, cmd, expect=EXPECT_EXIT_OK, stdin=None, stdout=FILE, stderr=FILE):
         """Start a process that will be killed at end of test, in the test dir."""
         os.chdir(self.dir)
         p = Popen(cmd, expect, stdin=stdin, stdout=stdout, stderr=stderr)
+<<<<<<< HEAD
         self.cleanup_stop(p)
         return p
 
     def broker(self, args=[], name=None, expect=EXPECT_RUNNING, wait=True, port=0, log_level=None, show_cmd=False):
         """Create and return a broker ready for use"""
         b = Broker(self, args=args, name=name, expect=expect, port=port, log_level=log_level, show_cmd=show_cmd)
+=======
+        self.teardown_add(p)
+        return p
+
+    def broker(self, args=[], name=None, expect=EXPECT_RUNNING, wait=True, port=0, show_cmd=False):
+        """Create and return a broker ready for use"""
+        b = Broker(self, args=args, name=name, expect=expect, port=port, show_cmd=show_cmd)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (wait):
             try: b.ready()
             except Exception, e:
                 raise RethrownException("Failed to start broker %s(%s): %s" % (b.name, b.log, e))
         return b
 
+<<<<<<< HEAD
     def cluster(self, count=0, args=[], expect=EXPECT_RUNNING, wait=True, show_cmd=False):
         """Create and return a cluster ready for use"""
         cluster = Cluster(self, count, args, expect=expect, wait=wait, show_cmd=show_cmd)
         return cluster
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     def browse(self, *args, **kwargs): browse(*args, **kwargs)
     def assert_browse(self, *args, **kwargs): assert_browse(*args, **kwargs)
     def assert_browse_retry(self, *args, **kwargs): assert_browse_retry(*args, **kwargs)
 
+<<<<<<< HEAD
 def join(thread, timeout=10):
+=======
+    def protocol_option(self, connection_options=""):
+        if "protocol" in connection_options: return connection_options
+        else: return ",".join(filter(None, [connection_options,"protocol:'%s'"%self.protocol]))
+
+
+def join(thread, timeout=30):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     thread.join(timeout)
     if thread.isAlive(): raise Exception("Timed out joining thread %s"%thread)
 
@@ -558,14 +843,25 @@ class StoppableThread(Thread):
         join(self)
         if self.error: raise self.error
 
+<<<<<<< HEAD
+=======
+# Options for a client that wants to reconnect automatically.
+RECONNECT_OPTIONS="reconnect:true,reconnect-timeout:10,reconnect-urls-replace:true"
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class NumberedSender(Thread):
     """
     Thread to run a sender client and send numbered messages until stopped.
     """
 
     def __init__(self, broker, max_depth=None, queue="test-queue",
+<<<<<<< HEAD
                  connection_options=Cluster.CONNECTION_OPTIONS,
                  failover_updates=True, url=None):
+=======
+                 connection_options=RECONNECT_OPTIONS,
+                 failover_updates=False, url=None, args=[]):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         """
         max_depth: enable flow control, ensure sent - received <= max_depth.
         Requires self.notify_received(n) to be called each time messages are received.
@@ -574,9 +870,15 @@ class NumberedSender(Thread):
         cmd = ["qpid-send",
                "--broker", url or broker.host_port(),
                "--address", "%s;{create:always}"%queue,
+<<<<<<< HEAD
                "--connection-options", "{%s}"%(connection_options),
                "--content-stdin"
                ]
+=======
+               "--connection-options", "{%s}"%(broker.test.protocol_option(connection_options)),
+               "--content-stdin"
+               ] + args
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if failover_updates: cmd += ["--failover-updates"]
         self.sender = broker.test.popen(
             cmd, expect=EXPECT_RUNNING, stdin=PIPE)
@@ -585,6 +887,10 @@ class NumberedSender(Thread):
         self.received = 0
         self.stopped = False
         self.error = None
+<<<<<<< HEAD
+=======
+        self.queue = queue
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def write_message(self, n):
         self.sender.stdin.write(str(n)+"\n")
@@ -602,7 +908,15 @@ class NumberedSender(Thread):
                     self.condition.release()
                 self.write_message(self.sent)
                 self.sent += 1
+<<<<<<< HEAD
         except Exception: self.error = RethrownException(self.sender.pname)
+=======
+        except Exception, e:
+            self.error = RethrownException(
+                "%s: (%s)%s"%(self.sender.pname,e,
+                              error_line(self.sender.outfile("err"))))
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def notify_received(self, count):
         """Called by receiver to enable flow control. count = messages received so far."""
@@ -627,8 +941,13 @@ class NumberedReceiver(Thread):
     sequentially numbered messages.
     """
     def __init__(self, broker, sender=None, queue="test-queue",
+<<<<<<< HEAD
                  connection_options=Cluster.CONNECTION_OPTIONS,
                  failover_updates=True, url=None):
+=======
+                 connection_options=RECONNECT_OPTIONS,
+                 failover_updates=False, url=None, args=[]):
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         """
         sender: enable flow control. Call sender.received(n) for each message received.
         """
@@ -637,10 +956,18 @@ class NumberedReceiver(Thread):
         cmd = ["qpid-receive",
                "--broker", url or broker.host_port(),
                "--address", "%s;{create:always}"%queue,
+<<<<<<< HEAD
                "--connection-options", "{%s}"%(connection_options),
                "--forever"
                ]
         if failover_updates: cmd += [ "--failover-updates" ]
+=======
+               "--connection-options", "{%s}"%(broker.test.protocol_option(connection_options)),
+               "--forever"
+               ]
+        if failover_updates: cmd += [ "--failover-updates" ]
+        cmd += args
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         self.receiver = self.test.popen(
             cmd, expect=EXPECT_RUNNING, stdout=PIPE)
         self.lock = Lock()
@@ -664,8 +991,15 @@ class NumberedReceiver(Thread):
                     if self.sender:
                         self.sender.notify_received(self.received)
                 m = self.read_message()
+<<<<<<< HEAD
         except Exception:
             self.error = RethrownException(self.receiver.pname)
+=======
+        except Exception, e:
+            self.error = RethrownException(
+                "%s: (%s)%s"%(self.receiver.pname,e,
+                              error_line(self.receiver.outfile("err"))))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def check(self):
         """Raise an exception if there has been an error"""
@@ -676,6 +1010,7 @@ class NumberedReceiver(Thread):
         join(self)
         self.check()
 
+<<<<<<< HEAD
 class ErrorGenerator(StoppableThread):
     """
     Thread that continuously generates errors by trying to consume from
@@ -701,6 +1036,8 @@ class ErrorGenerator(StoppableThread):
                 time.sleep(0.01)
         except: pass                    # Normal if broker is killed.
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 def import_script(path):
     """
     Import executable script at path as a module.

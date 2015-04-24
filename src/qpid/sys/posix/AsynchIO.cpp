@@ -20,6 +20,10 @@
  */
 
 #include "qpid/sys/AsynchIO.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/SecuritySettings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Socket.h"
 #include "qpid/sys/SocketAddress.h"
 #include "qpid/sys/Poller.h"
@@ -28,6 +32,7 @@
 #include "qpid/sys/Time.h"
 #include "qpid/log/Statement.h"
 
+<<<<<<< HEAD
 #include "qpid/sys/posix/check.h"
 
 // TODO The basic algorithm here is not really POSIX specific and with a
@@ -40,6 +45,20 @@
 
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
+=======
+// TODO The basic algorithm here is not really POSIX specific and with a
+// bit more abstraction could (should) be promoted to be platform portable
+// - The POSIX specific code here is ignoring SIGPIPE which should really
+//   be part of the socket code.
+// - And checking errno to detect specific read/write conditions.
+//
+#include <errno.h>
+#include <signal.h>
+
+#include <boost/bind.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/shared_array.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace sys {
@@ -92,7 +111,11 @@ private:
 AsynchAcceptor::AsynchAcceptor(const Socket& s,
                                AsynchAcceptor::Callback callback) :
     acceptedCallback(callback),
+<<<<<<< HEAD
     handle(s, boost::bind(&AsynchAcceptor::readable, this, _1), 0, 0),
+=======
+    handle((const IOHandle&)s, boost::bind(&AsynchAcceptor::readable, this, _1), 0, 0),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     socket(s) {
 
     s.setNonblocking();
@@ -142,6 +165,10 @@ class AsynchConnector : public qpid::sys::AsynchConnector,
 
 private:
     void connComplete(DispatchHandle& handle);
+<<<<<<< HEAD
+=======
+    void requestedCall(RequestCallback rCb);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 private:
     ConnectedCallback connCallback;
@@ -157,6 +184,10 @@ public:
                     FailedCallback failCb);
     void start(Poller::shared_ptr poller);
     void stop();
+<<<<<<< HEAD
+=======
+    void requestCallback(RequestCallback rCb);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 AsynchConnector::AsynchConnector(const Socket& s,
@@ -164,7 +195,11 @@ AsynchConnector::AsynchConnector(const Socket& s,
                                  const std::string& port,
                                  ConnectedCallback connCb,
                                  FailedCallback failCb) :
+<<<<<<< HEAD
     DispatchHandle(s,
+=======
+    DispatchHandle((const IOHandle&)s,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                    0,
                    boost::bind(&AsynchConnector::connComplete, this, _1),
                    boost::bind(&AsynchConnector::connComplete, this, _1)),
@@ -190,11 +225,36 @@ void AsynchConnector::stop()
     stopWatch();
 }
 
+<<<<<<< HEAD
+=======
+void AsynchConnector::requestCallback(RequestCallback callback) {
+    // TODO creating a function object every time isn't all that
+    // efficient - if this becomes heavily used do something better (what?)
+    assert(callback);
+    DispatchHandle::call(boost::bind(&AsynchConnector::requestedCall, this, callback));
+}
+
+void AsynchConnector::requestedCall(RequestCallback callback) {
+    assert(callback);
+    callback(*this);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void AsynchConnector::connComplete(DispatchHandle& h)
 {
     int errCode = socket.getError();
     if (errCode == 0) {
         h.stopWatch();
+<<<<<<< HEAD
+=======
+        try {
+            socket.finishConnect(sa);
+        } catch (const std::exception& e) {
+            failCallback(socket, 0, e.what());
+            DispatchHandle::doDelete();
+            return;
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         connCallback(socket);
     } else {
         // Retry while we cause an immediate exception
@@ -239,16 +299,26 @@ public:
     virtual void queueForDeletion();
 
     virtual void start(Poller::shared_ptr poller);
+<<<<<<< HEAD
+=======
+    virtual void createBuffers(uint32_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual void queueReadBuffer(BufferBase* buff);
     virtual void unread(BufferBase* buff);
     virtual void queueWrite(BufferBase* buff);
     virtual void notifyPendingWrite();
     virtual void queueWriteClose();
     virtual bool writeQueueEmpty();
+<<<<<<< HEAD
     virtual void startReading();
     virtual void stopReading();
     virtual void requestCallback(RequestCallback);
     virtual BufferBase* getQueuedBuffer();
+=======
+    virtual void requestCallback(RequestCallback);
+    virtual BufferBase* getQueuedBuffer();
+    virtual SecuritySettings getSecuritySettings();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 private:
     ~AsynchIO();
@@ -270,6 +340,11 @@ private:
     const Socket& socket;
     std::deque<BufferBase*> bufferQueue;
     std::deque<BufferBase*> writeQueue;
+<<<<<<< HEAD
+=======
+    std::vector<BufferBase> buffers;
+    boost::shared_array<char> bufferMemory;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool queuedClose;
     /**
      * This flag is used to detect and handle concurrency between
@@ -278,6 +353,7 @@ private:
      * thread processing this handle.
      */
     volatile bool writePending;
+<<<<<<< HEAD
     /**
      * This records whether we've been reading is flow controlled:
      * it's safe as a simple boolean as the only way to be stopped
@@ -285,13 +361,19 @@ private:
      * checking it are also in calls only allowed in callback context.
      */
     volatile bool readingStopped;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 AsynchIO::AsynchIO(const Socket& s,
                    ReadCallback rCb, EofCallback eofCb, DisconnectCallback disCb,
                    ClosedCallback cCb, BuffersEmptyCallback eCb, IdleCallback iCb) :
 
+<<<<<<< HEAD
     DispatchHandle(s, 
+=======
+    DispatchHandle((const IOHandle&)s,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                    boost::bind(&AsynchIO::readable, this, _1),
                    boost::bind(&AsynchIO::writeable, this, _1),
                    boost::bind(&AsynchIO::disconnected, this, _1)),
@@ -303,12 +385,17 @@ AsynchIO::AsynchIO(const Socket& s,
     idleCallback(iCb),
     socket(s),
     queuedClose(false),
+<<<<<<< HEAD
     writePending(false),
     readingStopped(false) {
+=======
+    writePending(false) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     s.setNonblocking();
 }
 
+<<<<<<< HEAD
 struct deleter
 {
     template <typename T>
@@ -318,6 +405,9 @@ struct deleter
 AsynchIO::~AsynchIO() {
     std::for_each( bufferQueue.begin(), bufferQueue.end(), deleter());
     std::for_each( writeQueue.begin(), writeQueue.end(), deleter());
+=======
+AsynchIO::~AsynchIO() {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void AsynchIO::queueForDeletion() {
@@ -328,6 +418,22 @@ void AsynchIO::start(Poller::shared_ptr poller) {
     DispatchHandle::startWatch(poller);
 }
 
+<<<<<<< HEAD
+=======
+void AsynchIO::createBuffers(uint32_t size) {
+    // Allocate all the buffer memory at once
+    bufferMemory.reset(new char[size*BufferCount]);
+
+    // Create the Buffer structs in a vector
+    // And push into the buffer queue
+    buffers.reserve(BufferCount);
+    for (uint32_t i = 0; i < BufferCount; i++) {
+        buffers.push_back(BufferBase(&bufferMemory[i*size], size));
+        queueReadBuffer(&buffers[i]);
+    }
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void AsynchIO::queueReadBuffer(BufferBase* buff) {
     assert(buff);
     buff->dataStart = 0;
@@ -335,7 +441,11 @@ void AsynchIO::queueReadBuffer(BufferBase* buff) {
 
     bool queueWasEmpty = bufferQueue.empty();
     bufferQueue.push_back(buff);
+<<<<<<< HEAD
     if (queueWasEmpty && !readingStopped)
+=======
+    if (queueWasEmpty)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         DispatchHandle::rewatchRead();
 }
 
@@ -345,7 +455,11 @@ void AsynchIO::unread(BufferBase* buff) {
 
     bool queueWasEmpty = bufferQueue.empty();
     bufferQueue.push_front(buff);
+<<<<<<< HEAD
     if (queueWasEmpty && !readingStopped)
+=======
+    if (queueWasEmpty)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         DispatchHandle::rewatchRead();
 }
 
@@ -377,6 +491,7 @@ bool AsynchIO::writeQueueEmpty() {
     return writeQueue.empty();
 }
 
+<<<<<<< HEAD
 // This can happen outside the callback context
 void AsynchIO::startReading() {
     readingStopped = false;
@@ -388,6 +503,8 @@ void AsynchIO::stopReading() {
     DispatchHandle::unwatchRead();
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void AsynchIO::requestCallback(RequestCallback callback) {
     // TODO creating a function object every time isn't all that
     // efficient - if this becomes heavily used do something better (what?)
@@ -404,6 +521,7 @@ void AsynchIO::requestedCall(RequestCallback callback) {
  * to spare
  */
 AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
+<<<<<<< HEAD
     // Always keep at least one buffer (it might have data that was "unread" in it)
     if (bufferQueue.size()<=1)
         return 0;
@@ -411,6 +529,16 @@ AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
     assert(buff);
     buff->dataStart = 0;
     buff->dataCount = 0;
+=======
+    BufferBase* buff = bufferQueue.empty() ? 0 : bufferQueue.back();
+    // An "unread" buffer is reserved for future read operations (which
+    // take from the front of the queue).
+    if (!buff || (buff->dataCount && bufferQueue.size() == 1)) {
+        QPID_LOG(error, "No IO buffers available");
+        return 0;
+    }
+    assert(buff->dataCount == 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bufferQueue.pop_back();
     return buff;
 }
@@ -420,11 +548,14 @@ AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
  * to put it in and reading is not stopped by flow control.
  */
 void AsynchIO::readable(DispatchHandle& h) {
+<<<<<<< HEAD
     if (readingStopped) {
         // We have been flow controlled.
         QPID_PROBE1(asynchio_read_flowcontrolled, &h);
         return;
     }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AbsTime readStartTime = AbsTime::now();
     size_t total = 0;
     int readCalls = 0;
@@ -438,7 +569,10 @@ void AsynchIO::readable(DispatchHandle& h) {
             errno = 0;
             int readCount = buff->byteCount-buff->dataCount;
             int rc = socket.read(buff->bytes + buff->dataCount, readCount);
+<<<<<<< HEAD
             int64_t duration = Duration(readStartTime, AbsTime::now());
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             ++readCalls;
             if (rc > 0) {
                 buff->dataCount += rc;
@@ -446,12 +580,16 @@ void AsynchIO::readable(DispatchHandle& h) {
                 total += rc;
 
                 readCallback(*this, buff);
+<<<<<<< HEAD
                 if (readingStopped) {
                     // We have been flow controlled.
                     QPID_PROBE4(asynchio_read_finished_flowcontrolled, &h, duration, total, readCalls);
                     break;
                 }
 
+=======
+                int64_t duration = Duration(readStartTime, AbsTime::now());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 if (rc != readCount) {
                     // If we didn't fill the read buffer then time to stop reading
                     QPID_PROBE4(asynchio_read_finished_done, &h, duration, total, readCalls);
@@ -469,7 +607,11 @@ void AsynchIO::readable(DispatchHandle& h) {
                 bufferQueue.push_front(buff);
                 assert(buff);
 
+<<<<<<< HEAD
                 QPID_PROBE5(asynchio_read_finished_error, &h, duration, total, readCalls, errno);
+=======
+                QPID_PROBE5(asynchio_read_finished_error, &h, Duration(readStartTime, AbsTime::now()), total, readCalls, errno);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 // Eof or other side has gone away
                 if (rc == 0 || errno == ECONNRESET) {
                     eofCallback(*this);
@@ -617,6 +759,16 @@ void AsynchIO::close(DispatchHandle& h) {
     }
 }
 
+<<<<<<< HEAD
+=======
+SecuritySettings AsynchIO::getSecuritySettings() {
+    SecuritySettings settings;
+    settings.ssf = socket.getKeyLen();
+    settings.authid = socket.getClientAuthId();
+    return settings;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 } // namespace posix
 
 AsynchAcceptor* AsynchAcceptor::create(const Socket& s, 

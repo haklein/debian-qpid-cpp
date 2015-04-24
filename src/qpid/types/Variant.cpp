@@ -20,6 +20,10 @@
  */
 #include "qpid/types/Variant.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
+=======
+#include "encodings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
@@ -36,6 +40,10 @@ const std::string PREFIX("invalid conversion: ");
 }
 
 InvalidConversion::InvalidConversion(const std::string& msg) : Exception(PREFIX + msg) {}
+<<<<<<< HEAD
+=======
+InvalidConversion::~InvalidConversion() throw() {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 class VariantImpl
 {
@@ -110,6 +118,7 @@ class VariantImpl
     } value;
     std::string encoding;//optional encoding for variable length data
 
+<<<<<<< HEAD
     template<class T> T convertFromString() const
     {
         const std::string& s = *value.string;
@@ -120,11 +129,33 @@ class VariantImpl
             //else its a non-zero negative number so throw exception at end of function
             if (std::numeric_limits<T>::is_signed || s.find('-') != 0 || r == 0) {
                 return r;
+=======
+  template<class T> T convertFromString() const
+    {
+        const std::string& s = *value.string;
+
+        try {
+            // Extra shenanigans to work around negative zero
+            // conversion error in older GCC libs.
+            if ( s[0] != '-' ) {
+                return boost::lexical_cast<T>(s);
+            } else {
+                T r = boost::lexical_cast<T>(s.substr(1));
+                if (std::numeric_limits<T>::is_signed) {
+                    return -r;
+                } else {
+                    if (r==0) return 0;
+                }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         } catch(const boost::bad_lexical_cast&) {
         }
         throw InvalidConversion(QPID_MSG("Cannot convert " << s));
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 
@@ -179,6 +210,7 @@ bool caseInsensitiveMatch(const std::string& a, const std::string& b)
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), &same_char);
 }
 
+<<<<<<< HEAD
 const std::string TRUE("True");
 const std::string FALSE("False");
 
@@ -186,6 +218,15 @@ bool toBool(const std::string& s)
 {
     if (caseInsensitiveMatch(s, TRUE)) return true;
     if (caseInsensitiveMatch(s, FALSE)) return false;
+=======
+const std::string TRUE_STRING("True");
+const std::string FALSE_STRING("False");
+
+bool toBool(const std::string& s)
+{
+    if (caseInsensitiveMatch(s, TRUE_STRING)) return true;
+    if (caseInsensitiveMatch(s, FALSE_STRING)) return false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     try { return boost::lexical_cast<int>(s); } catch(const boost::bad_lexical_cast&) {}
     throw InvalidConversion(QPID_MSG("Cannot convert " << s << " to bool"));
 }
@@ -485,7 +526,11 @@ std::string VariantImpl::asString() const
 {
     switch(type) {
       case VAR_VOID: return EMPTY;
+<<<<<<< HEAD
       case VAR_BOOL: return value.b ? TRUE : FALSE;
+=======
+      case VAR_BOOL: return value.b ? TRUE_STRING : FALSE_STRING;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       case VAR_UINT8: return boost::lexical_cast<std::string>((int) value.ui8);
       case VAR_UINT16: return boost::lexical_cast<std::string>(value.ui16);
       case VAR_UINT32: return boost::lexical_cast<std::string>(value.ui32);
@@ -650,7 +695,11 @@ VariantImpl* VariantImpl::create(const Variant& v)
     }
 }
 
+<<<<<<< HEAD
 Variant::Variant() : impl(0) {}
+=======
+Variant::Variant() : impl(new VariantImpl()) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Variant::Variant(bool b) : impl(new VariantImpl(b)) {}
 Variant::Variant(uint8_t i) : impl(new VariantImpl(i)) {}
 Variant::Variant(uint16_t i) : impl(new VariantImpl(i)) {}
@@ -797,11 +846,21 @@ Variant& Variant::parse(const std::string& s)
         return operator=(asInt64());
     } catch (const InvalidConversion&) {}
     try {
+<<<<<<< HEAD
+=======
+        return operator=(asUint64());
+    } catch (const InvalidConversion&) {}
+    try {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return operator=(asDouble());
     } catch (const InvalidConversion&) {}
     try {
         return operator=(asBool());
     } catch (const InvalidConversion&) {}
+<<<<<<< HEAD
+=======
+    setEncoding(qpid::types::encodings::UTF8);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return *this;
 }
 
@@ -893,6 +952,11 @@ bool operator==(const Variant& a, const Variant& b)
     return a.isEqualTo(b);
 }
 
+<<<<<<< HEAD
+=======
+bool operator!=(const Variant& a, const Variant& b) { return !(a == b); }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool Variant::isEqualTo(const Variant& other) const
 {
     return impl && impl->isEqualTo(*other.impl);

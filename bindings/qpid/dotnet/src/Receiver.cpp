@@ -29,6 +29,10 @@
 #include "qpid/messaging/exceptions.h"
 
 #include "Receiver.h"
+<<<<<<< HEAD
+=======
+#include "Address.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "Session.h"
 #include "Message.h"
 #include "Duration.h"
@@ -53,8 +57,13 @@ namespace Messaging {
 
     // unmanaged clone
     Receiver::Receiver(const ::qpid::messaging::Receiver & r,
+<<<<<<< HEAD
         Org::Apache::Qpid::Messaging::Session ^ sessRef) :
     parentSession(sessRef)
+=======
+        Org::Apache::Qpid::Messaging::Session ^ sessRef)
+        : parentSession(sessRef)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Exception ^ newException = nullptr;
 
@@ -102,8 +111,13 @@ namespace Messaging {
 
 
     // Copy constructor look-alike (C#)
+<<<<<<< HEAD
     Receiver::Receiver(const Receiver ^ receiver) :
     parentSession(receiver->parentSession)
+=======
+    Receiver::Receiver(const Receiver ^ receiver)
+        : parentSession(receiver->parentSession)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Exception ^ newException = nullptr;
 
@@ -126,8 +140,13 @@ namespace Messaging {
     }
 
     // Copy constructor implicitly dereferenced (C++)
+<<<<<<< HEAD
     Receiver::Receiver(const Receiver % receiver) :
     parentSession(receiver.parentSession)
+=======
+    Receiver::Receiver(const Receiver % receiver)
+        : parentSession(receiver.parentSession)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Exception ^ newException = nullptr;
 
@@ -344,9 +363,81 @@ namespace Messaging {
 
     void Receiver::Close()
     {
+<<<<<<< HEAD
         msclr::lock lk(privateLock);
         ThrowIfDisposed();
 
         nativeObjPtr->close();
+=======
+        System::Exception         ^ newException = nullptr;
+        Message                   ^ newMessage   = nullptr;
+
+        try
+        {
+            msclr::lock lk(privateLock);
+            ThrowIfDisposed();
+
+            nativeObjPtr->close();
+        }
+        catch (const ::qpid::types::Exception & error)
+        {
+            String ^ errmsg = gcnew String(error.what());
+            newException    = gcnew QpidException(errmsg);
+        }
+        finally
+        {
+            if (newException != nullptr)
+            {
+                if (newMessage != nullptr)
+                {
+                    delete newMessage;
+                }
+            }
+        }
+        if (newException != nullptr)
+        {
+            throw newException;
+        }
+    }
+
+    Org::Apache::Qpid::Messaging::Address ^ Receiver::GetAddress()
+    {
+        msclr::lock lk(privateLock);
+        ThrowIfDisposed();
+
+        System::Exception           ^ newException = nullptr;
+        Messaging::Address          ^ newAddress   = nullptr;
+
+        try
+        {
+            // fetch unmanaged Address
+            ::qpid::messaging::Address addr =
+                nativeObjPtr->getAddress();
+
+            // create a managed Address
+            newAddress = gcnew Address(addr);
+        }
+        catch (const ::qpid::types::Exception & error)
+        {
+            String ^ errmsg = gcnew String(error.what());
+            newException    = gcnew QpidException(errmsg);
+        }
+        finally
+        {
+            if (newException != nullptr)
+            {
+                if (newAddress != nullptr)
+                {
+                    delete newAddress;
+                }
+            }
+        }
+        if (newException != nullptr)
+        {
+            throw newException;
+        }
+
+        return newAddress;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }}}}

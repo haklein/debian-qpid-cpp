@@ -23,6 +23,10 @@
  */
 
 #include "qpid/broker/Broker.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/BrokerOptions.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/client/Connection.h"
 #include "qpid/client/ConnectionImpl.h"
 #include "qpid/client/Session.h"
@@ -42,15 +46,61 @@ namespace tests {
 struct  BrokerFixture : private boost::noncopyable {
     typedef qpid::broker::Broker Broker;
     typedef boost::intrusive_ptr<Broker> BrokerPtr;
+<<<<<<< HEAD
 
     BrokerPtr broker;
     qpid::sys::Thread brokerThread;
 
     BrokerFixture(Broker::Options opts=Broker::Options(), bool enableMgmt=false) {
+=======
+    typedef qpid::broker::BrokerOptions BrokerOptions;
+    typedef std::vector<std::string> Args;
+
+    BrokerPtr broker;
+    BrokerOptions opts;
+    uint16_t port;
+    qpid::sys::Thread brokerThread;
+
+    BrokerFixture(const Args& args=Args(), const BrokerOptions& opts0=BrokerOptions(),
+                  bool isExternalPort_=false, uint16_t externalPort_=0) :
+        opts(opts0)
+    {
+        init(args, isExternalPort_, externalPort_);
+    }
+
+    BrokerFixture(const BrokerOptions& opts0,
+                  bool isExternalPort_=false, uint16_t externalPort_=0) :
+        opts(opts0)
+    {
+        init(Args(), isExternalPort_, externalPort_);
+    }
+
+    void shutdownBroker() {
+        if (broker) {
+            broker->shutdown();
+            brokerThread.join();
+            broker = BrokerPtr();
+        }
+    }
+
+    ~BrokerFixture() {  shutdownBroker(); }
+
+    /** Open a connection to the broker. */
+    void open(qpid::client::Connection& c) {
+        c.open("localhost", getPort());
+    }
+
+    uint16_t getPort() { return port; }
+
+  private:
+    void init(const Args& args, bool isExternalPort=false, uint16_t externalPort=0)
+    {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         // Keep the tests quiet unless logging env. vars have been set by user.
         if (!::getenv("QPID_LOG_ENABLE") && !::getenv("QPID_TRACE")) {
             qpid::log::Options logOpts;
             logOpts.selectors.clear();
+<<<<<<< HEAD
             logOpts.selectors.push_back("error+");
             qpid::log::Logger::instance().configure(logOpts);
         }
@@ -60,11 +110,31 @@ struct  BrokerFixture : private boost::noncopyable {
         opts.workerThreads=1;
         opts.dataDir="";
         opts.auth=false;
+=======
+            logOpts.deselectors.clear();
+            logOpts.selectors.push_back("error+");
+            qpid::log::Logger::instance().configure(logOpts);
+        }
+        // Default options, may be over-ridden when we parse args.
+        opts.port=0;
+        opts.listenInterfaces.push_back("127.0.0.1");
+        opts.workerThreads=1;
+        opts.dataDir="";
+        opts.auth=false;
+
+        // Argument parsing
+        std::vector<const char*> argv(args.size());
+        for (size_t i = 0; i<args.size(); ++i)
+            argv[i] = args[i].c_str();
+        Plugin::addOptions(opts);
+        opts.parse(argv.size(), &argv[0]);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         broker = Broker::create(opts);
         // TODO aconway 2007-12-05: At one point BrokerFixture
         // tests could hang in Connection ctor if the following
         // line is removed. This may not be an issue anymore.
         broker->accept();
+<<<<<<< HEAD
         broker->getPort(qpid::broker::Broker::TCP_TRANSPORT);
         brokerThread = qpid::sys::Thread(*broker);
     };
@@ -85,6 +155,12 @@ struct  BrokerFixture : private boost::noncopyable {
     }
 
     uint16_t getPort() { return broker->getPort(qpid::broker::Broker::TCP_TRANSPORT); }
+=======
+        if (isExternalPort) port = externalPort;
+        else port = broker->getPort(qpid::broker::Broker::TCP_TRANSPORT);
+        brokerThread = qpid::sys::Thread(*broker);
+    };
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 /** Connection that opens in its constructor */
@@ -122,9 +198,15 @@ typedef ClientT<> Client;
 template <class ConnectionType, class SessionType=qpid::client::Session>
 struct  SessionFixtureT : BrokerFixture, ClientT<ConnectionType,SessionType> {
 
+<<<<<<< HEAD
     SessionFixtureT(Broker::Options opts=Broker::Options()) :
         BrokerFixture(opts),
         ClientT<ConnectionType,SessionType>(broker->getPort(qpid::broker::Broker::TCP_TRANSPORT))
+=======
+    SessionFixtureT(const BrokerOptions& opts=BrokerOptions()) :
+        BrokerFixture(BrokerFixture::Args(), opts),
+        ClientT<ConnectionType,SessionType>(getPort())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {}
 
 };

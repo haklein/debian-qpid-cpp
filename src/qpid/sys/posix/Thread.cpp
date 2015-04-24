@@ -55,11 +55,19 @@ Thread::Thread(Runnable* runnable) : impl(new ThreadPrivate(runnable)) {}
 Thread::Thread(Runnable& runnable) : impl(new ThreadPrivate(&runnable)) {}
 
 Thread::operator bool() {
+<<<<<<< HEAD
     return impl;
 }
 
 bool Thread::operator==(const Thread& t) const {
     return ::pthread_equal(impl->thread, t.impl->thread) != 0;
+=======
+    return !!impl;
+}
+
+bool Thread::operator==(const Thread& t) const {
+    return pthread_equal(impl->thread, t.impl->thread) != 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool Thread::operator!=(const Thread& t) const {

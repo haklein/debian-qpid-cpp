@@ -19,13 +19,17 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/IOHandle.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/windows/IoHandlePrivate.h"
 #include <windows.h>
 
 namespace qpid {
 namespace sys {
 
+<<<<<<< HEAD
 SOCKET toFd(const IOHandlePrivate* h)
 {
     return h->fd;
@@ -38,5 +42,7 @@ IOHandle::IOHandle(IOHandlePrivate* h) :
 IOHandle::~IOHandle() {
 	delete impl;
 }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 }} // namespace qpid::sys

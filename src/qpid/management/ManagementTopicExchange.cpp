@@ -35,19 +35,31 @@ ManagementTopicExchange::ManagementTopicExchange(const std::string& _name,
                                                  bool               _durable,
                                                  const FieldTable&  _args,
                                                  Manageable*        _parent, Broker* b) :
+<<<<<<< HEAD
     Exchange (_name, _durable, _args, _parent, b), 
     TopicExchange(_name, _durable, _args, _parent, b),
+=======
+    Exchange (_name, _durable, false, _args, _parent, b),
+    TopicExchange(_name, _durable, false, _args, _parent, b),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     managementAgent(0) {}
 
 void ManagementTopicExchange::route(Deliverable&      msg)
 {
     bool routeIt = true;
+<<<<<<< HEAD
     const std::string& routingKey = msg.getMessage().getRoutingKey();
     const FieldTable* args = msg.getMessage().getApplicationHeaders();
 
     // Intercept management agent commands
     if (managementAgent)
         routeIt = managementAgent->dispatchCommand(msg, routingKey, args, true, qmfVersion);
+=======
+
+    // Intercept management agent commands
+    if (managementAgent)
+        routeIt = managementAgent->dispatchCommand(msg, msg.getMessage().getRoutingKey(), 0/*args - TODO*/, true, qmfVersion);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if (routeIt)
         TopicExchange::route(msg);

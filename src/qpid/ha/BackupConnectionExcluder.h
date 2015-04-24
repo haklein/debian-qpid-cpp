@@ -22,6 +22,10 @@
  *
  */
 
+<<<<<<< HEAD
+=======
+#include "LogPrefix.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/ConnectionObserver.h"
 #include "qpid/broker/Connection.h"
 #include "qpid/log/Statement.h"
@@ -35,12 +39,25 @@ namespace ha {
 class BackupConnectionExcluder : public broker::ConnectionObserver
 {
   public:
+<<<<<<< HEAD
     void opened(broker::Connection& connection) {
         QPID_LOG(debug, "Backup: Rejected connection "+connection.getMgmtId());
+=======
+    BackupConnectionExcluder(const LogPrefix& lp) : logPrefix(lp) {}
+
+    void opened(broker::Connection& connection) {
+        QPID_LOG(trace, logPrefix << "Rejected connection "+connection.getMgmtId());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         connection.abort();
     }
 
     void closed(broker::Connection&) {}
+<<<<<<< HEAD
+=======
+
+  private:
+    const LogPrefix& logPrefix;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::ha

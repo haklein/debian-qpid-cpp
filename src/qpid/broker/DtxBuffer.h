@@ -27,7 +27,12 @@
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 class DtxBuffer : public TxBuffer{
+=======
+class DtxBuffer : public TxBuffer {
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     mutable sys::Mutex lock;
     const std::string xid;
     bool ended;
@@ -36,8 +41,11 @@ class DtxBuffer : public TxBuffer{
     bool expired;
 
   public:
+<<<<<<< HEAD
     typedef boost::shared_ptr<DtxBuffer> shared_ptr;
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_BROKER_EXTERN DtxBuffer(
         const std::string& xid = "",
         bool ended=false, bool suspended=false, bool failed=false, bool expired=false);

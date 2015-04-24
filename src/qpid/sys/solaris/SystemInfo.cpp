@@ -60,6 +60,7 @@ bool SystemInfo::getLocalHostname(Address &address) {
 static const string LOCALHOST("127.0.0.1");
 static const string TCP("tcp");
 
+<<<<<<< HEAD
 void SystemInfo::getLocalIpAddresses(uint16_t port,
                                      std::vector<Address> &addrList) {
     int s = socket(PF_INET, SOCK_STREAM, 0);
@@ -85,6 +86,8 @@ void SystemInfo::getLocalIpAddresses(uint16_t port,
     close (s);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void SystemInfo::getSystemId(std::string &osName,
                              std::string &nodeName,
                              std::string &release,
@@ -126,4 +129,13 @@ string SystemInfo::getProcessName()
     return value;
 }
 
+<<<<<<< HEAD
+=======
+// Always true.  Only Windows has exception cases.
+bool SystemInfo::threadSafeShutdown()
+{
+    return true;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::sys

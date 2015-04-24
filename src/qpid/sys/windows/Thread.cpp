@@ -27,6 +27,10 @@
 #include "qpid/sys/Thread.h"
 #include "qpid/sys/Runnable.h"
 #include "qpid/sys/windows/check.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/SystemInfo.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <process.h>
 #include <windows.h>
@@ -223,7 +227,11 @@ Thread::Thread(Runnable* runnable) : impl(ThreadPrivate::createThread(runnable))
 Thread::Thread(Runnable& runnable) : impl(ThreadPrivate::createThread(&runnable)) {}
 
 Thread::operator bool() {
+<<<<<<< HEAD
     return impl;
+=======
+    return !!impl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool Thread::operator==(const Thread& t) const {
@@ -274,8 +282,22 @@ Thread Thread::current() {
 
 #ifdef _DLL
 
+<<<<<<< HEAD
 // DllMain: called possibly many times in a process lifetime if dll
 // loaded and freed repeatedly .  Be mindful of Windows loader lock
+=======
+namespace qpid {
+namespace sys {
+namespace windows {
+
+extern bool processExiting;
+extern bool libraryUnloading;
+
+}}} // namespace qpid::sys::SystemInfo
+
+// DllMain: called possibly many times in a process lifetime if dll
+// loaded and freed repeatedly.  Be mindful of Windows loader lock
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // and other DllMain restrictions.
 
 BOOL APIENTRY DllMain(HMODULE hm, DWORD reason, LPVOID reserved) {
@@ -290,10 +312,19 @@ BOOL APIENTRY DllMain(HMODULE hm, DWORD reason, LPVOID reserved) {
         if (reserved != NULL) {
             // process exit(): threads are stopped arbitrarily and
             // possibly in an inconsistent state.  Not even threadLock
+<<<<<<< HEAD
             // can be trusted.  All static destructors have been
             // called at this point and any resources this unit knows
             // about will be released as part of process tear down by
             // the OS.  Accordingly, do nothing.
+=======
+            // can be trusted.  All static destructors for this unit
+            // are pending and face the same unsafe environment.
+            // Any resources this unit knows about will be released as
+            // part of process tear down by the OS.  Accordingly, skip
+            // any clean up tasks.
+            qpid::sys::windows::processExiting = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             return TRUE;
         }
         else {
@@ -301,6 +332,10 @@ BOOL APIENTRY DllMain(HMODULE hm, DWORD reason, LPVOID reserved) {
             // encouraged to clean up to avoid leaks.  Mostly we just
             // want any straggler threads to finish and notify
             // threadsDone as the last thing they do.
+<<<<<<< HEAD
+=======
+            qpid::sys::windows::libraryUnloading = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             while (1) {
                 {
                     ScopedCriticalSection l(threadLock);

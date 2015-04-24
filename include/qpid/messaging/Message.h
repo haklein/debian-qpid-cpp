@@ -34,7 +34,11 @@ namespace messaging {
 
 class Address;
 class Codec;
+<<<<<<< HEAD
 struct MessageImpl;
+=======
+class MessageImpl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**   \ingroup messaging 
  * Representation of a message.
@@ -42,6 +46,10 @@ struct MessageImpl;
 class QPID_MESSAGING_CLASS_EXTERN Message
 {
   public:
+<<<<<<< HEAD
+=======
+    QPID_MESSAGING_EXTERN Message(qpid::types::Variant&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_MESSAGING_EXTERN Message(const std::string& bytes = std::string());
     QPID_MESSAGING_EXTERN Message(const char*, size_t);
     QPID_MESSAGING_EXTERN Message(const Message&);
@@ -148,6 +156,10 @@ class QPID_MESSAGING_CLASS_EXTERN Message
      */
     QPID_MESSAGING_EXTERN const qpid::types::Variant::Map& getProperties() const;
     QPID_MESSAGING_EXTERN qpid::types::Variant::Map& getProperties();
+<<<<<<< HEAD
+=======
+    QPID_MESSAGING_EXTERN void setProperties(const qpid::types::Variant::Map&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Set the content to the data held in the string parameter. Note:
@@ -164,6 +176,30 @@ class QPID_MESSAGING_CLASS_EXTERN Message
 
     /** Get the content as a std::string */
     QPID_MESSAGING_EXTERN std::string getContent() const;
+<<<<<<< HEAD
+=======
+    /** Get the content as raw bytes (an alias for getContent() */
+    QPID_MESSAGING_EXTERN std::string getContentBytes() const;
+    /** Set the content as raw bytes (an alias for setContent() */
+    QPID_MESSAGING_EXTERN void setContentBytes(const std::string&);
+    /**
+     * Get the content as a Variant, which can represent an object of
+     * different types. This can be used for content representing a
+     * map or a list for example.
+     */
+    QPID_MESSAGING_EXTERN qpid::types::Variant& getContentObject();
+    /**
+     * Get the content as a Variant, which can represent an object of
+     * different types. This can be used for content representing a
+     * map or a list for example.
+     */
+    QPID_MESSAGING_EXTERN const qpid::types::Variant& getContentObject() const;
+    /**
+     * Set the content using a Variant, which can represent an object
+     * of different types.
+     */
+    QPID_MESSAGING_EXTERN void setContentObject(const qpid::types::Variant&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /**
      * Get a const pointer to the start of the content data. The
      * memory pointed to is owned by the message. The getContentSize()

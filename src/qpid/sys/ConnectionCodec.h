@@ -52,7 +52,11 @@ class ConnectionCodec : public Codec {
 
         /** Return 0 if version unknown */
         virtual ConnectionCodec* create(
+<<<<<<< HEAD
             framing::ProtocolVersion, OutputControl&, const std::string& id,
+=======
+            const framing::ProtocolVersion&, OutputControl&, const std::string& id,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             const SecuritySettings&
         ) = 0;
 
@@ -60,6 +64,11 @@ class ConnectionCodec : public Codec {
         virtual ConnectionCodec* create(
             OutputControl&, const std::string& id, const SecuritySettings&
         ) = 0;
+<<<<<<< HEAD
+=======
+
+        virtual framing::ProtocolVersion supportedVersion() const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 };
 

@@ -26,8 +26,13 @@ REPEAT="--repeat 10"
 QUEUES="-q 6"
 SENDERS="-s 3"
 RECEIVERS="-r 3"
+<<<<<<< HEAD
 BROKERS=			# Local broker
 CLIENT_HOSTS=			# No ssh, all clients are local
+=======
+BROKERS= # Local broker
+CLIENT_HOSTS= # No ssh, all clients are local
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 # Connection options
 TCP_NODELAY=false
 RECONNECT=true
@@ -55,12 +60,18 @@ done
 shift $(($OPTIND-1))
 
 CONNECTION_OPTIONS="--connection-options {tcp-nodelay:$TCP_NODELAY,reconnect:$RECONNECT,heartbeat:$HEARTBEAT}"
+<<<<<<< HEAD
 CREATE_OPTIONS="node:{x-declare:{arguments:{'qpid.replicate':all}}}"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 BROKER=$(echo $BROKERS | sed s/,.*//)
 run_test() { echo $*; shift; "$@"; echo; echo; echo; }
 
 OPTS="$OPTS $REPEAT $BROKERS --summarize $QUEUES $SENDERS $RECEIVERS $MESSAGES $CLIENT_HOSTS $SAVE_RECEIVED $CONNECTION_OPTIONS $NO_DELETE"
+<<<<<<< HEAD
 OPTS="$OPTS --create-option $CREATE_OPTIONS"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 run_test "Benchmark:" qpid-cpp-benchmark $OPTS "$@"

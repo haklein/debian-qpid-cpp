@@ -64,8 +64,12 @@ struct  Args : public qpid::Options,
 
 uint64_t current_time()
 {
+<<<<<<< HEAD
     Duration t(EPOCH, now());
     return t;
+=======
+    return Duration::FromEpoch();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 class Listener : public MessageListener

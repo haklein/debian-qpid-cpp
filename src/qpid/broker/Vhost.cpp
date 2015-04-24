@@ -29,7 +29,11 @@ namespace qpid { namespace management {
 class Manageable;
 }}
 
+<<<<<<< HEAD
 Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker) : mgmtObject(0)
+=======
+Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (parentBroker != 0 && broker != 0)
     {
@@ -37,12 +41,24 @@ Vhost::Vhost (qpid::management::Manageable* parentBroker, Broker* broker) : mgmt
 
         if (agent != 0)
         {
+<<<<<<< HEAD
             mgmtObject = new _qmf::Vhost(agent, this, parentBroker, "/");
+=======
+            mgmtObject = _qmf::Vhost::shared_ptr(new _qmf::Vhost(agent, this, parentBroker, "/"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             agent->addObject(mgmtObject, 0, true);
         }
     }
 }
 
+<<<<<<< HEAD
+=======
+Vhost::~Vhost () {
+    if (mgmtObject != 0)
+        mgmtObject->debugStats("destroying");
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void Vhost::setFederationTag(const std::string& tag)
 {
     mgmtObject->set_federationTag(tag);

@@ -19,11 +19,19 @@
  *
  */
 #include "qpid/broker/Message.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/Protocol.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/AMQP_HighestVersion.h"
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/framing/Uuid.h"
+<<<<<<< HEAD
+=======
+#include "MessageUtils.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include "unit_test.h"
 
@@ -43,6 +51,7 @@ QPID_AUTO_TEST_CASE(testEncodeDecode)
 {
     string exchange = "MyExchange";
     string routingKey = "MyRoutingKey";
+<<<<<<< HEAD
     Uuid messageId(true);
     string data1("abcdefg");
     string data2("hijklmn");
@@ -86,6 +95,45 @@ QPID_AUTO_TEST_CASE(testEncodeDecode)
     BOOST_CHECK_EQUAL(string("xyz"), msg->getProperties<MessageProperties>()->getApplicationHeaders().getAsString("abc"));
     BOOST_CHECK_EQUAL((uint8_t) PERSISTENT, msg->getProperties<DeliveryProperties>()->getDeliveryMode());
     BOOST_CHECK(msg->isPersistent());
+=======
+    uint64_t ttl(60);
+    Uuid messageId(true);
+    string data("abcdefghijklmn");
+
+    qpid::types::Variant::Map properties;
+    properties["routing-key"] = routingKey;
+    properties["ttl"] = ttl;
+    properties["durable"] = true;
+    properties["message-id"] = qpid::types::Uuid(messageId.data());
+    properties["abc"] = "xyz";
+    Message msg = MessageUtils::createMessage(properties, data);
+
+    std::vector<char> bytes(msg.getPersistentContext()->encodedSize());
+    qpid::framing::Buffer buffer(&bytes[0], bytes.size());
+    msg.getPersistentContext()->encode(buffer);
+    buffer.reset();
+    ProtocolRegistry registry(std::set<std::string>(), 0);
+    msg = registry.decode(buffer);
+
+    BOOST_CHECK_EQUAL(routingKey, msg.getRoutingKey());
+    BOOST_CHECK_EQUAL((uint64_t) data.size(), msg.getContent().size());
+    BOOST_CHECK_EQUAL(data, msg.getContent());
+    //BOOST_CHECK_EQUAL(messageId, msg->getProperties<MessageProperties>()->getMessageId());
+    BOOST_CHECK_EQUAL(string("xyz"), msg.getPropertyAsString("abc"));
+    BOOST_CHECK(msg.isPersistent());
+}
+
+QPID_AUTO_TEST_CASE(testMessageProperties)
+{
+  string data("abcdefghijklmn");
+
+  qpid::types::Variant::Map properties;
+  properties["abc"] = "xyz";
+  Message msg = MessageUtils::createMessage(properties, data);
+
+  // Regression test that looking up a property doesn't return a prefix
+  BOOST_CHECK_EQUAL(msg.getProperty("abcdef").getType(), qpid::types::VAR_VOID);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_SUITE_END()

@@ -64,11 +64,20 @@ if (BUILD_RDMA)
 
   add_library (rdmawrap SHARED ${rdma_SOURCES})
   target_link_libraries (rdmawrap qpidcommon rdmacm ibverbs)
+<<<<<<< HEAD
   set_target_properties (rdmawrap PROPERTIES VERSION ${rdmawrap_version})
   if (CMAKE_COMPILER_IS_GNUCXX)
     set_target_properties(rdmawrap PROPERTIES
                           COMPILE_FLAGS -Wno-missing-field-initializers
                           LINK_FLAGS ${GCC_CATCH_UNDEFINED})
+=======
+  set_target_properties (rdmawrap PROPERTIES
+                         VERSION ${rdmawrap_version} 
+                         SOVERSION ${rdmawrap_version_major})
+  if (CMAKE_COMPILER_IS_GNUCXX)
+    set_target_properties(rdmawrap PROPERTIES
+                          COMPILE_FLAGS -Wno-missing-field-initializers)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   endif (CMAKE_COMPILER_IS_GNUCXX)
 
   install (TARGETS rdmawrap
@@ -76,14 +85,24 @@ if (BUILD_RDMA)
            COMPONENT ${QPID_COMPONENT_COMMON})
 
   add_library (rdma MODULE qpid/sys/RdmaIOPlugin.cpp)
+<<<<<<< HEAD
   target_link_libraries (rdma qpidbroker rdmawrap)
   set_target_properties (rdma PROPERTIES
+=======
+  target_link_libraries (rdma qpidbroker qpidcommon rdmawrap)
+  set_target_properties (rdma PROPERTIES
+                         COMPILE_DEFINITIONS _IN_QPID_BROKER
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                          PREFIX "")
 
   if (CMAKE_COMPILER_IS_GNUCXX)
     set_target_properties(rdma PROPERTIES
+<<<<<<< HEAD
                           COMPILE_FLAGS -Wno-missing-field-initializers
                           LINK_FLAGS ${GCC_CATCH_UNDEFINED})
+=======
+                          COMPILE_FLAGS -Wno-missing-field-initializers)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   endif (CMAKE_COMPILER_IS_GNUCXX)
 
   install (TARGETS rdma
@@ -91,14 +110,22 @@ if (BUILD_RDMA)
            COMPONENT ${QPID_COMPONENT_BROKER})
 
   add_library (rdmaconnector MODULE qpid/client/RdmaConnector.cpp)
+<<<<<<< HEAD
   target_link_libraries (rdmaconnector qpidclient rdmawrap)
+=======
+  target_link_libraries (rdmaconnector qpidclient qpidcommon rdmawrap)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   set_target_properties (rdmaconnector PROPERTIES
                          PREFIX "")
 
   if (CMAKE_COMPILER_IS_GNUCXX)
     set_target_properties(rdmaconnector PROPERTIES
+<<<<<<< HEAD
                           COMPILE_FLAGS -Wno-missing-field-initializers
                           LINK_FLAGS ${GCC_CATCH_UNDEFINED})
+=======
+                          COMPILE_FLAGS -Wno-missing-field-initializers)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   endif (CMAKE_COMPILER_IS_GNUCXX)
 
   install (TARGETS rdmaconnector

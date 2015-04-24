@@ -25,14 +25,24 @@
 #include "BrokerInfo.h"
 #include "Membership.h"
 #include "types.h"
+<<<<<<< HEAD
 #include "ReplicationTest.h"
 #include "Settings.h"
 #include "qpid/Url.h"
+=======
+#include "LogPrefix.h"
+#include "Settings.h"
+#include "qpid/Url.h"
+#include "FailoverExchange.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Mutex.h"
 #include "qmf/org/apache/qpid/ha/HaBroker.h"
 #include "qpid/management/Manageable.h"
 #include "qpid/types/Variant.h"
+<<<<<<< HEAD
 #include <memory>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <set>
 #include <boost/shared_ptr.hpp>
 
@@ -54,11 +64,23 @@ namespace ha {
 class Backup;
 class ConnectionObserver;
 class Primary;
+<<<<<<< HEAD
+=======
+class Role;
+class QueueReplicator;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * HA state and actions associated with a HA broker. Holds all the management info.
  *
  * THREAD SAFE: may be called in arbitrary broker IO or timer threads.
+<<<<<<< HEAD
+=======
+
+ * NOTE: HaBroker and Role subclasses follow this lock hierarchy:
+ * - HaBroker MUST NOT hold its own lock across calls Role subclasses.
+ * - Role subclasses MAY hold their locks accross calls to HaBroker.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  */
 class HaBroker : public management::Manageable
 {
@@ -71,12 +93,17 @@ class HaBroker : public management::Manageable
     void initialize();
 
     // Implement Manageable.
+<<<<<<< HEAD
     qpid::management::ManagementObject* GetManagementObject() const { return mgmtObject; }
+=======
+    qpid::management::ManagementObject::shared_ptr GetManagementObject() const { return mgmtObject; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     management::Manageable::status_t ManagementMethod (
         uint32_t methodId, management::Args& args, std::string& text);
 
     broker::Broker& getBroker() { return broker; }
     const Settings& getSettings() const { return settings; }
+<<<<<<< HEAD
 
     /** Shut down the broker. Caller should log a critical error message. */
     void shutdown();
@@ -131,6 +158,56 @@ class HaBroker : public management::Manageable
     BrokerInfo brokerInfo;
     Membership membership;
     ReplicationTest replicationTest;
+=======
+    boost::shared_ptr<Role> getRole() const {return role; }
+
+    /** Shut down the broker because of a critical error. */
+    void shutdown(const std::string& message);
+
+    BrokerStatus getStatus() const;
+    boost::shared_ptr<ConnectionObserver> getObserver() { return observer; }
+
+    BrokerInfo getBrokerInfo() const { return membership.getSelf(); }
+    Membership& getMembership() { return membership; }
+    types::Uuid getSystemId() const { return systemId; }
+
+    void setAddress(const Address&); // set self address from a self-connection
+
+    boost::shared_ptr<QueueReplicator> findQueueReplicator(const std::string& queueName);
+
+    /** Authenticated user ID for queue create/delete */
+    std::string getUserId() const { return userId; }
+
+    /** logPrefix is thread safe and used by other classes (Membership) */
+    LogPrefix logPrefix;
+
+  private:
+    class BrokerObserver;
+
+    void setPublicUrl(const Url&);
+    void setBrokerUrl(const Url&);
+    void updateClientUrl(sys::Mutex::ScopedLock&);
+
+    std::vector<Url> getKnownBrokers() const;
+
+    // Immutable members
+    const types::Uuid systemId;
+    const Settings settings;
+    const std::string userId;
+
+    // Member variables protected by lock
+    mutable sys::Mutex lock;
+    Url publicUrl, brokerUrl;
+    std::vector<Url> knownBrokers;
+
+    // Independently thread-safe member variables
+    broker::Broker& broker;
+    qmf::org::apache::qpid::ha::HaBroker::shared_ptr mgmtObject;
+    boost::shared_ptr<ConnectionObserver> observer; // Used by Backup and Primary
+    boost::shared_ptr<Role> role;
+    Membership membership;
+    boost::shared_ptr<FailoverExchange> failoverExchange;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::ha
 

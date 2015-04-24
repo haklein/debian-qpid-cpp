@@ -42,7 +42,11 @@ class Codec
 
 
     /** Encode into buffer, return number of bytes encoded */
+<<<<<<< HEAD
     virtual std::size_t encode(const char* buffer, std::size_t size) = 0;
+=======
+    virtual std::size_t encode(char* buffer, std::size_t size) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Return true if we have data to encode */
     virtual bool canEncode() = 0;

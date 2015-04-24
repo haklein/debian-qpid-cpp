@@ -30,6 +30,12 @@
 namespace qpid {
 namespace messaging {
 
+<<<<<<< HEAD
+=======
+//  Explicitly instantiate Handle superclass
+template class Handle<SessionImpl>;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 typedef PrivateImplRef<qpid::messaging::Session> PI;
 
 Session::Session(SessionImpl* impl) { PI::ctor(*this, impl); }

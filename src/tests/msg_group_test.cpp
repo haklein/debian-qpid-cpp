@@ -130,8 +130,12 @@ struct Options : public qpid::Options
             if (messages == 0) throw qpid::Exception("The message count cannot be zero.");
             qpid::log::Logger::instance().configure(log);
             if (help) {
+<<<<<<< HEAD
                 std::ostringstream msg;
                 std::cout << msg << *this << std::endl << std::endl
+=======
+                std::cout << *this << std::endl << std::endl
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                           << "Verifies the behavior of grouped messages." << std::endl;
                 return false;
             } else {

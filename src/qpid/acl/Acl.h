@@ -23,6 +23,10 @@
 
 
 #include "qpid/acl/AclReader.h"
+<<<<<<< HEAD
+=======
+#include "qpid/AclHost.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/RefCounted.h"
 #include "qpid/broker/AclModule.h"
 #include "qpid/management/Manageable.h"
@@ -43,12 +47,20 @@ class Connection;
 
 namespace acl {
 class ConnectionCounter;
+<<<<<<< HEAD
+=======
+class ResourceCounter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 struct AclValues {
     std::string aclFile;
     uint16_t    aclMaxConnectPerUser;
     uint16_t    aclMaxConnectPerIp;
     uint16_t    aclMaxConnectTotal;
+<<<<<<< HEAD
+=======
+    uint16_t    aclMaxQueuesPerUser;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 
@@ -60,10 +72,19 @@ private:
     broker::Broker*                      broker;
     bool                                 transferAcl;
     boost::shared_ptr<AclData>           data;
+<<<<<<< HEAD
     qmf::org::apache::qpid::acl::Acl*    mgmtObject; // mgnt owns lifecycle
     qpid::management::ManagementAgent*   agent;
     mutable qpid::sys::Mutex             dataLock;
     boost::shared_ptr<ConnectionCounter> connectionCounter;
+=======
+    qmf::org::apache::qpid::acl::Acl::shared_ptr mgmtObject;
+    qpid::management::ManagementAgent*   agent;
+    mutable qpid::sys::Mutex             dataLock;
+    boost::shared_ptr<ConnectionCounter> connectionCounter;
+    boost::shared_ptr<ResourceCounter>   resourceCounter;
+    bool                                 userRules;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 public:
     Acl (AclValues& av, broker::Broker& b);
@@ -72,11 +93,26 @@ public:
      * issue management counts and alerts for denied connections
      */
     void reportConnectLimit(const std::string user, const std::string addr);
+<<<<<<< HEAD
+=======
+    void reportQueueLimit(const std::string user, const std::string queueName);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     inline virtual bool doTransferAcl() {
         return transferAcl;
     };
 
+<<<<<<< HEAD
+=======
+    inline virtual uint16_t getMaxConnectTotal() {
+        return aclValues.aclMaxConnectTotal;
+    };
+
+    inline virtual bool userAclRules() {
+      return userRules;
+    };
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // create specilied authorise methods for cases that need faster matching as needed.
     virtual bool authorise(
         const std::string&               id,
@@ -92,9 +128,16 @@ public:
         const std::string&               ExchangeName,
         const std::string&               RoutingKey);
 
+<<<<<<< HEAD
     virtual bool approveConnection(const broker::Connection& connection);
 
     virtual void setUserId(const broker::Connection& connection, const std::string& username);
+=======
+    // Resource quota tracking
+    virtual bool approveConnection(const broker::Connection& connection);
+    virtual bool approveCreateQueue(const std::string& userId, const std::string& queueName);
+    virtual void recordDestroyQueue(const std::string& queueName);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     virtual ~Acl();
 private:
@@ -106,9 +149,16 @@ private:
         const std::string& name);
     bool readAclFile(std::string& errorText);
     bool readAclFile(std::string& aclFile, std::string& errorText);
+<<<<<<< HEAD
     Manageable::status_t lookup       (management::Args& args, std::string& text);
     Manageable::status_t lookupPublish(management::Args& args, std::string& text);
     virtual qpid::management::ManagementObject* GetManagementObject(void) const;
+=======
+    void loadEmptyAclRuleset();
+    Manageable::status_t lookup       (management::Args& args, std::string& text);
+    Manageable::status_t lookupPublish(management::Args& args, std::string& text);
+    virtual qpid::management::ManagementObject::shared_ptr GetManagementObject(void) const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual management::Manageable::status_t ManagementMethod (uint32_t methodId, management::Args& args, std::string& text);
 
 };

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Apache Qpid C++ 0.8 Release Notes
 --------------------------------
 
@@ -9,3 +10,14 @@ http://www.amqp.org/confluence/display/AMQP/AMQP+Specification
 
 Please take time to go through the README file provided with the
 distro to get a good understanding about build system etc.
+=======
+Apache Qpid Release Notes
+--------------------------------
+
+Please see: 
+
+http://qpid.apache.org/releases/
+
+for information about this release and other related Qpid component
+current and past releases.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

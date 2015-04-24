@@ -23,12 +23,20 @@
  */
 
 #include "qpid/broker/RecoverableMessage.h"
+<<<<<<< HEAD
+=======
+#include "qpid/types/Variant.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/shared_ptr.hpp>
 
 namespace qpid {
 namespace broker {
 
 class ExternalQueueStore;
+<<<<<<< HEAD
+=======
+struct QueueSettings;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * The interface through which messages are added back to queues on
@@ -49,7 +57,13 @@ public:
 
     virtual const std::string& getName() const = 0;
     virtual void setExternalQueueStore(ExternalQueueStore* inst) = 0;
+<<<<<<< HEAD
 	virtual ExternalQueueStore* getExternalQueueStore() const = 0;
+=======
+    virtual ExternalQueueStore* getExternalQueueStore() const = 0;
+    virtual const QueueSettings& getSettings() const = 0;
+    virtual void addArgument(const std::string& key, const qpid::types::Variant& value) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 };
 

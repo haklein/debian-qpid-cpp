@@ -20,6 +20,7 @@
  *
  */
 
+<<<<<<< HEAD
 
 #include "qpid/RefCounted.h"
 #include "qpid/Exception.h"
@@ -111,6 +112,13 @@ namespace acl {
 
 } // namespace acl
 
+=======
+#include "qpid/acl/AclLexer.h"
+#include <map>
+#include <string>
+
+namespace qpid {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace broker {
 
     class Connection;
@@ -121,9 +129,19 @@ namespace broker {
     public:
 
         // Some ACLs are invoked on every message transfer.
+<<<<<<< HEAD
         // doTransferAcl pervents time consuming ACL calls on a per-message basis.
         virtual bool doTransferAcl()=0;
 
+=======
+        // doTransferAcl prevents time consuming ACL calls on a per-message basis.
+        virtual bool doTransferAcl()=0;
+
+        virtual uint16_t getMaxConnectTotal()=0;
+
+        virtual bool userAclRules()=0;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         virtual bool authorise(
             const std::string&                    id,
             const acl::Action&                    action,
@@ -145,6 +163,7 @@ namespace broker {
          */
         virtual bool approveConnection (const Connection& connection)=0;
 
+<<<<<<< HEAD
         /** Change connection's counted userId
          */
         virtual void setUserId(const Connection& connection, const std::string& username)=0;
@@ -415,5 +434,15 @@ namespace acl {
 
 
 }} // namespace qpid::acl
+=======
+        /** Approve queue creation by counting per-user.
+         */
+        virtual bool approveCreateQueue(const std::string& userId, const std::string& queueName)=0;
+        virtual void recordDestroyQueue(const std::string& queueName)=0;
+
+        virtual ~AclModule() {};
+    };
+}} // namespace qpid::broker
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #endif // QPID_ACLMODULE_ACL_H

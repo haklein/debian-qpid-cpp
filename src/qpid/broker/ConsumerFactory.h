@@ -25,11 +25,21 @@
 // TODO aconway 2011-11-25: it's ugly exposing SemanticState::ConsumerImpl in public.
 // Refactor to use a more abstract interface.
 
+<<<<<<< HEAD
 #include "qpid/broker/SemanticState.h"
+=======
+#include <boost/shared_ptr.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
+=======
+class SemanticState;
+class SemanticStateConsumerImpl;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /**
  * Base class for consumer factoires. Plugins can register a
  * ConsumerFactory via Broker:: getConsumerFactories() Each time a
@@ -41,7 +51,11 @@ class ConsumerFactory
   public:
     virtual ~ConsumerFactory() {}
 
+<<<<<<< HEAD
     virtual boost::shared_ptr<SemanticState::ConsumerImpl> create(
+=======
+    virtual boost::shared_ptr<SemanticStateConsumerImpl> create(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         SemanticState* parent,
         const std::string& name, boost::shared_ptr<Queue> queue,
         bool ack, bool acquire, bool exclusive, const std::string& tag,

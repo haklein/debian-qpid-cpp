@@ -43,7 +43,11 @@ size_t SecureConnection::decode(const char* buffer, size_t size)
     }
 }
 
+<<<<<<< HEAD
 size_t SecureConnection::encode(const char* buffer, size_t size)
+=======
+size_t SecureConnection::encode(char* buffer, size_t size)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (secured) {
         return securityLayer->encode(buffer, size);

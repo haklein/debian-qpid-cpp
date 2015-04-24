@@ -37,8 +37,11 @@
 #cmakedefine QPIDC_MODULE_DIR "${QPIDC_MODULE_DIR}"
 #cmakedefine QPIDD_MODULE_DIR "${QPIDD_MODULE_DIR}"
 
+<<<<<<< HEAD
 #cmakedefine QPID_LIBEXEC_DIR "${QPID_LIBEXEC_DIR}"
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #define QPID_SHLIB_PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}"
 #define QPID_MODULE_PREFIX
 #cmakedefine QPID_DEBUG_POSTFIX "${QPID_DEBUG_POSTFIX}"
@@ -52,6 +55,7 @@
 #define QPID_SHLIB_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}"
 #define QPID_MODULE_SUFFIX "${CMAKE_SHARED_LIBRARY_SUFFIX}"
 
+<<<<<<< HEAD
 #cmakedefine QPID_HAS_CLOCK_GETTIME
 
 #cmakedefine BROKER_SASL_NAME "${BROKER_SASL_NAME}"
@@ -64,4 +68,17 @@
 #cmakedefine HAVE_LOG_AUTHPRIV
 #cmakedefine HAVE_LOG_FTP
 
+=======
+#define BROKER_SASL_NAME "${QPID_BROKER_SASL_NAME}"
+#cmakedefine HAVE_SASL ${HAVE_SASL}
+
+#cmakedefine HAVE_SYS_SDT_H ${HAVE_SYS_SDT_H}
+#cmakedefine HAVE_LOG_AUTHPRIV
+#cmakedefine HAVE_LOG_FTP
+#cmakedefine QPID_SIZE_T_DISTINCT
+#cmakedefine HAVE_PROTON_TRACER
+#cmakedefine USE_PROTON_TRANSPORT_CONDITION
+#cmakedefine HAVE_PROTON_EVENTS
+#cmakedefine NO_PROTON_DELIVERY_TAG_T
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #endif /* QPID_CONFIG_H */

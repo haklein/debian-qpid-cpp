@@ -19,6 +19,7 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/ProtocolFactory.h"
 #include "qpid/sys/AsynchIOHandler.h"
 #include "qpid/sys/AsynchIO.h"
@@ -32,10 +33,21 @@
 
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+=======
+#include "qpid/sys/TransportFactory.h"
+
+#include "qpid/Plugin.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/log/Statement.h"
+#include "qpid/sys/AsynchIO.h"
+#include "qpid/sys/Socket.h"
+#include "qpid/sys/SocketTransport.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace sys {
 
+<<<<<<< HEAD
 class Timer;
 
 class AsynchIOProtocolFactory : public ProtocolFactory {
@@ -78,6 +90,8 @@ static bool sslMultiplexEnabled(void)
     return false;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // Static instance to initialise plugin
 static class TCPIOPlugin : public Plugin {
     void earlyInitialize(Target&) {
@@ -87,6 +101,7 @@ static class TCPIOPlugin : public Plugin {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
         if (broker) {
+<<<<<<< HEAD
             const broker::Broker::Options& opts = broker->getOptions();
 
             // Check for SSL on the same port
@@ -105,10 +120,27 @@ static class TCPIOPlugin : public Plugin {
             }
 
             broker->registerProtocolFactory("tcp", protocolt);
+=======
+            uint16_t port = broker->getPortOption();
+            TransportAcceptor::shared_ptr ta;
+            if (broker->shouldListen("tcp")) {
+                SocketAcceptor* aa = new SocketAcceptor(broker->getTcpNoDelay(), false, broker->getMaxNegotiateTime(), broker->getTimer());
+                ta.reset(aa);
+                port = aa->listen(broker->getListenInterfaces(), port, broker->getConnectionBacklog(), &createSocket);
+                if ( port!=0 ) {
+                    QPID_LOG(notice, "Listening on TCP/TCP6 port " << port);
+                }
+            }
+
+            TransportConnector::shared_ptr tc(new SocketConnector(broker->getTcpNoDelay(), false, broker->getMaxNegotiateTime(), broker->getTimer(), &createSocket));
+
+            broker->registerTransport("tcp", ta, tc, port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 } tcpPlugin;
 
+<<<<<<< HEAD
 AsynchIOProtocolFactory::AsynchIOProtocolFactory(const std::string& host, const std::string& port,
                                                  int backlog, bool nodelay,
                                                  Timer& timer, uint32_t maxTime,
@@ -223,4 +255,6 @@ void AsynchIOProtocolFactory::connect(
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::sys

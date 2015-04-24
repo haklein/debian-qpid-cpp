@@ -19,17 +19,32 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/broker/Broker.h"
 #include <stdlib.h>
+=======
+#include "qpid/broker/BrokerOptions.h"
+#include <stdlib.h>
+#include <windows.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
 const std::string Broker::Options::DEFAULT_DATA_DIR_LOCATION("\\TEMP");
 const std::string Broker::Options::DEFAULT_DATA_DIR_NAME("\\QPIDD.DATA");
 
 std::string
 Broker::Options::getHome() {
+=======
+const std::string BrokerOptions::DEFAULT_DATA_DIR_LOCATION("\\TEMP");
+const std::string BrokerOptions::DEFAULT_DATA_DIR_NAME("\\QPIDD.DATA");
+const std::string BrokerOptions::DEFAULT_PAGED_QUEUE_DIR("\\PQ");
+
+std::string
+BrokerOptions::getHome() {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     std::string home;
 #ifdef _MSC_VER
     char home_c[MAX_PATH+1];

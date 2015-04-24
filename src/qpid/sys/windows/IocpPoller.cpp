@@ -22,7 +22,11 @@
 #include "qpid/sys/Poller.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/sys/Dispatcher.h"
+<<<<<<< HEAD
 
+=======
+#include "qpid/sys/IOHandle.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/windows/AsynchIoResult.h"
 #include "qpid/sys/windows/IoHandlePrivate.h"
 #include "qpid/sys/windows/check.h"
@@ -55,7 +59,11 @@ class PollerHandlePrivate {
 };
 
 PollerHandle::PollerHandle(const IOHandle& h) :
+<<<<<<< HEAD
   impl(new PollerHandlePrivate(toSocketHandle(static_cast<const Socket&>(h)), h.impl->event, h.impl->cbRequest))
+=======
+    impl(new PollerHandlePrivate(h.fd, h.event, h.cbRequest))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 PollerHandle::~PollerHandle() {

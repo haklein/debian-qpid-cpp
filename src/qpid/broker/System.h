@@ -35,7 +35,11 @@ class System : public management::Manageable
 {
   private:
 
+<<<<<<< HEAD
     qmf::org::apache::qpid::broker::System* mgmtObject;
+=======
+    qmf::org::apache::qpid::broker::System::shared_ptr mgmtObject;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::Uuid systemId;
     std::string osName, nodeName, release, version, machine;
 
@@ -45,7 +49,13 @@ class System : public management::Manageable
 
     System (std::string _dataDir, Broker* broker = 0);
 
+<<<<<<< HEAD
     management::ManagementObject* GetManagementObject (void) const
+=======
+    ~System ();
+
+    management::ManagementObject::shared_ptr GetManagementObject(void) const
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     { return mgmtObject; }
 
 

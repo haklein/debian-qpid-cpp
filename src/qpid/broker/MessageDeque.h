@@ -22,8 +22,12 @@
  *
  */
 #include "qpid/broker/Messages.h"
+<<<<<<< HEAD
 #include "qpid/broker/QueuedMessage.h"
 #include <deque>
+=======
+#include "qpid/broker/IndexedDeque.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace broker {
@@ -36,6 +40,7 @@ class MessageDeque : public Messages
   public:
     MessageDeque();
     size_t size();
+<<<<<<< HEAD
     bool deleted(const QueuedMessage&);
     void release(const QueuedMessage&);
     bool acquire(const framing::SequenceNumber&, QueuedMessage&);
@@ -61,6 +66,22 @@ class MessageDeque : public Messages
     size_t head;
 
     size_t index(const framing::SequenceNumber&);
+=======
+    bool deleted(const QueueCursor&);
+    void publish(const Message& added);
+    Message* next(QueueCursor&);
+    Message* release(const QueueCursor& cursor);
+    Message* find(const QueueCursor&);
+    Message* find(const framing::SequenceNumber&, QueueCursor*);
+
+    void foreach(Functor);
+
+    void resetCursors();
+
+  private:
+    typedef IndexedDeque<Message> Deque;
+    Deque messages;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::broker
 

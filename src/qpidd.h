@@ -21,7 +21,11 @@
 
 #include "qpid/Modules.h"
 #include "qpid/Options.h"
+<<<<<<< HEAD
 #include "qpid/broker/Broker.h"
+=======
+#include "qpid/broker/BrokerOptions.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Options.h"
 
 #include <memory>
@@ -37,9 +41,16 @@ namespace broker {
 struct BootstrapOptions : public qpid::Options {
     qpid::CommonOptions common;
     qpid::ModuleOptions module;
+<<<<<<< HEAD
     qpid::log::Options log;     
 
     BootstrapOptions(const char *argv0);
+=======
+    qpid::log::Options log;
+
+    BootstrapOptions(const char *argv0);
+    void usage() const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 // Each platform derives an options struct from QpiddOptionsPrivate, adding
@@ -57,7 +68,11 @@ protected:
 struct QpiddOptions : public qpid::Options {
     qpid::CommonOptions common;
     qpid::ModuleOptions module;
+<<<<<<< HEAD
     qpid::broker::Broker::Options broker;
+=======
+    qpid::broker::BrokerOptions broker;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     qpid::log::Options log;
     std::auto_ptr<QpiddOptionsPrivate> platform;
 

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 #ifndef QPID_CLUSTER_URLARRAY_H
 #define QPID_CLUSTER_URLARRAY_H
+=======
+#ifndef QPID_URLARRAY_H
+#define QPID_URLARRAY_H
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /*
  *
@@ -33,4 +38,8 @@ QPID_COMMON_EXTERN std::vector<Url> urlArrayToVector(const framing::Array& array
 QPID_COMMON_EXTERN framing::Array vectorToUrlArray(const std::vector<Url>& urls);
 } // namespace qpid
 
+<<<<<<< HEAD
 #endif  /* !QPID_CLUSTER_URLARRAY_H */
+=======
+#endif  /* !QPID_URLARRAY_H */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

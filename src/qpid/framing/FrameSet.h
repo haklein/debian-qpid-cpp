@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+#ifndef QPID_FRAMING_FRAMESET_H
+#define QPID_FRAMING_FRAMESET_H
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -7,9 +12,15 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
  * 
  *   http://www.apache.org/licenses/LICENSE-2.0
  * 
+=======
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,16 +29,26 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <string>
 #include "qpid/InlineVector.h"
 #include "qpid/framing/amqp_framing.h"
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/SequenceNumber.h"
+<<<<<<< HEAD
 #include "qpid/CommonImportExport.h"
 
 #ifndef _FrameSet_
 #define _FrameSet_
 
+=======
+#include "qpid/sys/Time.h"
+#include "qpid/CommonImportExport.h"
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace framing {
 
@@ -36,6 +57,7 @@ namespace framing {
  */
 class FrameSet
 {
+<<<<<<< HEAD
     typedef InlineVector<AMQFrame, 4> Frames;
     const SequenceNumber id;
     Frames parts;
@@ -44,6 +66,22 @@ class FrameSet
 
 public:
     typedef boost::shared_ptr<FrameSet> shared_ptr;
+=======
+public:
+    typedef InlineVector<AMQFrame, 4> Frames;
+
+private:
+    const SequenceNumber id;
+    Frames parts;
+    mutable uint64_t contentSize;
+    mutable bool recalculateSize;
+    qpid::sys::AbsTime received;
+
+public:
+    typedef boost::shared_ptr<FrameSet> shared_ptr;
+    typedef Frames::iterator iterator;
+    typedef Frames::const_iterator const_iterator;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     QPID_COMMON_EXTERN FrameSet(const SequenceNumber& id);
     QPID_COMMON_EXTERN FrameSet(const FrameSet&);
@@ -56,13 +94,23 @@ public:
     QPID_COMMON_EXTERN std::string getContent() const;
     QPID_COMMON_EXTERN bool hasContent() const;
 
+<<<<<<< HEAD
+=======
+    QPID_COMMON_EXTERN void setReceived();
+    QPID_COMMON_EXTERN bool hasExpired() const;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool isContentBearing() const;
 
     QPID_COMMON_EXTERN const AMQMethodBody* getMethod() const;
     QPID_COMMON_EXTERN AMQMethodBody* getMethod();
     QPID_COMMON_EXTERN const AMQHeaderBody* getHeaders() const;
     QPID_COMMON_EXTERN AMQHeaderBody* getHeaders();
+<<<<<<< HEAD
      
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     template <class T> bool isA() const {
         const AMQMethodBody* method = getMethod();
         return method && method->isA<T>();
@@ -71,12 +119,20 @@ public:
     template <class T> const T* as() const {
         const AMQMethodBody* method = getMethod();
         return (method && method->isA<T>()) ? dynamic_cast<const T*>(method) : 0;
+<<<<<<< HEAD
     }    
+=======
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     template <class T>  T* as()  {
         AMQMethodBody* method = getMethod();
         return (method && method->isA<T>()) ? dynamic_cast<T*>(method) : 0;
+<<<<<<< HEAD
     }    
+=======
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     template <class T> const T* getHeaderProperties() const {
         const AMQHeaderBody* header = getHeaders();
@@ -85,7 +141,11 @@ public:
 
     Frames::const_iterator begin() const { return parts.begin(); }
     Frames::const_iterator end() const { return parts.end(); }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const SequenceNumber& getId() const { return id; }
 
     template <class P> void remove(P predicate) {
@@ -117,4 +177,8 @@ public:
 }
 
 
+<<<<<<< HEAD
 #endif
+=======
+#endif /*!QPID_FRAMING_FRAMESET_H*/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

@@ -21,9 +21,16 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/CommonImportExport.h"
 
+=======
+#include "qpid/CommonImportExport.h"
+
+#include "qpid/sys/IntegerTypes.h"
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <string.h>
 
 #include <boost/function.hpp>
@@ -31,7 +38,12 @@
 
 namespace qpid {
 namespace sys {
+<<<<<<< HEAD
     
+=======
+
+struct SecuritySettings;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class Socket;
 class Poller;
 
@@ -56,6 +68,10 @@ class AsynchConnector {
 public:
     typedef boost::function1<void, const Socket&> ConnectedCallback;
     typedef boost::function3<void, const Socket&, int, const std::string&> FailedCallback;
+<<<<<<< HEAD
+=======
+    typedef boost::function1<void, AsynchConnector&> RequestCallback;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Call create() to allocate a new AsynchConnector object with the
     // specified poller, addressing, and callbacks.
@@ -70,14 +86,23 @@ public:
                                    FailedCallback failCb);
     virtual void start(boost::shared_ptr<Poller> poller) = 0;
     virtual void stop() {};
+<<<<<<< HEAD
+=======
+    virtual void requestCallback(RequestCallback) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 protected:
     AsynchConnector() {}
     virtual ~AsynchConnector() {}
 };
 
 struct AsynchIOBufferBase {
+<<<<<<< HEAD
     char* const bytes;
     const int32_t byteCount;
+=======
+    char* bytes;
+    int32_t byteCount;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     int32_t dataStart;
     int32_t dataCount;
     
@@ -134,20 +159,45 @@ public:
                             BuffersEmptyCallback eCb = 0,
                             IdleCallback iCb = 0);
 public:
+<<<<<<< HEAD
     virtual void queueForDeletion() = 0;
 
     virtual void start(boost::shared_ptr<Poller> poller) = 0;
+=======
+    /*
+     * Size of IO buffers - this is the maximum possible frame size + 1
+     */
+    const static uint32_t MaxBufferSize = 65536;
+
+    /*
+     * Number of IO buffers allocated - 1 for reading and 1 for writing.
+     */
+    const static uint32_t BufferCount = 2;
+
+    virtual void queueForDeletion() = 0;
+
+    virtual void start(boost::shared_ptr<Poller> poller) = 0;
+    virtual void createBuffers(uint32_t size = MaxBufferSize) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual void queueReadBuffer(BufferBase* buff) = 0;
     virtual void unread(BufferBase* buff) = 0;
     virtual void queueWrite(BufferBase* buff) = 0;
     virtual void notifyPendingWrite() = 0;
     virtual void queueWriteClose() = 0;
     virtual bool writeQueueEmpty() = 0;
+<<<<<<< HEAD
     virtual void startReading() = 0;
     virtual void stopReading() = 0;
     virtual void requestCallback(RequestCallback) = 0;
     virtual BufferBase* getQueuedBuffer() = 0;
 
+=======
+    virtual void requestCallback(RequestCallback) = 0;
+    virtual BufferBase* getQueuedBuffer() = 0;
+
+    virtual SecuritySettings getSecuritySettings() = 0;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 protected:
     // Derived class manages lifetime; must be constructed using the
     // static create() method. Deletes not allowed from outside.

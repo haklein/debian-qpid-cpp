@@ -18,5 +18,9 @@
 #
 
 INSTALL (FILES qpidd.1
+<<<<<<< HEAD
          DESTINATION ${QPID_MAN_DIR}/man1)
+=======
+         DESTINATION ${QPID_INSTALL_MANDIR}/man1)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 

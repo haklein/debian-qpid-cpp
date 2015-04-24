@@ -21,6 +21,11 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
+=======
+#include <string>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace sys {
 

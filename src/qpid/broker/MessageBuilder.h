@@ -26,10 +26,16 @@
 #include "qpid/framing/SequenceNumber.h"
 #include "qpid/RefCounted.h"
 
+<<<<<<< HEAD
+=======
+#include <string>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/intrusive_ptr.hpp>
 
 namespace qpid {
     namespace broker {
+<<<<<<< HEAD
         class Message;
         class MessageStore;
 
@@ -38,13 +44,29 @@ namespace qpid {
             QPID_BROKER_EXTERN MessageBuilder(MessageStore* const store);
             QPID_BROKER_EXTERN void handle(framing::AMQFrame& frame);
             boost::intrusive_ptr<Message> getMessage() { return message; }
+=======
+        namespace amqp_0_10 {
+        class MessageTransfer;
+        }
+
+        class QPID_BROKER_CLASS_EXTERN MessageBuilder : public framing::FrameHandler{
+        public:
+            QPID_BROKER_EXTERN MessageBuilder();
+            QPID_BROKER_EXTERN void handle(framing::AMQFrame& frame);
+            boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> getMessage();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             QPID_BROKER_EXTERN void start(const framing::SequenceNumber& id);
             void end();
         private:
             enum State {DORMANT, METHOD, HEADER, CONTENT};
             State state;
+<<<<<<< HEAD
             boost::intrusive_ptr<Message> message;
             MessageStore* const store;
+=======
+            boost::intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> message;
+            std::string exchange;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             void checkType(uint8_t expected, uint8_t actual);
         };

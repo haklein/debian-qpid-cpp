@@ -27,8 +27,11 @@
 namespace qpid {
 namespace log {
 
+<<<<<<< HEAD
 using namespace std;
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Options::Options(const std::string& argv0_, const std::string& name_) :
     qpid::Options(name_),
     argv0(argv0_),
@@ -45,6 +48,7 @@ Options::Options(const std::string& argv0_, const std::string& name_) :
 {
     selectors.push_back("notice+");
 
+<<<<<<< HEAD
     ostringstream levels;
     levels << LevelTraits::name(Level(0));
     for (int i = 1; i < LevelTraits::COUNT; ++i)
@@ -55,10 +59,13 @@ Options::Options(const std::string& argv0_, const std::string& name_) :
     for (int i = 1; i < CategoryTraits::COUNT; ++i)
         categories << " " << CategoryTraits::name(Category(i));
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     addOptions()
         ("trace,t", optValue(trace), "Enables all logging" )
         ("log-enable", optValue(selectors, "RULE"),
          ("Enables logging for selected levels and components. "
+<<<<<<< HEAD
           "RULE is in the form 'LEVEL[+][:PATTERN]' "
           "LEVEL is one of: \n\t "+levels.str()+"\n"
           "PATTERN is a function name or a catogory: \n\t "+categories.str()+"\n"
@@ -69,6 +76,35 @@ Options::Options(const std::string& argv0_, const std::string& name_) :
           "logs all category 'Broker' messages.\n"
           "\t'--log-enable debug:framing' "
           "logs debug messages from the framing namespace. "
+=======
+          "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
+          "LEVEL is one of: \n\t "+getLevels()+"\n"
+          "PATTERN is a logging category name, or a namespace-qualified "
+          "function name or name fragment. "
+          "Logging category names are: \n\t "+getCategories()+"\n"
+          "For example:\n"
+          "\t'--log-enable warning+'\n"
+          "logs all warning, error and critical messages.\n"
+          "\t'--log-enable trace+:Broker'\n"
+          "logs all category 'Broker' messages.\n"
+          "\t'--log-enable debug:framing'\n"
+          "logs debug messages from all functions with 'framing' in the namespace or function name.\n"
+          "This option can be used multiple times").c_str())
+        ("log-disable", optValue(deselectors, "RULE"),
+         ("Disables logging for selected levels and components. "
+          "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
+          "LEVEL is one of: \n\t "+getLevels()+"\n"
+          "PATTERN is a logging category name, or a namespace-qualified "
+          "function name or name fragment. "
+          "Logging category names are: \n\t "+getCategories()+"\n"
+          "For example:\n"
+          "\t'--log-disable warning-'\n"
+          "disables logging all warning, notice, info, debug, and trace messages.\n"
+          "\t'--log-disable trace:Broker'\n"
+          "disables all category 'Broker' trace messages.\n"
+          "\t'--log-disable debug-:qmf::'\n"
+          "disables logging debug and trace messages from all functions with 'qmf::' in the namespace.\n"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           "This option can be used multiple times").c_str())
         ("log-time", optValue(time, "yes|no"), "Include time in log messages")
         ("log-level", optValue(level,"yes|no"), "Include severity level in log messages")
@@ -77,7 +113,11 @@ Options::Options(const std::string& argv0_, const std::string& name_) :
         ("log-function", optValue(function,"yes|no"), "Include function signature in log messages")
         ("log-hires-timestamp", optValue(hiresTs,"yes|no"), "Use hi-resolution timestamps in log messages")
         ("log-category", optValue(category,"yes|no"), "Include category in log messages")
+<<<<<<< HEAD
         ("log-prefix", optValue(prefix,"STRING"), "Prefix to append to all log messages")
+=======
+        ("log-prefix", optValue(prefix,"STRING"), "Prefix to prepend to all log messages")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         ;
     add(*sinkOptions);
 }
@@ -87,6 +127,10 @@ Options::Options(const Options &o) :
     argv0(o.argv0),
     name(o.name),
     selectors(o.selectors),
+<<<<<<< HEAD
+=======
+    deselectors(o.deselectors),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     time(o.time),
     level(o.level),
     thread(o.thread),
@@ -106,6 +150,10 @@ Options& Options::operator=(const Options& x) {
         argv0 = x.argv0;
         name = x.name;
         selectors = x.selectors;
+<<<<<<< HEAD
+=======
+        deselectors = x.deselectors;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         time = x.time;
         level= x.level;
         thread = x.thread;
@@ -120,4 +168,25 @@ Options& Options::operator=(const Options& x) {
     return *this;
 }
 
+<<<<<<< HEAD
+=======
+std::string getLevels()
+{
+    std::ostringstream levels;
+    levels << LevelTraits::name(Level(0));
+    for (int i = 1; i < LevelTraits::COUNT; ++i)
+        levels << " " << LevelTraits::name(Level(i));
+    return levels.str();
+}
+
+std::string getCategories()
+{
+    std::ostringstream categories;
+    categories << CategoryTraits::name(Category(0));
+    for (int i = 1; i < CategoryTraits::COUNT; ++i)
+        categories << " " << CategoryTraits::name(Category(i));
+    return categories.str();
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::log

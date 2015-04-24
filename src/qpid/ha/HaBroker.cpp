@@ -22,13 +22,27 @@
 #include "BackupConnectionExcluder.h"
 #include "ConnectionObserver.h"
 #include "HaBroker.h"
+<<<<<<< HEAD
+=======
+#include "IdSetter.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "Primary.h"
 #include "QueueReplicator.h"
 #include "ReplicatingSubscription.h"
 #include "Settings.h"
+<<<<<<< HEAD
 #include "qpid/amqp_0_10/Codecs.h"
 #include "qpid/Exception.h"
 #include "qpid/broker/Broker.h"
+=======
+#include "StandAlone.h"
+#include "QueueSnapshot.h"
+#include "qpid/amqp_0_10/Codecs.h"
+#include "qpid/assert.h"
+#include "qpid/Exception.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerObserver.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/Link.h"
 #include "qpid/broker/Queue.h"
 #include "qpid/broker/SignalHandler.h"
@@ -41,7 +55,10 @@
 #include "qmf/org/apache/qpid/ha/ArgsHaBrokerReplicate.h"
 #include "qmf/org/apache/qpid/ha/ArgsHaBrokerSetBrokersUrl.h"
 #include "qmf/org/apache/qpid/ha/ArgsHaBrokerSetPublicUrl.h"
+<<<<<<< HEAD
 #include "qmf/org/apache/qpid/ha/EventMembersUpdate.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 #include <boost/shared_ptr.hpp>
 
@@ -54,6 +71,7 @@ using namespace std;
 using types::Variant;
 using types::Uuid;
 using sys::Mutex;
+<<<<<<< HEAD
 
 // Called in Plugin::earlyInitialize
 HaBroker::HaBroker(broker::Broker& b, const Settings& s)
@@ -66,20 +84,70 @@ HaBroker::HaBroker(broker::Broker& b, const Settings& s)
       status(STANDALONE),
       membership(systemId),
       replicationTest(s.replicateDefault.get())
+=======
+using boost::shared_ptr;
+using boost::dynamic_pointer_cast;
+
+// In a HaBroker we always need to add QueueSnapshot and IdSetter to each queue
+// because we don't know in advance which queues might be used for stand-alone
+// replication.
+//
+// TODO aconway 2013-12-13: Can we restrict this to queues identified as replicated?
+//
+class HaBroker::BrokerObserver : public broker::BrokerObserver {
+  public:
+    BrokerObserver(const LogPrefix& lp) : logPrefix(lp) {}
+
+    void queueCreate(const boost::shared_ptr<broker::Queue>& q) {
+        q->getObservers().add(boost::shared_ptr<QueueSnapshot>(new QueueSnapshot));
+        q->getMessageInterceptors().add(
+            boost::shared_ptr<IdSetter>(new IdSetter(logPrefix, q->getName())));
+    }
+
+  private:
+    const LogPrefix& logPrefix;
+};
+
+// Called in Plugin::earlyInitialize
+HaBroker::HaBroker(broker::Broker& b, const Settings& s)
+    : systemId(b.getSystem()->getSystemId().data()),
+      settings(s),
+      userId(s.username+"@"+b.getRealm()),
+      broker(b),
+      observer(new ConnectionObserver(*this, systemId)),
+      role(new StandAlone),
+      membership(BrokerInfo(systemId, STANDALONE), *this), // Sets logPrefix
+      failoverExchange(new FailoverExchange(*b.GetVhostObject(), b))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     // If we are joining a cluster we must start excluding clients now,
     // otherwise there's a window for a client to connect before we get to
     // initialize()
     if (settings.cluster) {
+<<<<<<< HEAD
         QPID_LOG(debug, logPrefix << "Rejecting client connections.");
         observer->setObserver(boost::shared_ptr<broker::ConnectionObserver>(
                               new BackupConnectionExcluder));
         broker.getConnectionObservers().add(observer);
     }
+=======
+        shared_ptr<broker::ConnectionObserver> excluder(new BackupConnectionExcluder(logPrefix));
+        observer->setObserver(excluder);
+        broker.getConnectionObservers().add(observer);
+        broker.getExchanges().registerExchange(failoverExchange);
+    }
+    broker.getBrokerObservers().add(boost::shared_ptr<BrokerObserver>(new BrokerObserver(logPrefix)));
+}
+
+namespace {
+const std::string NONE("none");
+bool isNone(const std::string& x) { return x.empty() || x == NONE; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 // Called in Plugin::initialize
 void HaBroker::initialize() {
+<<<<<<< HEAD
 
     // FIXME aconway 2012-07-19: assumes there's a TCP transport with a meaningful port.
     brokerInfo = BrokerInfo(
@@ -88,12 +156,19 @@ void HaBroker::initialize() {
         systemId);
 
     QPID_LOG(notice, logPrefix << "Initializing: " << brokerInfo);
+=======
+    if (settings.cluster) {
+        QPID_LOG(info, logPrefix << "Starting HA broker");
+        membership.setStatus(JOINING);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Set up the management object.
     ManagementAgent* ma = broker.getManagementAgent();
     if (settings.cluster && !ma)
         throw Exception("Cannot start HA: management is disabled");
     _qmf::Package  packageInit(ma);
+<<<<<<< HEAD
     mgmtObject = new _qmf::HaBroker(ma, this, "ha-broker");
     mgmtObject->set_replicateDefault(settings.replicateDefault.str());
     mgmtObject->set_systemId(systemId);
@@ -166,13 +241,50 @@ Manageable::status_t HaBroker::ManagementMethod (uint32_t methodId, Args& args, 
             case STANDALONE: break;
           }
           break;
+=======
+    mgmtObject = _qmf::HaBroker::shared_ptr(new _qmf::HaBroker(ma, this, "ha-broker"));
+    mgmtObject->set_replicateDefault(settings.replicateDefault.str());
+    mgmtObject->set_systemId(systemId);
+    ma->addObject(mgmtObject);
+    membership.setMgmtObject(mgmtObject);
+
+    // Register a factory for replicating subscriptions.
+    broker.getConsumerFactories().add(
+        shared_ptr<ReplicatingSubscription::Factory>(
+            new ReplicatingSubscription::Factory(*this)));
+
+    // If we are in a cluster, start as backup in joining state.
+    if (settings.cluster) {
+        assert(membership.getStatus() == JOINING);
+        role.reset(new Backup(*this, settings));
+        broker.getKnownBrokers = boost::bind(&HaBroker::getKnownBrokers, this);
+        if (!isNone(settings.publicUrl)) setPublicUrl(Url(settings.publicUrl));
+        if (!isNone(settings.brokerUrl)) setBrokerUrl(Url(settings.brokerUrl));
+    }
+}
+
+HaBroker::~HaBroker() {
+    broker.getConnectionObservers().remove(observer);
+}
+
+Manageable::status_t HaBroker::ManagementMethod (uint32_t methodId, Args& args, string&) {
+    switch (methodId) {
+      case _qmf::HaBroker::METHOD_PROMOTE: {
+        Role* r = role->promote();
+        if (r) role.reset(r);
+        break;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       }
       case _qmf::HaBroker::METHOD_SETBROKERSURL: {
           setBrokerUrl(Url(dynamic_cast<_qmf::ArgsHaBrokerSetBrokersUrl&>(args).i_url));
           break;
       }
       case _qmf::HaBroker::METHOD_SETPUBLICURL: {
+<<<<<<< HEAD
           setClientUrl(Url(dynamic_cast<_qmf::ArgsHaBrokerSetPublicUrl&>(args).i_url));
+=======
+          setPublicUrl(Url(dynamic_cast<_qmf::ArgsHaBrokerSetPublicUrl&>(args).i_url));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           break;
       }
       case _qmf::HaBroker::METHOD_REPLICATE: {
@@ -181,7 +293,11 @@ Manageable::status_t HaBroker::ManagementMethod (uint32_t methodId, Args& args, 
           QPID_LOG(debug, logPrefix << "Replicate individual queue "
                    << bq_args.i_queue << " from " << bq_args.i_broker);
 
+<<<<<<< HEAD
           boost::shared_ptr<broker::Queue> queue = broker.getQueues().get(bq_args.i_queue);
+=======
+          shared_ptr<broker::Queue> queue = broker.getQueues().get(bq_args.i_queue);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           Url url(bq_args.i_broker);
           string protocol = url[0].protocol.empty() ? "tcp" : url[0].protocol;
           Uuid uuid(true);
@@ -191,12 +307,19 @@ Manageable::status_t HaBroker::ManagementMethod (uint32_t methodId, Args& args, 
               false,              // durable
               settings.mechanism, settings.username, settings.password,
               false);           // no amq.failover - don't want to use client URL.
+<<<<<<< HEAD
           boost::shared_ptr<broker::Link> link = result.first;
           link->setUrl(url);
           // Create a queue replicator
           boost::shared_ptr<QueueReplicator> qr(
               new QueueReplicator(brokerInfo, queue, link));
           qr->activate();
+=======
+          shared_ptr<broker::Link> link = result.first;
+          link->setUrl(url);
+          // Create a queue replicator
+          shared_ptr<QueueReplicator> qr(QueueReplicator::create(*this, queue, link));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
           broker.getExchanges().registerExchange(qr);
           break;
       }
@@ -207,6 +330,7 @@ Manageable::status_t HaBroker::ManagementMethod (uint32_t methodId, Args& args, 
     return Manageable::STATUS_OK;
 }
 
+<<<<<<< HEAD
 void HaBroker::setClientUrl(const Url& url) {
     Mutex::ScopedLock l(lock);
     if (url.empty()) throw Exception("Invalid empty URL for HA client failover");
@@ -232,6 +356,27 @@ void HaBroker::setBrokerUrl(const Url& url) {
     if (backup.get()) backup->setBrokerUrl(brokerUrl);
     // Updating broker URL also updates defaulted client URL:
     if (clientUrl.empty()) updateClientUrl(l);
+=======
+void HaBroker::setPublicUrl(const Url& url) {
+    Mutex::ScopedLock l(lock);
+    publicUrl = url;
+    mgmtObject->set_publicUrl(url.str());
+    knownBrokers.clear();
+    knownBrokers.push_back(url);
+    vector<Url> urls(1, url);
+    failoverExchange->updateUrls(urls);
+    QPID_LOG(debug, logPrefix << "Public URL set to: " << url);
+}
+
+void HaBroker::setBrokerUrl(const Url& url) {
+    {
+        Mutex::ScopedLock l(lock);
+        brokerUrl = url;
+        mgmtObject->set_brokersUrl(brokerUrl.str());
+        QPID_LOG(info, logPrefix << "Brokers URL set to: " << url);
+    }
+    role->setBrokerUrl(url); // Oustside lock
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 std::vector<Url> HaBroker::getKnownBrokers() const {
@@ -239,6 +384,7 @@ std::vector<Url> HaBroker::getKnownBrokers() const {
     return knownBrokers;
 }
 
+<<<<<<< HEAD
 void HaBroker::shutdown() {
     QPID_LOG(critical, logPrefix << "Critical error, shutting down.");
     broker.shutdown();
@@ -349,6 +495,26 @@ void HaBroker::setLinkProperties(Mutex::ScopedLock&) {
         linkProperties.erase(ConnectionObserver::BACKUP_TAG);
     }
     broker.setLinkClientProperties(linkProperties);
+=======
+void HaBroker::shutdown(const std::string& message) {
+    QPID_LOG(critical, logPrefix << "Shutting down: " << message);
+    broker.shutdown();
+    throw Exception(message);
+}
+
+BrokerStatus HaBroker::getStatus() const {
+    return membership.getStatus();
+}
+
+void HaBroker::setAddress(const Address& a) {
+    QPID_LOG(info, logPrefix << "Set self address to: " << a);
+    membership.setSelfAddress(a);
+}
+
+boost::shared_ptr<QueueReplicator> HaBroker::findQueueReplicator(const std::string& queueName) {
+    return boost::dynamic_pointer_cast<QueueReplicator>(
+        broker.getExchanges().find(QueueReplicator::replicatorName(queueName)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::ha

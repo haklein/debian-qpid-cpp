@@ -21,19 +21,37 @@
 #ifndef _Deliverable_
 #define _Deliverable_
 
+<<<<<<< HEAD
 #include "qpid/broker/Message.h"
 
 namespace qpid {
     namespace broker {
         class Deliverable{
+=======
+#include "qpid/broker/AsyncCompletion.h"
+#include "qpid/sys/IntegerTypes.h"
+#include <boost/shared_ptr.hpp>
+
+namespace qpid {
+    namespace broker {
+        class Message;
+        class Queue;
+
+    class Deliverable : public AsyncCompletion {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         public:
             bool delivered;
             Deliverable() : delivered(false) {}
 
 	    virtual Message& getMessage() = 0;
+<<<<<<< HEAD
 	    
             virtual void deliverTo(const boost::shared_ptr<Queue>& queue) = 0;
             virtual uint64_t contentSize() { return 0; }
+=======
+
+            virtual void deliverTo(const boost::shared_ptr<Queue>& queue) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             virtual ~Deliverable(){}
         };
     }

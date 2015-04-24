@@ -29,7 +29,12 @@ namespace framing {
 class SequenceNumber;
 }
 namespace broker {
+<<<<<<< HEAD
 struct QueuedMessage;
+=======
+class Message;
+class QueueCursor;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * This interface abstracts out the access to the messages held for
@@ -39,8 +44,12 @@ struct QueuedMessage;
 class Messages
 {
   public:
+<<<<<<< HEAD
     typedef boost::function1<void, QueuedMessage&> Functor;
     typedef boost::function1<bool, QueuedMessage&> Predicate;
+=======
+    typedef boost::function1<void, Message&> Functor;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     virtual ~Messages() {}
     /**
@@ -51,6 +60,7 @@ class Messages
     /**
      * Called when a message is deleted from the queue.
      */
+<<<<<<< HEAD
     virtual bool deleted(const QueuedMessage&) = 0;
     /**
      * Releases an acquired message, making it available again.
@@ -106,10 +116,51 @@ class Messages
      *@pre Any messages with seq > n must already be dequeued.
      */
     virtual void setPosition(const framing::SequenceNumber& /*n*/) = 0;
+=======
+    virtual bool deleted(const QueueCursor&) = 0;
+    /**
+     * Makes a message available.
+     */
+    virtual void publish(const Message& added) = 0;
+    /**
+     * Retrieve the next message for the given cursor. A reference to
+     * the message is passed back via the second parameter.
+     *
+     * @return a pointer to the message if there is one, in which case
+     * the cursor that points to it is assigned to cursor; null
+     * otherwise.
+     */
+    virtual Message* next(QueueCursor& cursor) = 0;
+
+    /**
+     * Release the message i.e. return it to the available state
+     * unless it has already been deleted.
+     *
+     * @return a pointer to the Message if it is still in acquired state and
+     * hence can be released; null if it has already been deleted
+     */
+    virtual Message* release(const QueueCursor& cursor) = 0;
+    /**
+     * Find the message with the specified sequence number, returning
+     * a pointer if found, null otherwise. A cursor to the matched
+     * message can be passed back via the second parameter, regardless
+     * of whether the message is found, using this cursor to call
+     * next() will give the next message greater than position if one
+     * exists.
+     */
+    virtual Message* find(const framing::SequenceNumber&, QueueCursor*) = 0;
+
+    /**
+     * Find the message at the specified position, returning a pointer if
+     * found, null otherwise.
+     */
+    virtual Message* find(const QueueCursor&) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Apply, the functor to each message held
      */
+<<<<<<< HEAD
 
     virtual void foreach(Functor) = 0;
     /**
@@ -118,6 +169,9 @@ class Messages
      */
     virtual void removeIf(Predicate) = 0;
 
+=======
+    virtual void foreach(Functor) = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   private:
 };
 }} // namespace qpid::broker

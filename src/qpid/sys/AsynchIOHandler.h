@@ -48,17 +48,25 @@ class AsynchIOHandler : public OutputControl {
     AsynchIO* aio;
     ConnectionCodec::Factory* factory;
     ConnectionCodec* codec;
+<<<<<<< HEAD
     uint32_t reads;
     bool readError;
     bool isClient;
     AtomicValue<int32_t> readCredit;
     static const int32_t InfiniteCredit = -1;
     Mutex creditLock;
+=======
+    bool readError;
+    bool isClient;
+    bool nodict;
+    bool headerSent;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     boost::intrusive_ptr<sys::TimerTask> timeoutTimerTask;
 
     void write(const framing::ProtocolInitiation&);
 
   public:
+<<<<<<< HEAD
     QPID_COMMON_EXTERN AsynchIOHandler(const std::string& id, qpid::sys::ConnectionCodec::Factory* f );
     QPID_COMMON_EXTERN ~AsynchIOHandler();
     QPID_COMMON_EXTERN void init(AsynchIO* a, Timer& timer, uint32_t maxTime, int numBuffs);
@@ -69,6 +77,16 @@ class AsynchIOHandler : public OutputControl {
     QPID_COMMON_EXTERN void abort();
     QPID_COMMON_EXTERN void activateOutput();
     QPID_COMMON_EXTERN void giveReadCredit(int32_t credit);
+=======
+    QPID_COMMON_EXTERN AsynchIOHandler(const std::string& id, qpid::sys::ConnectionCodec::Factory* f, bool isClient, bool nodict);
+    QPID_COMMON_EXTERN ~AsynchIOHandler();
+    QPID_COMMON_EXTERN void init(AsynchIO* a, Timer& timer, uint32_t maxTime);
+
+    // Output side
+    QPID_COMMON_EXTERN void abort();
+    QPID_COMMON_EXTERN void connectionEstablished();
+    QPID_COMMON_EXTERN void activateOutput();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Input side
     QPID_COMMON_EXTERN void readbuff(AsynchIO& aio, AsynchIOBufferBase* buff);

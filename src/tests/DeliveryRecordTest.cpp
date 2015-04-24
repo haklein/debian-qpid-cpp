@@ -49,7 +49,11 @@ QPID_AUTO_TEST_CASE(testSort)
 
     list<DeliveryRecord> records;
     for (list<SequenceNumber>::iterator i = ids.begin(); i != ids.end(); i++) {
+<<<<<<< HEAD
         DeliveryRecord r(QueuedMessage(0), Queue::shared_ptr(), "tag", Consumer::shared_ptr(), false, false, false);
+=======
+        DeliveryRecord r(QueueCursor(CONSUMER), framing::SequenceNumber(), SequenceNumber(), Queue::shared_ptr(), "tag", Consumer::shared_ptr(), false, false, false);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         r.setId(*i);
         records.push_back(r);
     }

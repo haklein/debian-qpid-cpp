@@ -33,7 +33,11 @@ namespace qpid {
  * to the class that has mixed this in not the class itself (as that would sidestep
  * the reference counting)
  */
+<<<<<<< HEAD
 class RefCounted : boost::noncopyable {
+=======
+class RefCounted : private boost::noncopyable {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     mutable boost::detail::atomic_count count;
 
 public:

@@ -20,7 +20,11 @@
  */
 #include "qpid/amqp_0_10/Connection.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
 #include "qpid/amqp_0_10/exceptions.h"
+=======
+#include "qpid/framing/reply_exceptions.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/Buffer.h"
 #include "qpid/framing/ProtocolInitiation.h"
@@ -28,6 +32,10 @@
 namespace qpid {
 namespace amqp_0_10 {
 
+<<<<<<< HEAD
+=======
+using framing::InternalErrorException;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using sys::Mutex;
 
 Connection::Connection(sys::OutputControl& o, const std::string& id, bool _isClient)
@@ -49,11 +57,19 @@ size_t  Connection::decode(const char* buffer, size_t size) {
                 throw Exception(QPID_MSG("Unsupported version: " << pi
                                          << " supported version " << version));
             QPID_LOG(trace, "RECV [" << identifier << "]: INIT(" << pi << ")");
+<<<<<<< HEAD
         }
         initialized = true;
     }
     framing::AMQFrame frame;
     while(frame.decode(in)) {
+=======
+            initialized = true;
+        }
+    }
+    framing::AMQFrame frame;
+    while(!pushClosed && frame.decode(in)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(trace, "RECV [" << identifier << "]: " << frame);
          connection->received(frame);
     }
@@ -74,14 +90,22 @@ bool Connection::isClosed() const {
     return pushClosed && popClosed;
 }
 
+<<<<<<< HEAD
 size_t  Connection::encode(const char* buffer, size_t size) {
+=======
+size_t  Connection::encode(char* buffer, size_t size) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {   // Swap frameQueue data into workQueue to avoid holding lock while we encode.
         Mutex::ScopedLock l(frameQueueLock);
         if (popClosed) return 0; // Can't pop any more frames.
         assert(workQueue.empty());
         workQueue.swap(frameQueue);
     }
+<<<<<<< HEAD
     framing::Buffer out(const_cast<char*>(buffer), size);
+=======
+    framing::Buffer out(buffer, size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (!isClient && !initialized) {
         framing::ProtocolInitiation pi(getVersion());
         pi.encode(out);
@@ -118,8 +142,13 @@ size_t  Connection::encode(const char* buffer, size_t size) {
 }
 
 void Connection::abort() { output.abort(); }
+<<<<<<< HEAD
 void Connection::activateOutput() { output.activateOutput(); }
 void Connection::giveReadCredit(int32_t credit) { output.giveReadCredit(credit); }
+=======
+void Connection::connectionEstablished() { output.connectionEstablished(); }
+void Connection::activateOutput() { output.activateOutput(); }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void  Connection::close() {
     // No more frames can be pushed onto the queue.
@@ -132,7 +161,11 @@ void  Connection::closed() {
     connection->closed();
 }
 
+<<<<<<< HEAD
 void Connection::send(framing::AMQFrame& f) {
+=======
+void Connection::handle(framing::AMQFrame& f) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         Mutex::ScopedLock l(frameQueueLock);
 	if (!pushClosed)
@@ -146,6 +179,7 @@ framing::ProtocolVersion Connection::getVersion() const {
     return version;
 }
 
+<<<<<<< HEAD
 void Connection::setVersion(const framing::ProtocolVersion& v)  {
     version = v;
 }
@@ -155,4 +189,6 @@ size_t Connection::getBuffered() const {
     return buffered;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::amqp_0_10

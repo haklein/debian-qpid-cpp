@@ -28,6 +28,7 @@
 #include "qpid/management/ManagementObject.h"
 #include "qpid/broker/DeliverableMessage.h"
 #include "qpid/log/Statement.h"
+<<<<<<< HEAD
 #include <qpid/broker/Message.h>
 #include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/FieldValue.h"
@@ -35,6 +36,20 @@
 #include "qpid/sys/Thread.h"
 #include "qpid/broker/ConnectionState.h"
 #include "qpid/broker/AclModule.h"
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/framing/MessageTransferBody.h"
+#include "qpid/framing/FieldValue.h"
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+#include "qpid/sys/Time.h"
+#include "qpid/sys/Timer.h"
+#include "qpid/sys/Thread.h"
+#include "qpid/sys/PollableQueue.h"
+#include "qpid/broker/Connection.h"
+#include "qpid/broker/AclModule.h"
+#include "qpid/broker/Protocol.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/types/Variant.h"
 #include "qpid/types/Uuid.h"
 #include "qpid/framing/List.h"
@@ -45,6 +60,12 @@
 #include <sstream>
 #include <typeinfo>
 
+<<<<<<< HEAD
+=======
+#include <boost/bind.hpp>
+#include <boost/function.hpp>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace management {
 
@@ -61,6 +82,7 @@ namespace _qmf = qmf::org::apache::qpid::broker;
 
 
 namespace {
+<<<<<<< HEAD
     const string defaultVendorName("vendor");
     const string defaultProductName("product");
 
@@ -89,6 +111,80 @@ struct ScopedManagementContext
         setManagementExecutionContext(0);
     }
 };
+=======
+const size_t qmfV1BufferSize(65536);
+const string defaultVendorName("vendor");
+const string defaultProductName("product");
+
+// Create a valid binding key substring by
+// replacing all '.' chars with '_'
+const string keyifyNameStr(const string& name)
+{
+    string n2 = name;
+
+    size_t pos = n2.find('.');
+    while (pos != n2.npos) {
+        n2.replace(pos, 1, "_");
+        pos = n2.find('.', pos);
+    }
+    return n2;
+}
+
+struct ScopedManagementContext
+{
+    const Connection* context;
+
+    ScopedManagementContext(const Connection* p) : context(p)
+    {
+        if (p) setManagementExecutionContext(*p);
+    }
+
+    management::ObjectId getObjectId() const
+    {
+        return context ? context->getObjectId() : management::ObjectId();
+    }
+    std::string getUserId() const
+    {
+        return context ? context->getUserId() : std::string();
+    }
+    std::string getMgmtId() const
+    {
+        return context ? context->getMgmtId() : std::string();
+    }
+
+
+    ~ScopedManagementContext()
+    {
+        resetManagementExecutionContext();
+    }
+};
+
+typedef boost::function0<void> FireFunction;
+struct Periodic : public qpid::sys::TimerTask
+{
+    FireFunction fireFunction;
+    qpid::sys::Timer* timer;
+
+    Periodic (FireFunction f, qpid::sys::Timer* t, uint32_t seconds);
+    virtual ~Periodic ();
+    void fire ();
+};
+
+Periodic::Periodic (FireFunction f, qpid::sys::Timer* t, uint32_t _seconds)
+    : TimerTask(sys::Duration((_seconds ? _seconds : 1) * sys::TIME_SEC),
+                "ManagementAgent::periodicProcessing"),
+      fireFunction(f), timer(t) {}
+
+Periodic::~Periodic() {}
+
+void Periodic::fire()
+{
+    setupNextFire();
+    timer->add(this);
+    fireFunction();
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
@@ -112,19 +208,32 @@ ManagementAgent::RemoteAgent::~RemoteAgent ()
     QPID_LOG(debug, "Remote Agent removed bank=[" << brokerBank << "." << agentBank << "]");
     if (mgmtObject != 0) {
         mgmtObject->resourceDestroy();
+<<<<<<< HEAD
         agent.deleteObjectNowLH(mgmtObject->getObjectId());
         delete mgmtObject;
         mgmtObject = 0;
+=======
+        agent.deleteObjectNow(mgmtObject->getObjectId());
+        mgmtObject.reset();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 ManagementAgent::ManagementAgent (const bool qmfV1, const bool qmfV2) :
+<<<<<<< HEAD
     threadPoolSize(1), publish(true), interval(10), broker(0), timer(0),
     startTime(sys::now()),
     suppressed(false), disallowAllV1Methods(false),
     vendorNameKey(defaultVendorName), productNameKey(defaultProductName),
     qmf1Support(qmfV1), qmf2Support(qmfV2), maxReplyObjs(100),
     msgBuffer(MA_BUFFER_SIZE), memstat(0)
+=======
+    threadPoolSize(1), publish(true), interval(10), broker(0), timer(0), protocols(0),
+    startTime(sys::now()),
+    suppressed(false), disallowAllV1Methods(false),
+    vendorNameKey(defaultVendorName), productNameKey(defaultProductName),
+    qmf1Support(qmfV1), qmf2Support(qmfV2), maxReplyObjs(100)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     nextObjectId   = 1;
     brokerBank     = 1;
@@ -135,7 +244,11 @@ ManagementAgent::ManagementAgent (const bool qmfV1, const bool qmfV2) :
     attrMap["_vendor"] = defaultVendorName;
     attrMap["_product"] = defaultProductName;
 
+<<<<<<< HEAD
     memstat = new qmf::org::apache::qpid::broker::Memory(this, 0, "amqp-broker");
+=======
+    memstat = _qmf::Memory::shared_ptr(new qmf::org::apache::qpid::broker::Memory(this, 0, "amqp-broker"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     addObject(memstat, "amqp-broker");
 }
 
@@ -154,6 +267,7 @@ ManagementAgent::~ManagementAgent ()
         v2Direct.reset();
 
         remoteAgents.clear();
+<<<<<<< HEAD
 
         moveNewObjectsLH();
         for (ManagementObjectMap::iterator iter = managementObjects.begin ();
@@ -163,6 +277,8 @@ ManagementAgent::~ManagementAgent ()
             delete object;
         }
         managementObjects.clear();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -175,7 +291,17 @@ void ManagementAgent::configure(const string& _dataDir, bool _publish, uint16_t 
     broker         = _broker;
     threadPoolSize = _threads;
     ManagementObject::maxThreads = threadPoolSize;
+<<<<<<< HEAD
 
+=======
+    sendQueue.reset(
+        new EventQueue(boost::bind(&ManagementAgent::sendEvents, this, _1), broker->getPoller()));
+    sendQueue->start();
+    timer          = &broker->getTimer();
+    timer->add(new Periodic(boost::bind(&ManagementAgent::periodicProcessing, this), timer, interval));
+
+    protocols = &broker->getProtocolRegistry();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // Get from file or generate and save to file.
     if (dataDir.empty())
     {
@@ -217,6 +343,7 @@ void ManagementAgent::configure(const string& _dataDir, bool _publish, uint16_t 
     }
 }
 
+<<<<<<< HEAD
 void ManagementAgent::pluginsInitialized() {
     // Do this here so cluster plugin has the chance to set up the timer.
     timer          = &broker->getClusterTimer();
@@ -224,6 +351,8 @@ void ManagementAgent::pluginsInitialized() {
 }
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void ManagementAgent::setName(const string& vendor, const string& product, const string& instance)
 {
     if (vendor.find(':') != vendor.npos) {
@@ -244,6 +373,7 @@ void ManagementAgent::setName(const string& vendor, const string& product, const
     } else
         inst = instance;
 
+<<<<<<< HEAD
    name_address = vendor + ":" + product + ":" + inst;
    attrMap["_instance"] = inst;
    attrMap["_name"] = name_address;
@@ -251,6 +381,15 @@ void ManagementAgent::setName(const string& vendor, const string& product, const
    vendorNameKey = keyifyNameStr(vendor);
    productNameKey = keyifyNameStr(product);
    instanceNameKey = keyifyNameStr(inst);
+=======
+    name_address = vendor + ":" + product + ":" + inst;
+    attrMap["_instance"] = inst;
+    attrMap["_name"] = name_address;
+
+    vendorNameKey = keyifyNameStr(vendor);
+    productNameKey = keyifyNameStr(product);
+    instanceNameKey = keyifyNameStr(inst);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
@@ -315,11 +454,19 @@ void ManagementAgent::registerEvent (const string&  packageName,
 }
 
 // Deprecated:  V1 objects
+<<<<<<< HEAD
 ObjectId ManagementAgent::addObject(ManagementObject* object, uint64_t persistId, bool persistent)
+=======
+ObjectId ManagementAgent::addObject(ManagementObject::shared_ptr object, uint64_t persistId, bool persistent)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     uint16_t sequence;
     uint64_t objectNum;
 
+<<<<<<< HEAD
+=======
+    sys::Mutex::ScopedLock lock(addLock);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     sequence = persistent ? 0 : bootSequence;
     objectNum = persistId ? persistId : nextObjectId++;
 
@@ -328,17 +475,25 @@ ObjectId ManagementAgent::addObject(ManagementObject* object, uint64_t persistId
 
     object->setObjectId(objId);
 
+<<<<<<< HEAD
     {
         sys::Mutex::ScopedLock lock(addLock);
         newManagementObjects.push_back(object);
     }
+=======
+    newManagementObjects.push_back(object);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "Management object (V1) added: " << objId.getV2Key());
     return objId;
 }
 
 
 
+<<<<<<< HEAD
 ObjectId ManagementAgent::addObject(ManagementObject* object,
+=======
+ObjectId ManagementAgent::addObject(ManagementObject::shared_ptr object,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                     const string& key,
                                     bool persistent)
 {
@@ -368,25 +523,41 @@ void ManagementAgent::raiseEvent(const ManagementEvent& event, severity_t severi
         "emerg", "alert", "crit", "error", "warn",
         "note", "info", "debug"
     };
+<<<<<<< HEAD
     sys::Mutex::ScopedLock lock (userLock);
     uint8_t sev = (severity == SEV_DEFAULT) ? event.getSeverity() : (uint8_t) severity;
 
     if (qmf1Support) {
         Buffer outBuffer(eventBuffer, MA_BUFFER_SIZE);
         uint32_t outLen;
+=======
+    uint8_t sev = (severity == SEV_DEFAULT) ? event.getSeverity() : (uint8_t) severity;
+
+    if (qmf1Support) {
+        char buffer[qmfV1BufferSize];
+        Buffer outBuffer(buffer, qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         encodeHeader(outBuffer, 'e');
         outBuffer.putShortString(event.getPackageName());
         outBuffer.putShortString(event.getEventName());
         outBuffer.putBin128(event.getMd5Sum());
+<<<<<<< HEAD
         outBuffer.putLongLong(uint64_t(sys::Duration(sys::EPOCH, sys::now())));
+=======
+        outBuffer.putLongLong(sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         outBuffer.putOctet(sev);
         string sBuf;
         event.encode(sBuf);
         outBuffer.putRawData(sBuf);
+<<<<<<< HEAD
         outLen = MA_BUFFER_SIZE - outBuffer.available();
         outBuffer.reset();
         sendBufferLH(outBuffer, outLen, mExchange,
+=======
+        sendBuffer(outBuffer, mExchange,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                    "console.event.1.0." + event.getPackageName() + "." + event.getEventName());
         QPID_LOG(debug, "SEND raiseEvent (v1) class=" << event.getPackageName() << "." << event.getEventName());
     }
@@ -403,7 +574,11 @@ void ManagementAgent::raiseEvent(const ManagementEvent& event, severity_t severi
                                                event.getMd5Sum());
         event.mapEncode(values);
         map_["_values"] = values;
+<<<<<<< HEAD
         map_["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+=======
+        map_["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         map_["_severity"] = sev;
 
         headers["method"] = "indication";
@@ -425,11 +600,16 @@ void ManagementAgent::raiseEvent(const ManagementEvent& event, severity_t severi
         Variant::List list_;
         list_.push_back(map_);
         ListCodec::encode(list_, content);
+<<<<<<< HEAD
         sendBufferLH(content, "", headers, "amqp/list", v2Topic, key.str());
+=======
+        sendBuffer(content, "", headers, "amqp/list", v2Topic, key.str());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND raiseEvent (v2) class=" << event.getPackageName() << "." << event.getEventName());
     }
 }
 
+<<<<<<< HEAD
 ManagementAgent::Periodic::Periodic (ManagementAgent& _agent, uint32_t _seconds)
     : TimerTask(sys::Duration((_seconds ? _seconds : 1) * sys::TIME_SEC),
                 "ManagementAgent::periodicProcessing"),
@@ -444,6 +624,8 @@ void ManagementAgent::Periodic::fire()
     agent.periodicProcessing();
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void ManagementAgent::clientAdded (const string& routingKey)
 {
     sys::Mutex::ScopedLock lock(userLock);
@@ -479,17 +661,24 @@ void ManagementAgent::clientAdded (const string& routingKey)
     while (rkeys.size()) {
         char     localBuffer[16];
         Buffer   outBuffer(localBuffer, 16);
+<<<<<<< HEAD
         uint32_t outLen;
 
         encodeHeader(outBuffer, 'x');
         outLen = outBuffer.getPosition();
         outBuffer.reset();
         sendBufferLH(outBuffer, outLen, dExchange, rkeys.front());
+=======
+
+        encodeHeader(outBuffer, 'x');
+        sendBuffer(outBuffer, dExchange, rkeys.front());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND ConsoleAddedIndication to=" << rkeys.front());
         rkeys.pop_front();
     }
 }
 
+<<<<<<< HEAD
 void ManagementAgent::clusterUpdate() {
     // Called on all cluster memebers when a new member joins a cluster.
     // Set clientWasAdded so that on the next periodicProcessing we will do 
@@ -501,6 +690,8 @@ void ManagementAgent::clusterUpdate() {
     debugSnapshot("Cluster member joined");
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void ManagementAgent::encodeHeader (Buffer& buf, uint8_t opcode, uint32_t seq)
 {
     buf.putOctet ('A');
@@ -522,12 +713,18 @@ bool ManagementAgent::checkHeader (Buffer& buf, uint8_t *opcode, uint32_t *seq)
     return h1 == 'A' && h2 == 'M' && h3 == '2';
 }
 
+<<<<<<< HEAD
 // NOTE WELL: assumes userLock is held by caller (LH)
 // NOTE EVEN WELLER: drops this lock when delivering the message!!!
 void ManagementAgent::sendBufferLH(Buffer&  buf,
                                    uint32_t length,
                                    qpid::broker::Exchange::shared_ptr exchange,
                                    const string&  routingKey)
+=======
+void ManagementAgent::sendBuffer(Buffer&  buf,
+                                 qpid::broker::Exchange::shared_ptr exchange,
+                                 const string&  routingKey)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (suppressed) {
         QPID_LOG(debug, "Suppressing management message to " << routingKey);
@@ -535,11 +732,20 @@ void ManagementAgent::sendBufferLH(Buffer&  buf,
     }
     if (exchange.get() == 0) return;
 
+<<<<<<< HEAD
     intrusive_ptr<Message> msg(new Message());
+=======
+    intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> transfer(new qpid::broker::amqp_0_10::MessageTransfer());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AMQFrame method((MessageTransferBody(ProtocolVersion(), exchange->getName (), 0, 0)));
     AMQFrame header((AMQHeaderBody()));
     AMQFrame content((AMQContentBody()));
 
+<<<<<<< HEAD
+=======
+    size_t length = buf.getPosition();
+    buf.reset();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     content.castBody<AMQContentBody>()->decode(buf, length);
 
     method.setEof(false);
@@ -547,6 +753,7 @@ void ManagementAgent::sendBufferLH(Buffer&  buf,
     header.setEof(false);
     content.setBof(false);
 
+<<<<<<< HEAD
     msg->getFrames().append(method);
     msg->getFrames().append(header);
 
@@ -569,10 +776,28 @@ void ManagementAgent::sendBufferLH(Buffer&  buf,
             exchange->route(deliverable);
         } catch(exception&) {}
     }
+=======
+    transfer->getFrames().append(method);
+    transfer->getFrames().append(header);
+
+    MessageProperties* props =
+        transfer->getFrames().getHeaders()->get<MessageProperties>(true);
+    props->setContentLength(length);
+
+    DeliveryProperties* dp =
+        transfer->getFrames().getHeaders()->get<DeliveryProperties>(true);
+    dp->setRoutingKey(routingKey);
+
+    transfer->getFrames().append(content);
+    transfer->setIsManagementMessage(true);
+    Message msg(transfer, transfer);
+    sendQueue->push(make_pair(exchange, msg));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     buf.reset();
 }
 
 
+<<<<<<< HEAD
 void ManagementAgent::sendBufferLH(Buffer&  buf,
                                    uint32_t length,
                                    const string& exchange,
@@ -593,6 +818,25 @@ void ManagementAgent::sendBufferLH(const string& data,
                                    qpid::broker::Exchange::shared_ptr exchange,
                                    const string& routingKey,
                                    uint64_t ttl_msec)
+=======
+void ManagementAgent::sendBuffer(Buffer&  buf,
+                                 const string& exchange,
+                                 const string& routingKey)
+{
+    qpid::broker::Exchange::shared_ptr ex(broker->getExchanges().get(exchange));
+    if (ex.get() != 0)
+        sendBuffer(buf, ex, routingKey);
+}
+
+
+void ManagementAgent::sendBuffer(const string& data,
+                                 const string& cid,
+                                 const Variant::Map& headers,
+                                 const string& content_type,
+                                 qpid::broker::Exchange::shared_ptr exchange,
+                                 const string& routingKey,
+                                 uint64_t ttl_msec)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     Variant::Map::const_iterator i;
 
@@ -602,7 +846,11 @@ void ManagementAgent::sendBufferLH(const string& data,
     }
     if (exchange.get() == 0) return;
 
+<<<<<<< HEAD
     intrusive_ptr<Message> msg(new Message());
+=======
+    intrusive_ptr<qpid::broker::amqp_0_10::MessageTransfer> transfer(new qpid::broker::amqp_0_10::MessageTransfer);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AMQFrame method((MessageTransferBody(ProtocolVersion(), exchange->getName (), 0, 0)));
     AMQFrame header((AMQHeaderBody()));
     AMQFrame content((AMQContentBody(data)));
@@ -612,11 +860,19 @@ void ManagementAgent::sendBufferLH(const string& data,
     header.setEof(false);
     content.setBof(false);
 
+<<<<<<< HEAD
     msg->getFrames().append(method);
     msg->getFrames().append(header);
 
     MessageProperties* props =
         msg->getFrames().getHeaders()->get<MessageProperties>(true);
+=======
+    transfer->getFrames().append(method);
+    transfer->getFrames().append(header);
+
+    MessageProperties* props =
+        transfer->getFrames().getHeaders()->get<MessageProperties>(true);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     props->setContentLength(data.length());
     if (!cid.empty()) {
         props->setCorrelationId(cid);
@@ -625,6 +881,7 @@ void ManagementAgent::sendBufferLH(const string& data,
     props->setAppId("qmf2");
 
     for (i = headers.begin(); i != headers.end(); ++i) {
+<<<<<<< HEAD
         msg->insertCustomProperty(i->first, i->second.asString());
     }
 
@@ -660,12 +917,48 @@ void ManagementAgent::sendBufferLH(const string& data,
     qpid::broker::Exchange::shared_ptr ex(broker->getExchanges().get(exchange));
     if (ex.get() != 0)
         sendBufferLH(data, cid, headers, content_type, ex, routingKey, ttl_msec);
+=======
+        props->getApplicationHeaders().setString(i->first, i->second.asString());
+    }
+
+    DeliveryProperties* dp =
+        transfer->getFrames().getHeaders()->get<DeliveryProperties>(true);
+    dp->setRoutingKey(routingKey);
+    if (ttl_msec) {
+        dp->setTtl(ttl_msec);
+    }
+    transfer->getFrames().append(content);
+    transfer->computeRequiredCredit();
+    transfer->setIsManagementMessage(true);
+    transfer->computeExpiration();
+    Message msg(transfer, transfer);
+
+    sendQueue->push(make_pair(exchange, msg));
+}
+
+
+void ManagementAgent::sendBuffer(const string& data,
+                                 const string& cid,
+                                 const Variant::Map& headers,
+                                 const string& content_type,
+                                 const string& exchange,
+                                 const string& routingKey,
+                                 uint64_t ttl_msec)
+{
+    qpid::broker::Exchange::shared_ptr ex(broker->getExchanges().get(exchange));
+    if (ex.get() != 0)
+        sendBuffer(data, cid, headers, content_type, ex, routingKey, ttl_msec);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
 /** Objects that have been added since the last periodic poll are temporarily
  * saved in the newManagementObjects list.  This allows objects to be
+<<<<<<< HEAD
  * added without needing to block on the userLock (addLock is used instead).
+=======
+ * added without needing to block on the userLock (objectLock is used instead).
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * These new objects need to be integrated into the object database
  * (managementObjects) *before* they can be properly managed.  This routine
  * performs the integration.
@@ -675,34 +968,58 @@ void ManagementAgent::sendBufferLH(const string& data,
  * duplicate object ids.  To avoid clashes, don't put deleted objects
  * into the active object database.
  */
+<<<<<<< HEAD
 void ManagementAgent::moveNewObjectsLH()
 {
     sys::Mutex::ScopedLock lock (addLock);
     while (!newManagementObjects.empty()) {
         ManagementObject *object = newManagementObjects.back();
+=======
+void ManagementAgent::moveNewObjects()
+{
+    sys::Mutex::ScopedLock lock(addLock);
+    sys::Mutex::ScopedLock objLock (objectLock);
+    while (!newManagementObjects.empty()) {
+        ManagementObject::shared_ptr object = newManagementObjects.back();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         newManagementObjects.pop_back();
 
         if (object->isDeleted()) {
             DeletedObject::shared_ptr dptr(new DeletedObject(object, qmf1Support, qmf2Support));
             pendingDeletedObjs[dptr->getKey()].push_back(dptr);
+<<<<<<< HEAD
             delete object;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {    // add to active object list, check for duplicates.
             ObjectId oid = object->getObjectId();
             ManagementObjectMap::iterator destIter = managementObjects.find(oid);
             if (destIter != managementObjects.end()) {
                 // duplicate found.  It is OK if the old object has been marked
                 // deleted, just replace the old with the new.
+<<<<<<< HEAD
                 ManagementObject *oldObj = destIter->second;
                 if (oldObj->isDeleted()) {
                     DeletedObject::shared_ptr dptr(new DeletedObject(oldObj, qmf1Support, qmf2Support));
                     pendingDeletedObjs[dptr->getKey()].push_back(dptr);
                     delete oldObj;
                 } else {
+=======
+                ManagementObject::shared_ptr oldObj = destIter->second;
+                if (!oldObj->isDeleted()) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     // Duplicate non-deleted objects? This is a user error - oids must be unique.
                     // for now, leak the old object (safer than deleting - may still be referenced)
                     // and complain loudly...
                     QPID_LOG(error, "Detected two management objects with the same identifier: " << oid);
+<<<<<<< HEAD
                 }
+=======
+                    oldObj->resourceDestroy();
+                }
+                DeletedObject::shared_ptr dptr(new DeletedObject(oldObj, qmf1Support, qmf2Support));
+                pendingDeletedObjs[dptr->getKey()].push_back(dptr);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 // QPID-3666: be sure to replace the -index- also, as non-key members of
                 // the index object may be different for the new object!  So erase the
                 // entry, rather than []= assign here:
@@ -715,6 +1032,7 @@ void ManagementAgent::moveNewObjectsLH()
 
 void ManagementAgent::periodicProcessing (void)
 {
+<<<<<<< HEAD
 #define BUFSIZE   65536
 #define HEADROOM  4096
     debugSnapshot("Management agent periodic processing");
@@ -724,23 +1042,55 @@ void ManagementAgent::periodicProcessing (void)
     string sBuf;
 
     moveNewObjectsLH();
+=======
+#define HEADROOM  4096
+    debugSnapshot("Management agent periodic processing");
+    sys::Mutex::ScopedLock lock (userLock);
+    string              routingKey;
+    string sBuf;
+
+    moveNewObjects();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     //
     //  If we're publishing updates, get the latest memory statistics and uptime now
     //
     if (publish) {
         uint64_t uptime = sys::Duration(startTime, sys::now());
+<<<<<<< HEAD
         static_cast<_qmf::Broker*>(broker->GetManagementObject())->set_uptime(uptime);
         qpid::sys::MemStat::loadMemInfo(memstat);
+=======
+        boost::dynamic_pointer_cast<_qmf::Broker>(broker->GetManagementObject())->set_uptime(uptime);
+        qpid::sys::MemStat::loadMemInfo(memstat.get());
+    }
+
+    //
+    //  Use a copy of the management object map to avoid holding the objectLock
+    //
+    ManagementObjectVector localManagementObjects;
+    {
+        sys::Mutex::ScopedLock objLock(objectLock);
+        std::transform(managementObjects.begin(), managementObjects.end(),
+                       std::back_inserter(localManagementObjects),
+                       boost::bind(&ManagementObjectMap::value_type::second, _1));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     //
     //  Clear the been-here flag on all objects in the map.
     //
+<<<<<<< HEAD
     for (ManagementObjectMap::iterator iter = managementObjects.begin();
          iter != managementObjects.end();
          iter++) {
         ManagementObject* object = iter->second;
+=======
+    for (ManagementObjectVector::iterator iter = localManagementObjects.begin();
+         iter != localManagementObjects.end();
+         iter++) {
+        ManagementObject::shared_ptr object = *iter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         object->setFlags(0);
         if (clientWasAdded) {
             object->setForcePublish(true);
@@ -755,13 +1105,23 @@ void ManagementAgent::periodicProcessing (void)
     // if we sent the active update first, _then_ the delete update, clients
     // would incorrectly think the object was deleted.  See QPID-2997
     //
+<<<<<<< HEAD
     bool objectsDeleted = moveDeletedObjectsLH();
+=======
+    bool objectsDeleted = moveDeletedObjects();
+    PendingDeletedObjsMap localPendingDeletedObjs;
+    {
+        sys::Mutex::ScopedLock objLock(objectLock);
+        localPendingDeletedObjs.swap(pendingDeletedObjs);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     //
     // If we are not publishing updates, just clear the pending deletes.  There's no
     // need to tell anybody.
     //
     if (!publish)
+<<<<<<< HEAD
         pendingDeletedObjs.clear();
 
     if (!pendingDeletedObjs.empty()) {
@@ -771,6 +1131,15 @@ void ManagementAgent::periodicProcessing (void)
         pendingDeletedObjs.clear();
 
         for (PendingDeletedObjsMap::iterator mIter = tmp.begin(); mIter != tmp.end(); mIter++) {
+=======
+        localPendingDeletedObjs.clear();
+
+    ResizableBuffer msgBuffer(qmfV1BufferSize);
+    if (!localPendingDeletedObjs.empty()) {
+        for (PendingDeletedObjsMap::iterator mIter = localPendingDeletedObjs.begin();
+             mIter != localPendingDeletedObjs.end();
+             mIter++) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             std::string packageName;
             std::string className;
             msgBuffer.reset();
@@ -802,11 +1171,18 @@ void ManagementAgent::periodicProcessing (void)
                 }
                 if (v1Objs >= maxReplyObjs) {
                     v1Objs = 0;
+<<<<<<< HEAD
                     contentSize = msgBuffer.getSize();
                     stringstream key;
                     key << "console.obj.1.0." << packageName << "." << className;
                     msgBuffer.reset();
                     sendBufferLH(msgBuffer, contentSize, mExchange, key.str());   // UNLOCKS USERLOCK
+=======
+                    stringstream key;
+                    key << "console.obj.1.0." << packageName << "." << className;
+                    size_t contentSize = msgBuffer.getPosition();
+                    sendBuffer(msgBuffer, mExchange, key.str());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     QPID_LOG(debug, "SEND V1 Multicast ContentInd V1 (delete) to="
                              << key.str() << " len=" << contentSize);
                 }
@@ -835,7 +1211,11 @@ void ManagementAgent::periodicProcessing (void)
                             headers["qmf.content"] = "_data";
                             headers["qmf.agent"] = name_address;
 
+<<<<<<< HEAD
                             sendBufferLH(content, "", headers, "amqp/list", v2Topic, key.str());  // UNLOCKS USERLOCK
+=======
+                            sendBuffer(content, "", headers, "amqp/list", v2Topic, key.str(), 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                             QPID_LOG(debug, "SEND Multicast ContentInd V2 (delete) to=" << key.str() << " len=" << content.length());
                         }
                     }
@@ -845,11 +1225,18 @@ void ManagementAgent::periodicProcessing (void)
             // send any remaining objects...
 
             if (v1Objs) {
+<<<<<<< HEAD
                 contentSize = BUFSIZE - msgBuffer.available();
                 stringstream key;
                 key << "console.obj.1.0." << packageName << "." << className;
                 msgBuffer.reset();
                 sendBufferLH(msgBuffer, contentSize, mExchange, key.str());   // UNLOCKS USERLOCK
+=======
+                stringstream key;
+                key << "console.obj.1.0." << packageName << "." << className;
+                size_t contentSize = msgBuffer.getPosition();
+                sendBuffer(msgBuffer, mExchange, key.str());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 QPID_LOG(debug, "SEND V1 Multicast ContentInd V1 (delete) to=" << key.str() << " len=" << contentSize);
             }
 
@@ -872,7 +1259,11 @@ void ManagementAgent::periodicProcessing (void)
                     headers["qmf.content"] = "_data";
                     headers["qmf.agent"] = name_address;
 
+<<<<<<< HEAD
                     sendBufferLH(content, "", headers, "amqp/list", v2Topic, key.str());  // UNLOCKS USERLOCK
+=======
+                    sendBuffer(content, "", headers, "amqp/list", v2Topic, key.str(), 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     QPID_LOG(debug, "SEND Multicast ContentInd V2 (delete) to=" << key.str() << " len=" << content.length());
                 }
             }
@@ -880,9 +1271,13 @@ void ManagementAgent::periodicProcessing (void)
     }
 
     //
+<<<<<<< HEAD
     // Process the entire object map.  Remember: we drop the userLock each time we call
     // sendBuffer().  This allows the managementObjects map to be altered during the
     // sendBuffer() call, so always restart the search after a sendBuffer() call
+=======
+    // Process the entire object map.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     //
     // If publish is disabled, don't send any updates.
     //
@@ -892,6 +1287,7 @@ void ManagementAgent::periodicProcessing (void)
         uint32_t pcount;
         uint32_t scount;
         uint32_t v1Objs, v2Objs;
+<<<<<<< HEAD
         ManagementObjectMap::iterator baseIter;
         std::string packageName;
         std::string className;
@@ -900,6 +1296,16 @@ void ManagementAgent::periodicProcessing (void)
              baseIter != managementObjects.end();
              baseIter++) {
             ManagementObject* baseObject = baseIter->second;
+=======
+        ManagementObjectVector::iterator baseIter;
+        std::string packageName;
+        std::string className;
+
+        for (baseIter = localManagementObjects.begin();
+             baseIter != localManagementObjects.end();
+             baseIter++) {
+            ManagementObject::shared_ptr baseObject = *baseIter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             //
             //  Skip until we find a base object requiring processing...
             //
@@ -910,7 +1316,11 @@ void ManagementAgent::periodicProcessing (void)
             }
         }
 
+<<<<<<< HEAD
         if (baseIter == managementObjects.end())
+=======
+        if (baseIter == localManagementObjects.end())
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             break;  // done - all objects processed
 
         pcount = scount = 0;
@@ -919,12 +1329,21 @@ void ManagementAgent::periodicProcessing (void)
         list_.clear();
         msgBuffer.reset();
 
+<<<<<<< HEAD
         for (ManagementObjectMap::iterator iter = baseIter;
              iter != managementObjects.end();
              iter++) {
             msgBuffer.makeAvailable(HEADROOM); // Make sure there's buffer space
             ManagementObject* baseObject = baseIter->second;
             ManagementObject* object = iter->second;
+=======
+        for (ManagementObjectVector::iterator iter = baseIter;
+             iter != localManagementObjects.end();
+             iter++) {
+            msgBuffer.makeAvailable(HEADROOM); // Make sure there's buffer space
+            ManagementObject::shared_ptr baseObject = *baseIter;
+            ManagementObject::shared_ptr object = *iter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             bool send_stats, send_props;
             if (baseObject->isSameClass(*object) && object->getFlags() == 0) {
                 object->setFlags(1);
@@ -999,12 +1418,20 @@ void ManagementAgent::periodicProcessing (void)
 
         if (pcount || scount) {
             if (qmf1Support) {
+<<<<<<< HEAD
                 contentSize = BUFSIZE - msgBuffer.available();
                 if (contentSize > 0) {
                     stringstream key;
                     key << "console.obj.1.0." << packageName << "." << className;
                     msgBuffer.reset();
                     sendBufferLH(msgBuffer, contentSize, mExchange, key.str());   // UNLOCKS USERLOCK
+=======
+                if (msgBuffer.getPosition() > 0) {
+                    stringstream key;
+                    key << "console.obj.1.0." << packageName << "." << className;
+                    size_t contentSize = msgBuffer.getPosition();
+                    sendBuffer(msgBuffer, mExchange, key.str());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     QPID_LOG(debug, "SEND V1 Multicast ContentInd to=" << key.str()
                              << " props=" << pcount
                              << " stats=" << scount
@@ -1030,7 +1457,11 @@ void ManagementAgent::periodicProcessing (void)
                     headers["qmf.content"] = "_data";
                     headers["qmf.agent"] = name_address;
 
+<<<<<<< HEAD
                     sendBufferLH(content, "", headers, "amqp/list", v2Topic, key.str());  // UNLOCKS USERLOCK
+=======
+                    sendBuffer(content, "", headers, "amqp/list", v2Topic, key.str(), 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     QPID_LOG(debug, "SEND Multicast ContentInd to=" << key.str()
                              << " props=" << pcount
                              << " stats=" << scount
@@ -1040,11 +1471,19 @@ void ManagementAgent::periodicProcessing (void)
         }
     }  // end processing updates for all objects
 
+<<<<<<< HEAD
     if (objectsDeleted) deleteOrphanedAgentsLH();
+=======
+    if (objectsDeleted) {
+        sys::Mutex::ScopedLock lock (userLock);
+        deleteOrphanedAgentsLH();
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // heartbeat generation.  Note that heartbeats need to be sent even if publish is disabled.
 
     if (qmf1Support) {
+<<<<<<< HEAD
         uint32_t            contentSize;
         char                msgChars[BUFSIZE];
         Buffer msgBuffer(msgChars, BUFSIZE);
@@ -1055,6 +1494,15 @@ void ManagementAgent::periodicProcessing (void)
         msgBuffer.reset ();
         routingKey = "console.heartbeat.1.0";
         sendBufferLH(msgBuffer, contentSize, mExchange, routingKey);
+=======
+        char                msgChars[qmfV1BufferSize];
+        Buffer msgBuffer(msgChars, qmfV1BufferSize);
+        encodeHeader(msgBuffer, 'h');
+        msgBuffer.putLongLong(sys::Duration::FromEpoch());
+
+        routingKey = "console.heartbeat.1.0";
+        sendBuffer(msgBuffer, mExchange, routingKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND HeartbeatInd to=" << routingKey);
     }
 
@@ -1073,7 +1521,11 @@ void ManagementAgent::periodicProcessing (void)
         headers["qmf.agent"] = name_address;
 
         map["_values"] = attrMap;
+<<<<<<< HEAD
         map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+=======
+        map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         map["_values"].asMap()["_heartbeat_interval"] = interval;
         map["_values"].asMap()["_epoch"] = bootSequence;
 
@@ -1082,12 +1534,17 @@ void ManagementAgent::periodicProcessing (void)
 
         // Set TTL (in msecs) on outgoing heartbeat indications based on the interval
         // time to prevent stale heartbeats from getting to the consoles.
+<<<<<<< HEAD
         sendBufferLH(content, "", headers, "amqp/map", v2Topic, addr_key.str(), interval * 2 * 1000);
+=======
+        sendBuffer(content, "", headers, "amqp/map", v2Topic, addr_key.str(), interval * 2 * 1000);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         QPID_LOG(debug, "SENT AgentHeartbeat name=" << name_address);
     }
 }
 
+<<<<<<< HEAD
 void ManagementAgent::deleteObjectNowLH(const ObjectId& oid)
 {
     ManagementObjectMap::iterator iter = managementObjects.find(oid);
@@ -1099,6 +1556,22 @@ void ManagementAgent::deleteObjectNowLH(const ObjectId& oid)
 
     // since sendBufferLH drops the userLock, don't call it until we
     // are done manipulating the object.
+=======
+void ManagementAgent::deleteObjectNow(const ObjectId& oid)
+{
+    ManagementObject::shared_ptr object;
+    {
+        sys::Mutex::ScopedLock lock(objectLock);
+        ManagementObjectMap::iterator iter = managementObjects.find(oid);
+        if (iter == managementObjects.end())
+            return;
+        object = iter->second;
+        if (!object->isDeleted())
+            return;
+        managementObjects.erase(oid);
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #define DNOW_BUFSIZE 2048
     char     msgChars[DNOW_BUFSIZE];
     Buffer   msgBuffer(msgChars, DNOW_BUFSIZE);
@@ -1134,15 +1607,23 @@ void ManagementAgent::deleteObjectNowLH(const ObjectId& oid)
             v2key << "." << instanceNameKey;
     }
 
+<<<<<<< HEAD
     object = 0;
     managementObjects.erase(oid);
+=======
+    object.reset();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // object deleted, ok to drop lock now.
 
     if (publish && qmf1Support) {
+<<<<<<< HEAD
         uint32_t contentSize = msgBuffer.getPosition();
         msgBuffer.reset();
         sendBufferLH(msgBuffer, contentSize, mExchange, v1key.str());
+=======
+        sendBuffer(msgBuffer, mExchange, v1key.str());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND Immediate(delete) ContentInd to=" << v1key.str());
     }
 
@@ -1155,29 +1636,49 @@ void ManagementAgent::deleteObjectNowLH(const ObjectId& oid)
 
         string content;
         ListCodec::encode(list_, content);
+<<<<<<< HEAD
         sendBufferLH(content, "", headers, "amqp/list", v2Topic, v2key.str());
+=======
+        sendBuffer(content, "", headers, "amqp/list", v2Topic, v2key.str(), 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND Immediate(delete) ContentInd to=" << v2key.str());
     }
 }
 
+<<<<<<< HEAD
 void ManagementAgent::sendCommandCompleteLH(const string& replyToKey, uint32_t sequence,
                                             uint32_t code, const string& text)
 {
     Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
     uint32_t outLen;
+=======
+void ManagementAgent::sendCommandComplete(const string& replyToKey, uint32_t sequence,
+                                          uint32_t code, const string& text)
+{
+    ResizableBuffer   outBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     encodeHeader (outBuffer, 'z', sequence);
     outBuffer.putLong (code);
     outBuffer.putShortString (text);
+<<<<<<< HEAD
     outLen = MA_BUFFER_SIZE - outBuffer.available ();
     outBuffer.reset ();
     sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+    sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SEND CommandCompleteInd code=" << code << " text=" << text << " to=" <<
              replyToKey << " seq=" << sequence);
 }
 
+<<<<<<< HEAD
 void ManagementAgent::sendExceptionLH(const string& rte, const string& rtk, const string& cid,
                                       const string& text, uint32_t code, bool viaLocal)
+=======
+void ManagementAgent::sendException(const string& rte, const string& rtk, const string& cid,
+                                    const string& text, uint32_t code, bool viaLocal)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     static const string addr_exchange("qmf.default.direct");
 
@@ -1195,7 +1696,11 @@ void ManagementAgent::sendExceptionLH(const string& rte, const string& rtk, cons
     map["_values"] = values;
 
     MapCodec::encode(map, content);
+<<<<<<< HEAD
     sendBufferLH(content, cid, headers, "amqp/map", rte, rtk);
+=======
+    sendBuffer(content, cid, headers, "amqp/map", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     QPID_LOG(debug, "SENT Exception code=" << code <<" text=" << text);
 }
@@ -1206,7 +1711,10 @@ bool ManagementAgent::dispatchCommand (Deliverable&      deliverable,
                                        const bool topic,
                                        int qmfVersion)
 {
+<<<<<<< HEAD
     sys::Mutex::ScopedLock lock (userLock);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Message&  msg = ((DeliverableMessage&) deliverable).getMessage ();
 
     if (topic && qmfVersion == 1) {
@@ -1220,23 +1728,39 @@ bool ManagementAgent::dispatchCommand (Deliverable&      deliverable,
         //    schema.#
 
         if (routingKey == "broker") {
+<<<<<<< HEAD
             dispatchAgentCommandLH(msg);
+=======
+            dispatchAgentCommand(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             return false;
         }
 
         if (routingKey.length() > 6) {
 
             if (routingKey.compare(0, 9, "agent.1.0") == 0) {
+<<<<<<< HEAD
                 dispatchAgentCommandLH(msg);
+=======
+                dispatchAgentCommand(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return false;
             }
 
             if (routingKey.compare(0, 8, "agent.1.") == 0) {
+<<<<<<< HEAD
                 return authorizeAgentMessageLH(msg);
             }
 
             if (routingKey.compare(0, 7, "schema.") == 0) {
                 dispatchAgentCommandLH(msg);
+=======
+                return authorizeAgentMessage(msg);
+            }
+
+            if (routingKey.compare(0, 7, "schema.") == 0) {
+                dispatchAgentCommand(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return true;
             }
         }
@@ -1248,7 +1772,11 @@ bool ManagementAgent::dispatchCommand (Deliverable&      deliverable,
             // Intercept messages bound to:
             //  "console.ind.locate.# - process these messages, and also allow them to be forwarded.
             if (routingKey == "console.request.agent_locate") {
+<<<<<<< HEAD
                 dispatchAgentCommandLH(msg);
+=======
+                dispatchAgentCommand(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return true;
             }
 
@@ -1259,7 +1787,11 @@ bool ManagementAgent::dispatchCommand (Deliverable&      deliverable,
             //  "<name_address>" - the broker agent's proper name
             // and do not forward them futher
             if (routingKey == "broker" || routingKey == name_address) {
+<<<<<<< HEAD
                 dispatchAgentCommandLH(msg, routingKey == "broker");
+=======
+                dispatchAgentCommand(msg, routingKey == "broker");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return false;
             }
         }
@@ -1268,16 +1800,26 @@ bool ManagementAgent::dispatchCommand (Deliverable&      deliverable,
     return true;
 }
 
+<<<<<<< HEAD
 void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const ConnectionToken* connToken)
 {
     moveNewObjectsLH();
+=======
+void ManagementAgent::handleMethodRequest(Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const string& userId)
+{
+    moveNewObjects();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     string   methodName;
     string   packageName;
     string   className;
     uint8_t  hash[16];
+<<<<<<< HEAD
     Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
     uint32_t outLen;
+=======
+    ResizableBuffer   outBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AclModule* acl = broker->getAcl();
     string inArgs;
 
@@ -1299,9 +1841,13 @@ void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& repl
     if (disallowAllV1Methods) {
         outBuffer.putLong(Manageable::STATUS_FORBIDDEN);
         outBuffer.putMediumString("QMFv1 methods forbidden on this broker, use QMFv2");
+<<<<<<< HEAD
         outLen = MA_BUFFER_SIZE - outBuffer.available();
         outBuffer.reset();
         sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+        sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND MethodResponse status=FORBIDDEN reason='All QMFv1 Methods Forbidden' seq=" << sequence);
         return;
     }
@@ -1310,14 +1856,21 @@ void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& repl
     if (i != disallowed.end()) {
         outBuffer.putLong(Manageable::STATUS_FORBIDDEN);
         outBuffer.putMediumString(i->second);
+<<<<<<< HEAD
         outLen = MA_BUFFER_SIZE - outBuffer.available();
         outBuffer.reset();
         sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+        sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND MethodResponse status=FORBIDDEN text=" << i->second << " seq=" << sequence);
         return;
     }
 
+<<<<<<< HEAD
     string userId = ((const qpid::broker::ConnectionState*) connToken)->getUserId();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (acl != 0) {
         map<acl::Property, string> params;
         params[acl::PROP_SCHEMAPACKAGE] = packageName;
@@ -1326,14 +1879,19 @@ void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& repl
         if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_METHOD, methodName, &params)) {
             outBuffer.putLong(Manageable::STATUS_FORBIDDEN);
             outBuffer.putMediumString(Manageable::StatusText(Manageable::STATUS_FORBIDDEN));
+<<<<<<< HEAD
             outLen = MA_BUFFER_SIZE - outBuffer.available();
             outBuffer.reset();
             sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+            sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             QPID_LOG(debug, "SEND MethodResponse status=FORBIDDEN" << " seq=" << sequence);
             return;
         }
     }
 
+<<<<<<< HEAD
     ManagementObjectMap::iterator iter = numericFind(objId);
     if (iter == managementObjects.end() || iter->second->isDeleted()) {
         outBuffer.putLong        (Manageable::STATUS_UNKNOWN_OBJECT);
@@ -1341,15 +1899,36 @@ void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& repl
     } else {
         if ((iter->second->getPackageName() != packageName) ||
             (iter->second->getClassName()   != className)) {
+=======
+    ManagementObject::shared_ptr object;
+    {
+        sys::Mutex::ScopedLock lock(objectLock);
+        ManagementObjectMap::iterator iter = numericFind(objId);
+        if (iter != managementObjects.end())
+            object = iter->second;
+    }
+
+    if (!object || object->isDeleted()) {
+        outBuffer.putLong        (Manageable::STATUS_UNKNOWN_OBJECT);
+        outBuffer.putMediumString(Manageable::StatusText (Manageable::STATUS_UNKNOWN_OBJECT));
+    } else {
+        if ((object->getPackageName() != packageName) ||
+            (object->getClassName()   != className)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             outBuffer.putLong        (Manageable::STATUS_PARAMETER_INVALID);
             outBuffer.putMediumString(Manageable::StatusText (Manageable::STATUS_PARAMETER_INVALID));
         }
         else {
             uint32_t pos = outBuffer.getPosition();
             try {
+<<<<<<< HEAD
                 sys::Mutex::ScopedUnlock u(userLock);
                 string outBuf;
                 iter->second->doMethod(methodName, inArgs, outBuf, userId);
+=======
+                string outBuf;
+                object->doMethod(methodName, inArgs, outBuf, userId);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 outBuffer.putRawData(outBuf);
             } catch(exception& e) {
                 outBuffer.setPosition(pos);;
@@ -1359,17 +1938,28 @@ void ManagementAgent::handleMethodRequestLH(Buffer& inBuffer, const string& repl
         }
     }
 
+<<<<<<< HEAD
     outLen = MA_BUFFER_SIZE - outBuffer.available();
     outBuffer.reset();
     sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+    sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SEND MethodResponse (v1) to=" << replyToKey << " seq=" << sequence);
 }
 
 
+<<<<<<< HEAD
 void ManagementAgent::handleMethodRequestLH (const string& body, const string& rte, const string& rtk,
                                              const string& cid, const ConnectionToken* connToken, bool viaLocal)
 {
     moveNewObjectsLH();
+=======
+void ManagementAgent::handleMethodRequest (const string& body, const string& rte, const string& rtk,
+                                           const string& cid, const string& userId, bool viaLocal)
+{
+    moveNewObjects();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     string   methodName;
     Variant::Map inMap;
@@ -1388,8 +1978,13 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
 
     if ((oid = inMap.find("_object_id")) == inMap.end() ||
         (mid = inMap.find("_method_name")) == inMap.end()) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_PARAMETER_INVALID),
                         Manageable::STATUS_PARAMETER_INVALID, viaLocal);
+=======
+        sendException(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_PARAMETER_INVALID),
+                      Manageable::STATUS_PARAMETER_INVALID, viaLocal);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
@@ -1407,6 +2002,7 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
             inArgs = (mid->second).asMap();
         }
     } catch(exception& e) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, e.what(), Manageable::STATUS_EXCEPTION, viaLocal);
         return;
     }
@@ -1417,6 +2013,24 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
         stringstream estr;
         estr << "No object found with ID=" << objId;
         sendExceptionLH(rte, rtk, cid, estr.str(), 1, viaLocal);
+=======
+        sendException(rte, rtk, cid, e.what(), Manageable::STATUS_EXCEPTION, viaLocal);
+        return;
+    }
+
+    ManagementObject::shared_ptr object;
+    {
+        sys::Mutex::ScopedLock lock(objectLock);
+        ManagementObjectMap::iterator iter = managementObjects.find(objId);
+        if (iter != managementObjects.end())
+            object = iter->second;
+    }
+
+    if (!object || object->isDeleted()) {
+        stringstream estr;
+        estr << "No object found with ID=" << objId;
+        sendException(rte, rtk, cid, estr.str(), 1, viaLocal);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
@@ -1424,6 +2038,7 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
     AclModule* acl = broker->getAcl();
     DisallowedMethods::const_iterator i;
 
+<<<<<<< HEAD
     i = disallowed.find(make_pair(iter->second->getClassName(), methodName));
     if (i != disallowed.end()) {
         sendExceptionLH(rte, rtk, cid, i->second, Manageable::STATUS_FORBIDDEN, viaLocal);
@@ -1439,12 +2054,29 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
         if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_METHOD, methodName, &params)) {
             sendExceptionLH(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_FORBIDDEN),
                             Manageable::STATUS_FORBIDDEN, viaLocal);
+=======
+    i = disallowed.find(make_pair(object->getClassName(), methodName));
+    if (i != disallowed.end()) {
+        sendException(rte, rtk, cid, i->second, Manageable::STATUS_FORBIDDEN, viaLocal);
+        return;
+    }
+
+    if (acl != 0) {
+        map<acl::Property, string> params;
+        params[acl::PROP_SCHEMAPACKAGE] = object->getPackageName();
+        params[acl::PROP_SCHEMACLASS]   = object->getClassName();
+
+        if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_METHOD, methodName, &params)) {
+            sendException(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_FORBIDDEN),
+                          Manageable::STATUS_FORBIDDEN, viaLocal);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             return;
         }
     }
 
     // invoke the method
 
+<<<<<<< HEAD
     QPID_LOG(debug, "RECV MethodRequest (v2) class=" << iter->second->getPackageName()
              << ":" << iter->second->getClassName() << " method=" <<
              methodName << " replyTo=" << rte << "/" << rtk << " objId=" << objId << " inArgs=" << inArgs);
@@ -1452,6 +2084,14 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
     try {
         sys::Mutex::ScopedUnlock u(userLock);
         iter->second->doMethod(methodName, inArgs, callMap, userId);
+=======
+    QPID_LOG(debug, "RECV MethodRequest (v2) class=" << object->getPackageName()
+             << ":" << object->getClassName() << " method=" <<
+             methodName << " replyTo=" << rte << "/" << rtk << " objId=" << objId << " inArgs=" << inArgs);
+
+    try {
+        object->doMethod(methodName, inArgs, callMap, userId);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         errorCode = callMap["_status_code"].asUint32();
         if (errorCode == 0) {
             outMap["_arguments"] = Variant::Map();
@@ -1462,31 +2102,50 @@ void ManagementAgent::handleMethodRequestLH (const string& body, const string& r
         } else
             error = callMap["_status_text"].asString();
     } catch(exception& e) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, e.what(), Manageable::STATUS_EXCEPTION, viaLocal);
+=======
+        sendException(rte, rtk, cid, e.what(), Manageable::STATUS_EXCEPTION, viaLocal);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
     if (errorCode != 0) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, error, errorCode, viaLocal);
+=======
+        sendException(rte, rtk, cid, error, errorCode, viaLocal);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
     MapCodec::encode(outMap, content);
+<<<<<<< HEAD
     sendBufferLH(content, cid, headers, "amqp/map", rte, rtk);
+=======
+    sendBuffer(content, cid, headers, "amqp/map", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SEND MethodResponse (v2) to=" << rte << "/" << rtk << " seq=" << cid << " map=" << outMap);
 }
 
 
+<<<<<<< HEAD
 void ManagementAgent::handleBrokerRequestLH (Buffer&, const string& replyToKey, uint32_t sequence)
 {
     Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
     uint32_t outLen;
+=======
+void ManagementAgent::handleBrokerRequest (Buffer&, const string& replyToKey, uint32_t sequence)
+{
+    ResizableBuffer   outBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     QPID_LOG(debug, "RECV BrokerRequest replyTo=" << replyToKey);
 
     encodeHeader (outBuffer, 'b', sequence);
     uuid.encode  (outBuffer);
 
+<<<<<<< HEAD
     outLen = MA_BUFFER_SIZE - outBuffer.available ();
     outBuffer.reset ();
     sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
@@ -1518,6 +2177,37 @@ void ManagementAgent::handlePackageQueryLH (Buffer&, const string& replyToKey, u
 }
 
 void ManagementAgent::handlePackageIndLH (Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
+=======
+    sendBuffer(outBuffer, dExchange, replyToKey);
+    QPID_LOG(debug, "SEND BrokerResponse to=" << replyToKey);
+}
+
+void ManagementAgent::handlePackageQuery (Buffer&, const string& replyToKey, uint32_t sequence)
+{
+    QPID_LOG(debug, "RECV PackageQuery replyTo=" << replyToKey);
+    ResizableBuffer   outBuffer (qmfV1BufferSize);
+
+    {
+        sys::Mutex::ScopedLock lock(userLock);
+        for (PackageMap::iterator pIter = packages.begin ();
+             pIter != packages.end ();
+             pIter++)
+        {
+            encodeHeader (outBuffer, 'p', sequence);
+            encodePackageIndication (outBuffer, pIter);
+        }
+    }
+
+    if (outBuffer.getPosition() > 0) {
+        sendBuffer(outBuffer, dExchange, replyToKey);
+        QPID_LOG(debug, "SEND PackageInd to=" << replyToKey << " seq=" << sequence);
+    }
+
+    sendCommandComplete(replyToKey, sequence);
+}
+
+void ManagementAgent::handlePackageInd (Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string packageName;
 
@@ -1525,10 +2215,18 @@ void ManagementAgent::handlePackageIndLH (Buffer& inBuffer, const string& replyT
 
     QPID_LOG(debug, "RECV PackageInd package=" << packageName << " replyTo=" << replyToKey << " seq=" << sequence);
 
+<<<<<<< HEAD
     findOrAddPackageLH(packageName);
 }
 
 void ManagementAgent::handleClassQueryLH(Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
+=======
+    sys::Mutex::ScopedLock lock(userLock);
+    findOrAddPackageLH(packageName);
+}
+
+void ManagementAgent::handleClassQuery(Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string packageName;
 
@@ -1536,6 +2234,7 @@ void ManagementAgent::handleClassQueryLH(Buffer& inBuffer, const string& replyTo
 
     QPID_LOG(debug, "RECV ClassQuery package=" << packageName << " replyTo=" << replyToKey << " seq=" << sequence);
 
+<<<<<<< HEAD
     PackageMap::iterator pIter = packages.find(packageName);
     if (pIter != packages.end())
     {
@@ -1570,6 +2269,41 @@ void ManagementAgent::handleClassQueryLH(Buffer& inBuffer, const string& replyTo
 }
 
 void ManagementAgent::handleClassIndLH (Buffer& inBuffer, const string& replyToKey, uint32_t)
+=======
+    typedef std::pair<SchemaClassKey, uint8_t> _ckeyType;
+    std::list<_ckeyType> classes;
+    {
+        sys::Mutex::ScopedLock lock(userLock);
+        PackageMap::iterator pIter = packages.find(packageName);
+        if (pIter != packages.end())
+        {
+            ClassMap &cMap = pIter->second;
+            for (ClassMap::iterator cIter = cMap.begin();
+                 cIter != cMap.end();
+                 cIter++) {
+                if (cIter->second.hasSchema()) {
+                    classes.push_back(make_pair(cIter->first, cIter->second.kind));
+                }
+            }
+        }
+    }
+
+    while (classes.size()) {
+        ResizableBuffer   outBuffer(qmfV1BufferSize);
+
+        encodeHeader(outBuffer, 'q', sequence);
+        encodeClassIndication(outBuffer, packageName, classes.front().first, classes.front().second);
+
+        sendBuffer(outBuffer, dExchange, replyToKey);
+        QPID_LOG(debug, "SEND ClassInd class=" << packageName << ":" << classes.front().first.name <<
+                 "(" << Uuid(classes.front().first.hash) << ") to=" << replyToKey << " seq=" << sequence);
+        classes.pop_front();
+    }
+    sendCommandComplete(replyToKey, sequence);
+}
+
+void ManagementAgent::handleClassInd (Buffer& inBuffer, const string& replyToKey, uint32_t)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string packageName;
     SchemaClassKey key;
@@ -1582,20 +2316,32 @@ void ManagementAgent::handleClassIndLH (Buffer& inBuffer, const string& replyToK
     QPID_LOG(debug, "RECV ClassInd class=" << packageName << ":" << key.name << "(" << Uuid(key.hash) <<
              "), replyTo=" << replyToKey);
 
+<<<<<<< HEAD
     PackageMap::iterator pIter = findOrAddPackageLH(packageName);
     ClassMap::iterator   cIter = pIter->second.find(key);
     if (cIter == pIter->second.end() || !cIter->second.hasSchema()) {
         Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
         uint32_t outLen;
+=======
+    sys::Mutex::ScopedLock lock(userLock);
+    PackageMap::iterator pIter = findOrAddPackageLH(packageName);
+    ClassMap::iterator   cIter = pIter->second.find(key);
+    if (cIter == pIter->second.end() || !cIter->second.hasSchema()) {
+        ResizableBuffer   outBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         uint32_t sequence = nextRequestSequence++;
 
         // Schema Request
         encodeHeader (outBuffer, 'S', sequence);
         outBuffer.putShortString(packageName);
         key.encode(outBuffer);
+<<<<<<< HEAD
         outLen = MA_BUFFER_SIZE - outBuffer.available ();
         outBuffer.reset ();
         sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+        sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SEND SchemaRequest class=" << packageName << ":" << key.name << "(" << Uuid(key.hash) <<
                  "), to=" << replyToKey << " seq=" << sequence);
 
@@ -1620,7 +2366,11 @@ void ManagementAgent::SchemaClass::appendSchema(Buffer& buf)
         buf.putRawData(reinterpret_cast<uint8_t*>(&data[0]), data.size());
 }
 
+<<<<<<< HEAD
 void ManagementAgent::handleSchemaRequestLH(Buffer& inBuffer, const string& rte, const string& rtk, uint32_t sequence)
+=======
+void ManagementAgent::handleSchemaRequest(Buffer& inBuffer, const string& rte, const string& rtk, uint32_t sequence)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string         packageName;
     SchemaClassKey key;
@@ -1631,18 +2381,27 @@ void ManagementAgent::handleSchemaRequestLH(Buffer& inBuffer, const string& rte,
     QPID_LOG(debug, "RECV SchemaRequest class=" << packageName << ":" << key.name << "(" << Uuid(key.hash) <<
              "), replyTo=" << rte << "/" << rtk << " seq=" << sequence);
 
+<<<<<<< HEAD
+=======
+    sys::Mutex::ScopedLock lock(userLock);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     PackageMap::iterator pIter = packages.find(packageName);
     if (pIter != packages.end()) {
         ClassMap& cMap = pIter->second;
         ClassMap::iterator cIter = cMap.find(key);
         if (cIter != cMap.end()) {
+<<<<<<< HEAD
             Buffer   outBuffer(outputBuffer, MA_BUFFER_SIZE);
             uint32_t outLen;
+=======
+            ResizableBuffer   outBuffer(qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             SchemaClass& classInfo = cIter->second;
 
             if (classInfo.hasSchema()) {
                 encodeHeader(outBuffer, 's', sequence);
                 classInfo.appendSchema(outBuffer);
+<<<<<<< HEAD
                 outLen = MA_BUFFER_SIZE - outBuffer.available();
                 outBuffer.reset();
                 sendBufferLH(outBuffer, outLen, rte, rtk);
@@ -1659,6 +2418,22 @@ void ManagementAgent::handleSchemaRequestLH(Buffer& inBuffer, const string& rte,
 }
 
 void ManagementAgent::handleSchemaResponseLH(Buffer& inBuffer, const string& /*replyToKey*/, uint32_t sequence)
+=======
+                sendBuffer(outBuffer, rte, rtk);
+                QPID_LOG(debug, "SEND SchemaResponse to=" << rte << "/" << rtk << " seq=" << sequence);
+            }
+            else
+                sendCommandComplete(rtk, sequence, 1, "Schema not available");
+        }
+        else
+            sendCommandComplete(rtk, sequence, 1, "Class key not found");
+    }
+    else
+        sendCommandComplete(rtk, sequence, 1, "Package not found");
+}
+
+void ManagementAgent::handleSchemaResponse(Buffer& inBuffer, const string& /*replyToKey*/, uint32_t sequence)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string         packageName;
     SchemaClassKey key;
@@ -1671,6 +2446,10 @@ void ManagementAgent::handleSchemaResponseLH(Buffer& inBuffer, const string& /*r
 
     QPID_LOG(debug, "RECV SchemaResponse class=" << packageName << ":" << key.name << "(" << Uuid(key.hash) << ")" << " seq=" << sequence);
 
+<<<<<<< HEAD
+=======
+    sys::Mutex::ScopedLock lock(userLock);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     PackageMap::iterator pIter = packages.find(packageName);
     if (pIter != packages.end()) {
         ClassMap& cMap = pIter->second;
@@ -1685,6 +2464,7 @@ void ManagementAgent::handleSchemaResponseLH(Buffer& inBuffer, const string& /*r
                 inBuffer.getRawData(reinterpret_cast<uint8_t*>(&cIter->second.data[0]), length);
 
                 // Publish a class-indication message
+<<<<<<< HEAD
                 Buffer   outBuffer(outputBuffer, MA_BUFFER_SIZE);
                 uint32_t outLen;
 
@@ -1693,6 +2473,13 @@ void ManagementAgent::handleSchemaResponseLH(Buffer& inBuffer, const string& /*r
                 outLen = MA_BUFFER_SIZE - outBuffer.available();
                 outBuffer.reset();
                 sendBufferLH(outBuffer, outLen, mExchange, "schema.class");
+=======
+                ResizableBuffer outBuffer(qmfV1BufferSize);
+
+                encodeHeader(outBuffer, 'q');
+                encodeClassIndication(outBuffer, pIter->first, cIter->first, cIter->second.kind);
+                sendBuffer(outBuffer, mExchange, "schema.class");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 QPID_LOG(debug, "SEND ClassInd class=" << packageName << ":" << key.name << "(" << Uuid(key.hash) << ")" <<
                          " to=schema.class");
             }
@@ -1751,20 +2538,36 @@ void ManagementAgent::deleteOrphanedAgentsLH()
         remoteAgents.erase(*dIter);
 }
 
+<<<<<<< HEAD
 void ManagementAgent::handleAttachRequestLH (Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const ConnectionToken* connToken)
+=======
+void ManagementAgent::handleAttachRequest (Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const ObjectId& connectionRef)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     string   label;
     uint32_t requestedBrokerBank, requestedAgentBank;
     uint32_t assignedBank;
+<<<<<<< HEAD
     ObjectId connectionRef = ((const ConnectionState*) connToken)->GetManagementObject()->getObjectId();
     Uuid     systemId;
 
     moveNewObjectsLH();
+=======
+    Uuid     systemId;
+
+    moveNewObjects();
+
+    sys::Mutex::ScopedLock lock(userLock);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     deleteOrphanedAgentsLH();
     RemoteAgentMap::iterator aIter = remoteAgents.find(connectionRef);
     if (aIter != remoteAgents.end()) {
         // There already exists an agent on this session.  Reject the request.
+<<<<<<< HEAD
         sendCommandCompleteLH(replyToKey, sequence, 1, "Connection already has remote agent");
+=======
+        sendCommandComplete(replyToKey, sequence, 1, "Connection already has remote agent");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
@@ -1783,7 +2586,11 @@ void ManagementAgent::handleAttachRequestLH (Buffer& inBuffer, const string& rep
     agent->agentBank  = assignedBank;
     agent->routingKey = replyToKey;
     agent->connectionRef = connectionRef;
+<<<<<<< HEAD
     agent->mgmtObject = new _qmf::Agent (this, agent.get());
+=======
+    agent->mgmtObject = _qmf::Agent::shared_ptr(new _qmf::Agent (this, agent.get()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     agent->mgmtObject->set_connectionRef(agent->connectionRef);
     agent->mgmtObject->set_label        (label);
     agent->mgmtObject->set_registeredTo (broker->GetManagementObject()->getObjectId());
@@ -1796,25 +2603,43 @@ void ManagementAgent::handleAttachRequestLH (Buffer& inBuffer, const string& rep
     QPID_LOG(debug, "Remote Agent registered bank=[" << brokerBank << "." << assignedBank << "] replyTo=" << replyToKey);
 
     // Send an Attach Response
+<<<<<<< HEAD
     Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
     uint32_t outLen;
+=======
+    ResizableBuffer outBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     encodeHeader (outBuffer, 'a', sequence);
     outBuffer.putLong (brokerBank);
     outBuffer.putLong (assignedBank);
+<<<<<<< HEAD
     outLen = MA_BUFFER_SIZE - outBuffer.available ();
     outBuffer.reset ();
     sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
+=======
+    sendBuffer(outBuffer, dExchange, replyToKey);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SEND AttachResponse brokerBank=" << brokerBank << " agentBank=" << assignedBank <<
              " to=" << replyToKey << " seq=" << sequence);
 }
 
+<<<<<<< HEAD
 void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
 {
     FieldTable           ft;
     FieldTable::ValuePtr value;
 
     moveNewObjectsLH();
+=======
+void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const string& userId)
+{
+    FieldTable           ft;
+    FieldTable::ValuePtr value;
+    AclModule* acl = broker->getAcl();
+
+    moveNewObjects();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     ft.decode(inBuffer);
 
@@ -1827,11 +2652,33 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
             return;
 
         ObjectId selector(value->get<string>());
+<<<<<<< HEAD
         ManagementObjectMap::iterator iter = numericFind(selector);
         if (iter != managementObjects.end()) {
             ManagementObject* object = iter->second;
             Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
             uint32_t outLen;
+=======
+
+        ManagementObject::shared_ptr object;
+        {
+            sys::Mutex::ScopedLock lock(objectLock);
+            ManagementObjectMap::iterator iter = numericFind(selector);
+            if (iter != managementObjects.end())
+                object = iter->second;
+        }
+
+        if (object) {
+            ResizableBuffer outBuffer (qmfV1BufferSize);
+	    if (acl != 0) {
+        	map<acl::Property, string> params;
+        	params[acl::PROP_SCHEMACLASS]   = object->getClassName();
+
+	        if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, object->getObjectId().getV2Key(), &params)) {
+                    throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object " << object->getObjectId().getV2Key() << " from " << userId));
+	        }
+	    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             if (object->getConfigChanged() || object->getInstChanged())
                 object->setUpdateTime();
@@ -1844,6 +2691,7 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
                 sBuf.clear();
                 object->writeStatistics(sBuf, true);
                 outBuffer.putRawData(sBuf);
+<<<<<<< HEAD
                 outLen = MA_BUFFER_SIZE - outBuffer.available ();
                 outBuffer.reset ();
                 sendBufferLH(outBuffer, outLen, dExchange, replyToKey);
@@ -1851,10 +2699,18 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
             }
         }
         sendCommandCompleteLH(replyToKey, sequence);
+=======
+                sendBuffer(outBuffer, dExchange, replyToKey);
+                QPID_LOG(debug, "SEND GetResponse (v1) to=" << replyToKey << " seq=" << sequence);
+            }
+        }
+        sendCommandComplete(replyToKey, sequence);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
     string className (value->get<string>());
+<<<<<<< HEAD
     std::list<ObjectId>matches;
 
     if (className == "memory")
@@ -1863,10 +2719,30 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
     if (className == "broker") {
         uint64_t uptime = sys::Duration(startTime, sys::now());
         static_cast<_qmf::Broker*>(broker->GetManagementObject())->set_uptime(uptime);
+=======
+    std::list<ManagementObject::shared_ptr> matches;
+
+    if (acl != 0) {
+        map<acl::Property, string> params;
+        params[acl::PROP_SCHEMACLASS]   = className;
+
+        if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, className /* class-wide query */, &params)) {
+            throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object class " << className << " from " << userId));
+        }
+    }
+
+    if (className == "memory")
+        qpid::sys::MemStat::loadMemInfo(memstat.get());
+
+    if (className == "broker") {
+        uint64_t uptime = sys::Duration(startTime, sys::now());
+        boost::dynamic_pointer_cast<_qmf::Broker>(broker->GetManagementObject())->set_uptime(uptime);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
 
     // build up a set of all objects to be dumped
+<<<<<<< HEAD
     for (ManagementObjectMap::iterator iter = managementObjects.begin();
          iter != managementObjects.end();
          iter++) {
@@ -1908,11 +2784,50 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
                     outBuffer.putRawData(sProps);
                     outBuffer.putRawData(sStats);
                 }
+=======
+    {
+        sys::Mutex::ScopedLock lock(objectLock);
+        for (ManagementObjectMap::iterator iter = managementObjects.begin();
+             iter != managementObjects.end();
+             iter++) {
+            ManagementObject::shared_ptr object = iter->second;
+            if (object->getClassName () == className) {
+                matches.push_back(object);
+            }
+        }
+    }
+
+    // send them
+    ResizableBuffer outBuffer (qmfV1BufferSize);
+    while (matches.size()) {
+        ManagementObject::shared_ptr object = matches.front();
+        if (object->getConfigChanged() || object->getInstChanged())
+            object->setUpdateTime();
+
+        if (!object->isDeleted()) {
+            string sProps, sStats;
+            object->writeProperties(sProps);
+            object->writeStatistics(sStats, true);
+
+            size_t len = 8 + sProps.length() + sStats.length();   // 8 == size of header in bytes.
+            if (len > qmfV1BufferSize) {
+                QPID_LOG(error, "Object " << object->getObjectId() << " too large for output buffer - discarded!");
+            } else {
+                if (outBuffer.available() < len) {  // not enough room in current buffer, send it.
+                    sendBuffer(outBuffer, dExchange, replyToKey);
+                    QPID_LOG(debug, "SEND GetResponse (v1) to=" << replyToKey << " seq=" << sequence);
+                    continue;  // lock dropped, need to re-find _SAME_ objid as it may have been deleted.
+                }
+                encodeHeader(outBuffer, 'g', sequence);
+                outBuffer.putRawData(sProps);
+                outBuffer.putRawData(sStats);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
         matches.pop_front();
     }
 
+<<<<<<< HEAD
     outLen = MA_BUFFER_SIZE - outBuffer.available ();
     if (outLen) {
         outBuffer.reset ();
@@ -1927,10 +2842,28 @@ void ManagementAgent::handleGetQueryLH(Buffer& inBuffer, const string& replyToKe
 void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, const string& rtk, const string& cid, bool viaLocal)
 {
     moveNewObjectsLH();
+=======
+    if (outBuffer.getPosition() > 0) {
+        sendBuffer(outBuffer, dExchange, replyToKey);
+        QPID_LOG(debug, "SEND GetResponse (v1) to=" << replyToKey << " seq=" << sequence);
+    }
+
+    sendCommandComplete(replyToKey, sequence);
+}
+
+
+void ManagementAgent::handleGetQuery(const string& body, const string& rte, const string& rtk, const string& cid, const std::string& userId, bool viaLocal)
+{
+    moveNewObjects();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Variant::Map inMap;
     Variant::Map::const_iterator i;
     Variant::Map headers;
+<<<<<<< HEAD
+=======
+    AclModule* acl = broker->getAcl();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     MapCodec::decode(body, inMap);
     QPID_LOG(debug, "RECV GetQuery (v2): map=" << inMap << " seq=" << cid);
@@ -1945,17 +2878,29 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
      */
     i = inMap.find("_what");
     if (i == inMap.end()) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, "_what element missing in Query");
+=======
+        sendException(rte, rtk, cid, "_what element missing in Query");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
     if (i->second.getType() != qpid::types::VAR_STRING) {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, "_what element is not a string");
+=======
+        sendException(rte, rtk, cid, "_what element is not a string");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
     if (i->second.asString() != "OBJECT") {
+<<<<<<< HEAD
         sendExceptionLH(rte, rtk, cid, "Query for _what => '" + i->second.asString() + "' not supported");
+=======
+        sendException(rte, rtk, cid, "Query for _what => '" + i->second.asString() + "' not supported");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         return;
     }
 
@@ -1979,11 +2924,19 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
     }
 
     if (className == "memory")
+<<<<<<< HEAD
         qpid::sys::MemStat::loadMemInfo(memstat);
 
     if (className == "broker") {
         uint64_t uptime = sys::Duration(startTime, sys::now());
         static_cast<_qmf::Broker*>(broker->GetManagementObject())->set_uptime(uptime);
+=======
+        qpid::sys::MemStat::loadMemInfo(memstat.get());
+
+    if (className == "broker") {
+        uint64_t uptime = sys::Duration(startTime, sys::now());
+        boost::dynamic_pointer_cast<_qmf::Broker>(broker->GetManagementObject())->set_uptime(uptime);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     /*
@@ -1995,10 +2948,29 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
         Variant::List list_;
         ObjectId objId(i->second.asMap());
 
+<<<<<<< HEAD
         ManagementObjectMap::iterator iter = managementObjects.find(objId);
         if (iter != managementObjects.end()) {
             ManagementObject* object = iter->second;
 
+=======
+        ManagementObject::shared_ptr object;
+        {
+            sys::Mutex::ScopedLock lock (objectLock);
+            ManagementObjectMap::iterator iter = managementObjects.find(objId);
+            if (iter != managementObjects.end())
+                object = iter->second;
+        }
+        if (object) {
+            if (acl != 0) {
+                map<acl::Property, string> params;
+                params[acl::PROP_SCHEMACLASS]   = object->getClassName();
+
+                if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, object->getObjectId().getV2Key(), &params)) {
+		    throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object " << object->getObjectId().getV2Key() << " from " << userId));
+                }
+            }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (object->getConfigChanged() || object->getInstChanged())
                 object->setUpdateTime();
 
@@ -2022,20 +2994,50 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
             string content;
 
             ListCodec::encode(list_, content);
+<<<<<<< HEAD
             sendBufferLH(content, cid, headers, "amqp/list", rte, rtk);
+=======
+            sendBuffer(content, cid, headers, "amqp/list", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             QPID_LOG(debug, "SENT QueryResponse (query by object_id) to=" << rte << "/" << rtk);
             return;
         }
     } else {
         // send class-based result.
+<<<<<<< HEAD
+=======
+        if (acl != 0) {
+            map<acl::Property, string> params;
+            params[acl::PROP_SCHEMACLASS]   = className;
+
+            if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, className /* class-wide query */, &params)) {
+                throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object class " << className << " from " << userId));
+            }
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         Variant::List _list;
         Variant::List _subList;
         unsigned int objCount = 0;
 
+<<<<<<< HEAD
         for (ManagementObjectMap::iterator iter = managementObjects.begin();
              iter != managementObjects.end();
              iter++) {
             ManagementObject* object = iter->second;
+=======
+        ManagementObjectVector localManagementObjects;
+        {
+            sys::Mutex::ScopedLock objLock(objectLock);
+            std::transform(managementObjects.begin(), managementObjects.end(),
+                           std::back_inserter(localManagementObjects),
+                           boost::bind(&ManagementObjectMap::value_type::second, _1));
+        }
+
+        for (ManagementObjectVector::iterator iter = localManagementObjects.begin();
+             iter != localManagementObjects.end();
+             iter++) {
+            ManagementObject::shared_ptr object = *iter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (object->getClassName() == className &&
                 (packageName.empty() || object->getPackageName() == packageName)) {
 
@@ -2050,7 +3052,11 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
 
                     object->writeTimestamps(map_);
                     object->mapEncodeValues(values, true, true); // write both stats and properties
+<<<<<<< HEAD
                     iter->first.mapEncode(oidMap);
+=======
+                    object->getObjectId().mapEncode(oidMap);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
                     map_["_values"] = values;
                     map_["_object_id"] = oidMap;
@@ -2075,13 +3081,21 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
         string content;
         while (_list.size() > 1) {
             ListCodec::encode(_list.front().asList(), content);
+<<<<<<< HEAD
             sendBufferLH(content, cid, headers, "amqp/list", rte, rtk);
+=======
+            sendBuffer(content, cid, headers, "amqp/list", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             _list.pop_front();
             QPID_LOG(debug, "SENT QueryResponse (partial, query by schema_id) to=" << rte << "/" << rtk << " len=" << content.length());
         }
         headers.erase("partial");
         ListCodec::encode(_list.size() ? _list.front().asList() : Variant::List(), content);
+<<<<<<< HEAD
         sendBufferLH(content, cid, headers, "amqp/list", rte, rtk);
+=======
+        sendBuffer(content, cid, headers, "amqp/list", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(debug, "SENT QueryResponse (query by schema_id) to=" << rte << "/" << rtk << " len=" << content.length());
         return;
     }
@@ -2089,12 +3103,20 @@ void ManagementAgent::handleGetQueryLH(const string& body, const string& rte, co
     // Unrecognized query - Send empty message to indicate CommandComplete
     string content;
     ListCodec::encode(Variant::List(), content);
+<<<<<<< HEAD
     sendBufferLH(content, cid, headers, "amqp/list", rte, rtk);
+=======
+    sendBuffer(content, cid, headers, "amqp/list", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SENT QueryResponse (empty) to=" << rte << "/" << rtk);
 }
 
 
+<<<<<<< HEAD
 void ManagementAgent::handleLocateRequestLH(const string&, const string& rte, const string& rtk, const string& cid)
+=======
+void ManagementAgent::handleLocateRequest(const string&, const string& rte, const string& rtk, const string& cid)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     QPID_LOG(debug, "RCVD AgentLocateRequest");
 
@@ -2106,22 +3128,37 @@ void ManagementAgent::handleLocateRequestLH(const string&, const string& rte, co
     headers["qmf.agent"] = name_address;
 
     map["_values"] = attrMap;
+<<<<<<< HEAD
     map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+=======
+    map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     map["_values"].asMap()["_heartbeat_interval"] = interval;
     map["_values"].asMap()["_epoch"] = bootSequence;
 
     string content;
     MapCodec::encode(map, content);
+<<<<<<< HEAD
     sendBufferLH(content, cid, headers, "amqp/map", rte, rtk);
+=======
+    sendBuffer(content, cid, headers, "amqp/map", rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     clientWasAdded = true;
 
     QPID_LOG(debug, "SENT AgentLocateResponse replyTo=" << rte << "/" << rtk);
 }
 
 
+<<<<<<< HEAD
 bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
 {
     Buffer   inBuffer (inputBuffer, MA_BUFFER_SIZE);
+=======
+bool ManagementAgent::authorizeAgentMessage(Message& msg)
+{
+    sys::Mutex::ScopedLock lock(userLock);
+    ResizableBuffer inBuffer (qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     uint32_t sequence = 0;
     bool methodReq = false;
     bool mapMsg = false;
@@ -2130,6 +3167,7 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
     string  methodName;
     string cid;
 
+<<<<<<< HEAD
     //
     // If the message is larger than our working buffer size, we can't determine if it's
     // authorized or not.  In this case, return true (authorized) if there is no ACL in place,
@@ -2139,15 +3177,37 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
         return broker->getAcl() == 0;
 
     msg.encodeContent(inBuffer);
+=======
+    boost::intrusive_ptr<const qpid::broker::amqp_0_10::MessageTransfer> transfer = protocols->translate(msg);
+    //
+    // If the message is larger than our working buffer size (or if it
+    // could not be converted to an 0-10 messgae-transfer), we can't
+    // determine if it's authorized or not.  In this case, return true
+    // (authorized) if there is no ACL in place, otherwise return
+    // false;
+    //
+    if (!transfer || transfer->getContentSize() > qmfV1BufferSize)
+        return broker->getAcl() == 0;
+
+    inBuffer.putRawData(transfer->getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     uint32_t bufferLen = inBuffer.getPosition();
     inBuffer.reset();
 
     const framing::MessageProperties* p =
+<<<<<<< HEAD
       msg.getFrames().getHeaders()->get<framing::MessageProperties>();
 
     const framing::FieldTable *headers = msg.getApplicationHeaders();
 
     if (headers && msg.getAppId() == "qmf2")
+=======
+        transfer ? transfer->getFrames().getHeaders()->get<framing::MessageProperties>() : 0;
+
+    const framing::FieldTable *headers = p ? &p->getApplicationHeaders() : 0;
+
+    if (headers && p->getAppId() == "qmf2")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         mapMsg = true;
 
@@ -2187,11 +3247,19 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
             }
 
             // look up schema for object to get package and class name
+<<<<<<< HEAD
 
             ManagementObjectMap::iterator iter = managementObjects.find(objId);
 
             if (iter == managementObjects.end() || iter->second->isDeleted()) {
                 QPID_LOG(debug, "ManagementAgent::authorizeAgentMessageLH: stale object id " <<
+=======
+            sys::Mutex::ScopedLock lock(objectLock);
+            ManagementObjectMap::iterator iter = managementObjects.find(objId);
+
+            if (iter == managementObjects.end() || iter->second->isDeleted()) {
+                QPID_LOG(debug, "ManagementAgent::authorizeAgentMessage: stale object id " <<
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                          objId);
                 return false;
             }
@@ -2223,13 +3291,20 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
     }
 
     if (methodReq) {
+<<<<<<< HEAD
         // TODO: check method call against ACL list.
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         map<acl::Property, string> params;
         AclModule* acl = broker->getAcl();
         if (acl == 0)
             return true;
 
+<<<<<<< HEAD
         string  userId = ((const qpid::broker::ConnectionState*) msg.getPublisher())->getUserId();
+=======
+        string  userId = msg.getUserId();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         params[acl::PROP_SCHEMAPACKAGE] = packageName;
         params[acl::PROP_SCHEMACLASS]   = className;
 
@@ -2238,8 +3313,14 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
 
         // authorization failed, send reply if replyTo present
 
+<<<<<<< HEAD
         const framing::MessageProperties* p =
             msg.getFrames().getHeaders()->get<framing::MessageProperties>();
+=======
+        boost::intrusive_ptr<const qpid::broker::amqp_0_10::MessageTransfer> transfer = protocols->translate(msg);
+        const framing::MessageProperties* p =
+            transfer ? transfer->getFrames().getHeaders()->get<framing::MessageProperties>() : 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (p && p->hasReplyTo()) {
             const framing::ReplyTo& rt = p->getReplyTo();
             string rte = rt.getExchange();
@@ -2249,19 +3330,31 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
                 cid = p->getCorrelationId();
 
             if (mapMsg) {
+<<<<<<< HEAD
                 sendExceptionLH(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_FORBIDDEN),
                                 Manageable::STATUS_FORBIDDEN, false);
             } else {
 
                 Buffer   outBuffer(outputBuffer, MA_BUFFER_SIZE);
                 uint32_t outLen;
+=======
+                sendException(rte, rtk, cid, Manageable::StatusText(Manageable::STATUS_FORBIDDEN),
+                              Manageable::STATUS_FORBIDDEN, false);
+            } else {
+
+                ResizableBuffer outBuffer(qmfV1BufferSize);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
                 encodeHeader(outBuffer, 'm', sequence);
                 outBuffer.putLong(Manageable::STATUS_FORBIDDEN);
                 outBuffer.putMediumString(Manageable::StatusText(Manageable::STATUS_FORBIDDEN));
+<<<<<<< HEAD
                 outLen = MA_BUFFER_SIZE - outBuffer.available();
                 outBuffer.reset();
                 sendBufferLH(outBuffer, outLen, rte, rtk);
+=======
+                sendBuffer(outBuffer, rte, rtk);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
 
             QPID_LOG(debug, "SEND MethodResponse status=FORBIDDEN" << " seq=" << sequence);
@@ -2273,12 +3366,23 @@ bool ManagementAgent::authorizeAgentMessageLH(Message& msg)
     return true;
 }
 
+<<<<<<< HEAD
 void ManagementAgent::dispatchAgentCommandLH(Message& msg, bool viaLocal)
 {
     string   rte;
     string   rtk;
     const framing::MessageProperties* p =
         msg.getFrames().getHeaders()->get<framing::MessageProperties>();
+=======
+void ManagementAgent::dispatchAgentCommand(Message& msg, bool viaLocal)
+{
+    string   rte;
+    string   rtk;
+
+    boost::intrusive_ptr<const qpid::broker::amqp_0_10::MessageTransfer> transfer = protocols->translate(msg);
+    const framing::MessageProperties* p = transfer ?
+        transfer->getFrames().getHeaders()->get<framing::MessageProperties>() : 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (p && p->hasReplyTo()) {
         const framing::ReplyTo& rt = p->getReplyTo();
         rte = rt.getExchange();
@@ -2287,6 +3391,7 @@ void ManagementAgent::dispatchAgentCommandLH(Message& msg, bool viaLocal)
     else
         return;
 
+<<<<<<< HEAD
     Buffer   inBuffer(inputBuffer, MA_BUFFER_SIZE);
     uint8_t  opcode;
 
@@ -2303,12 +3408,31 @@ void ManagementAgent::dispatchAgentCommandLH(Message& msg, bool viaLocal)
     ScopedManagementContext context((const qpid::broker::ConnectionState*) msg.getPublisher());
     const framing::FieldTable *headers = msg.getApplicationHeaders();
     if (headers && msg.getAppId() == "qmf2")
+=======
+    ResizableBuffer inBuffer(qmfV1BufferSize);
+    uint8_t  opcode;
+
+    if (transfer->getContentSize() > qmfV1BufferSize) {
+        QPID_LOG(debug, "ManagementAgent::dispatchAgentCommandLH: Message too large: " <<
+                 transfer->getContentSize());
+        return;
+    }
+
+    inBuffer.putRawData(transfer->getContent());
+    uint32_t bufferLen = inBuffer.getPosition();
+    inBuffer.reset();
+
+    ScopedManagementContext context(msg.getPublisher());
+    const framing::FieldTable *headers = p ? &p->getApplicationHeaders() : 0;
+    if (headers && p->getAppId() == "qmf2")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         string opcode = headers->getAsString("qmf.opcode");
         string contentType = headers->getAsString("qmf.content");
         string body;
         string cid;
         inBuffer.getRawData(body, bufferLen);
+<<<<<<< HEAD
 
         if (p && p->hasCorrelationId()) {
             cid = p->getCorrelationId();
@@ -2321,17 +3445,35 @@ void ManagementAgent::dispatchAgentCommandLH(Message& msg, bool viaLocal)
         else if (opcode == "_agent_locate_request")
             return handleLocateRequestLH(body, rte, rtk, cid);
 
+=======
+        {
+            if (p && p->hasCorrelationId()) {
+                cid = p->getCorrelationId();
+            }
+
+            if (opcode == "_method_request")
+                return handleMethodRequest(body, rte, rtk, cid, context.getUserId(), viaLocal);
+            else if (opcode == "_query_request")
+                return handleGetQuery(body, rte, rtk, cid, context.getUserId(), viaLocal);
+            else if (opcode == "_agent_locate_request")
+                return handleLocateRequest(body, rte, rtk, cid);
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG(warning, "Support for QMF Opcode [" << opcode << "] TBD!!!");
         return;
     }
 
     // old preV2 binary messages
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     while (inBuffer.getPosition() < bufferLen) {
         uint32_t sequence;
         if (!checkHeader(inBuffer, &opcode, &sequence))
             return;
 
+<<<<<<< HEAD
         if      (opcode == 'B') handleBrokerRequestLH  (inBuffer, rtk, sequence);
         else if (opcode == 'P') handlePackageQueryLH   (inBuffer, rtk, sequence);
         else if (opcode == 'p') handlePackageIndLH     (inBuffer, rtk, sequence);
@@ -2342,6 +3484,18 @@ void ManagementAgent::dispatchAgentCommandLH(Message& msg, bool viaLocal)
         else if (opcode == 'A') handleAttachRequestLH  (inBuffer, rtk, sequence, msg.getPublisher());
         else if (opcode == 'G') handleGetQueryLH       (inBuffer, rtk, sequence);
         else if (opcode == 'M') handleMethodRequestLH  (inBuffer, rtk, sequence, msg.getPublisher());
+=======
+        if      (opcode == 'B') handleBrokerRequest  (inBuffer, rtk, sequence);
+        else if (opcode == 'P') handlePackageQuery   (inBuffer, rtk, sequence);
+        else if (opcode == 'p') handlePackageInd     (inBuffer, rtk, sequence);
+        else if (opcode == 'Q') handleClassQuery     (inBuffer, rtk, sequence);
+        else if (opcode == 'q') handleClassInd       (inBuffer, rtk, sequence);
+        else if (opcode == 'S') handleSchemaRequest  (inBuffer, rte, rtk, sequence);
+        else if (opcode == 's') handleSchemaResponse (inBuffer, rtk, sequence);
+        else if (opcode == 'A') handleAttachRequest  (inBuffer, rtk, sequence, context.getObjectId());
+        else if (opcode == 'G') handleGetQuery       (inBuffer, rtk, sequence, context.getMgmtId());
+        else if (opcode == 'M') handleMethodRequest  (inBuffer, rtk, sequence, context.getMgmtId());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -2357,6 +3511,7 @@ ManagementAgent::PackageMap::iterator ManagementAgent::findOrAddPackageLH(string
     QPID_LOG (debug, "ManagementAgent added package " << name);
 
     // Publish a package-indication message
+<<<<<<< HEAD
     Buffer   outBuffer (outputBuffer, MA_BUFFER_SIZE);
     uint32_t outLen;
 
@@ -2365,6 +3520,13 @@ ManagementAgent::PackageMap::iterator ManagementAgent::findOrAddPackageLH(string
     outLen = MA_BUFFER_SIZE - outBuffer.available ();
     outBuffer.reset ();
     sendBufferLH(outBuffer, outLen, mExchange, "schema.package");
+=======
+    ResizableBuffer outBuffer (qmfV1BufferSize);
+
+    encodeHeader (outBuffer, 'p');
+    encodePackageIndication (outBuffer, result.first);
+    sendBuffer(outBuffer, mExchange, "schema.package");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "SEND PackageInd package=" << name << " to=schema.package");
 
     return result.first;
@@ -2579,6 +3741,7 @@ void ManagementAgent::SchemaClass::mapDecode(const Variant::Map& _map) {
     }
 }
 
+<<<<<<< HEAD
 void ManagementAgent::exportSchemas(string& out) {
     Variant::List list_;
     Variant::Map map_, kmap, cmap;
@@ -2643,6 +3806,8 @@ void ManagementAgent::importSchemas(qpid::framing::Buffer& inBuf) {
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void ManagementAgent::RemoteAgent::mapEncode(Variant::Map& map_) const {
     Variant::Map _objId, _values;
 
@@ -2676,7 +3841,11 @@ void ManagementAgent::RemoteAgent::mapDecode(const Variant::Map& map_) {
         connectionRef.mapDecode(i->second.asMap());
     }
 
+<<<<<<< HEAD
     mgmtObject = new _qmf::Agent(&agent, this);
+=======
+    mgmtObject = _qmf::Agent::shared_ptr(new _qmf::Agent(&agent, this));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if ((i = map_.find("_values")) != map_.end()) {
         mgmtObject->mapDecodeValues(i->second.asMap());
@@ -2686,6 +3855,7 @@ void ManagementAgent::RemoteAgent::mapDecode(const Variant::Map& map_) {
     mgmtObject->set_connectionRef(connectionRef);
 }
 
+<<<<<<< HEAD
 void ManagementAgent::exportAgents(string& out) {
     Variant::List list_;
     Variant::Map map_, omap, amap;
@@ -2732,6 +3902,8 @@ void ManagementAgent::importAgents(qpid::framing::Buffer& inBuf) {
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace {
 bool isDeletedMap(const ManagementObjectMap::value_type& value) {
     return value.second->isDeleted();
@@ -2810,6 +3982,7 @@ Variant::Map ManagementAgent::toMap(const FieldTable& from)
     return map;
 }
 
+<<<<<<< HEAD
 
 // Build up a list of the current set of deleted objects that are pending their
 // next (last) publish-ment.
@@ -2860,6 +4033,10 @@ void ManagementAgent::importDeletedObjects(const DeletedObjectList& inList)
 
 // construct a DeletedObject from a management object.
 ManagementAgent::DeletedObject::DeletedObject(ManagementObject *src, bool v1, bool v2)
+=======
+// construct a DeletedObject from a management object.
+ManagementAgent::DeletedObject::DeletedObject(ManagementObject::shared_ptr src, bool v1, bool v2)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     : packageName(src->getPackageName()),
       className(src->getClassName())
 {
@@ -2895,6 +4072,7 @@ ManagementAgent::DeletedObject::DeletedObject(ManagementObject *src, bool v1, bo
     }
 }
 
+<<<<<<< HEAD
 
 
 // construct a DeletedObject from an encoded representation. Used by
@@ -2937,12 +4115,24 @@ void ManagementAgent::DeletedObject::encode(std::string& toBuffer)
 // Remove Deleted objects, and save for later publishing...
 bool ManagementAgent::moveDeletedObjectsLH() {
     typedef vector<pair<ObjectId, ManagementObject*> > DeleteList;
+=======
+// Remove Deleted objects, and save for later publishing...
+bool ManagementAgent::moveDeletedObjects() {
+    typedef vector<pair<ObjectId, ManagementObject::shared_ptr> > DeleteList;
+
+    sys::Mutex::ScopedLock lock (objectLock);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     DeleteList deleteList;
     for (ManagementObjectMap::iterator iter = managementObjects.begin();
          iter != managementObjects.end();
          ++iter)
     {
+<<<<<<< HEAD
         ManagementObject* object = iter->second;
+=======
+        ManagementObject::shared_ptr object = iter->second;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (object->isDeleted()) deleteList.push_back(*iter);
     }
 
@@ -2951,17 +4141,25 @@ bool ManagementAgent::moveDeletedObjectsLH() {
          iter != deleteList.rend();
          iter++)
     {
+<<<<<<< HEAD
         ManagementObject* delObj = iter->second;
+=======
+        ManagementObject::shared_ptr delObj = iter->second;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         assert(delObj->isDeleted());
         DeletedObject::shared_ptr dptr(new DeletedObject(delObj, qmf1Support, qmf2Support));
 
         pendingDeletedObjs[dptr->getKey()].push_back(dptr);
         managementObjects.erase(iter->first);
+<<<<<<< HEAD
         delete iter->second;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     return !deleteList.empty();
 }
 
+<<<<<<< HEAD
 namespace {
 QPID_TSS const qpid::broker::ConnectionState* executionContext = 0;
 }
@@ -2973,6 +4171,40 @@ void setManagementExecutionContext(const qpid::broker::ConnectionState* ctxt)
 const qpid::broker::ConnectionState* getManagementExecutionContext()
 {
     return executionContext;
+=======
+ManagementAgent::EventQueue::Batch::const_iterator ManagementAgent::sendEvents(
+    const EventQueue::Batch& batch)
+{
+    EventQueue::Batch::const_iterator i;
+    for (i = batch.begin(); i != batch.end(); ++i) {
+        DeliverableMessage deliverable (i->second, 0);
+        try {
+            i->first->route(deliverable);
+        } catch(exception& e) {
+            QPID_LOG(warning, "ManagementAgent failed to route event: " << e.what());
+        }
+    }
+    return i;
+}
+
+namespace {
+QPID_TSS const Connection* currentPublisher = 0;
+}
+
+void setManagementExecutionContext(const Connection& p)
+{
+    currentPublisher = &p;
+}
+
+void resetManagementExecutionContext()
+{
+    currentPublisher = 0;
+}
+
+const Connection* getCurrentPublisher()
+{
+    return currentPublisher;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }}

@@ -127,7 +127,11 @@ void Connection::open(const ConnectionSettings& settings)
         impl->registerFailureCallback ( failureCallback );
 }
 
+<<<<<<< HEAD
 const ConnectionSettings& Connection::getNegotiatedSettings()
+=======
+const ConnectionSettings& Connection::getNegotiatedSettings() const
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (!isOpen())
         throw Exception(QPID_MSG("Connection is not open."));

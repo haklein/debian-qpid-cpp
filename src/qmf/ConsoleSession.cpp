@@ -645,7 +645,11 @@ void ConsoleSessionImpl::run()
 
     try {
         while (!threadCanceled) {
+<<<<<<< HEAD
             periodicProcessing((uint64_t) qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()) /
+=======
+            periodicProcessing((uint64_t) qpid::sys::Duration::FromEpoch() /
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                qpid::sys::TIME_SEC);
 
             Receiver rx;

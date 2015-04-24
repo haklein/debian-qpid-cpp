@@ -23,6 +23,10 @@
 #include "qpid/sys/Mutex.h"
 #include "qpid/sys/Socket.h"
 #include "qpid/sys/Poller.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/SecuritySettings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Thread.h"
 #include "qpid/sys/Time.h"
 #include "qpid/log/Statement.h"
@@ -37,6 +41,10 @@
 
 #include <queue>
 #include <boost/bind.hpp>
+<<<<<<< HEAD
+=======
+#include "AsynchIO.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace sys {
@@ -55,7 +63,11 @@ namespace {
      * the frame layer for writing into.
      */
     struct SslIoBuff : public qpid::sys::AsynchIO::BufferBase {
+<<<<<<< HEAD
         std::auto_ptr<qpid::sys::AsynchIO::BufferBase> aioBuff;
+=======
+        qpid::sys::AsynchIO::BufferBase* aioBuff;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         SslIoBuff (qpid::sys::AsynchIO::BufferBase *base,
                    const SecPkgContext_StreamSizes &sizes)
@@ -66,7 +78,10 @@ namespace {
         {}
 
         ~SslIoBuff() {}
+<<<<<<< HEAD
         qpid::sys::AsynchIO::BufferBase* release() { return aioBuff.release(); }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 }
 
@@ -85,8 +100,15 @@ SslAsynchIO::SslAsynchIO(const qpid::sys::Socket& s,
     readCallback(rCb),
     idleCallback(iCb),
     negotiateDoneCallback(nCb),
+<<<<<<< HEAD
     callbacksInProgress(0),
     queuedDelete(false),
+=======
+    queuedDelete(false),
+    queuedClose(false),
+    reapCheckPending(false),
+    started(false),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     leftoverPlaintext(0)
 {
     SecInvalidateHandle(&ctxtHandle);
@@ -101,6 +123,7 @@ SslAsynchIO::SslAsynchIO(const qpid::sys::Socket& s,
 }
 
 SslAsynchIO::~SslAsynchIO() {
+<<<<<<< HEAD
     if (leftoverPlaintext) {
         delete leftoverPlaintext;
         leftoverPlaintext = 0;
@@ -114,13 +137,60 @@ void SslAsynchIO::queueForDeletion() {
     queuedDelete = true;
     if (!callbacksInProgress)
         delete this;
+=======
+    leftoverPlaintext = 0;
+}
+
+void SslAsynchIO::queueForDeletion() {
+    // Called exactly once, always on the IO completion thread.
+    bool authenticated = (state != Negotiating);
+    state = ShuttingDown;
+    if (authenticated) {
+        // Tell SChannel we are done.
+        DWORD shutdown = SCHANNEL_SHUTDOWN;
+        SecBuffer shutBuff;
+        shutBuff.cbBuffer = sizeof(DWORD);
+        shutBuff.BufferType = SECBUFFER_TOKEN;
+        shutBuff.pvBuffer = &shutdown;
+        SecBufferDesc desc;
+        desc.ulVersion = SECBUFFER_VERSION;
+        desc.cBuffers = 1;
+        desc.pBuffers = &shutBuff;
+        ::ApplyControlToken(&ctxtHandle, &desc);
+        negotiateStep(0);
+    }
+
+    queueWriteClose();
+    queuedDelete = true;
+
+    // This method effectively disconnects the layer above; pass it on the
+    // AsynchIO and delete.
+    aio->queueForDeletion();
+
+    if (!reapCheckPending)
+        delete(this);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslAsynchIO::start(qpid::sys::Poller::shared_ptr poller) {
     aio->start(poller);
+<<<<<<< HEAD
     startNegotiate();
 }
 
+=======
+    started = true;
+    startNegotiate();
+}
+
+void SslAsynchIO::createBuffers(uint32_t size) {
+    // Reserve an extra buffer to hold unread plaintext or trailing encrypted input.
+    windows::AsynchIO *waio = dynamic_cast<windows::AsynchIO*>(aio);
+    waio->setBufferCount(waio->getBufferCount() + 1);
+    aio->createBuffers(size);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void SslAsynchIO::queueReadBuffer(AsynchIO::BufferBase* buff) {
     aio->queueReadBuffer(buff);
 }
@@ -148,7 +218,11 @@ void SslAsynchIO::queueWrite(AsynchIO::BufferBase* buff) {
     // encoding was working on, and adjusting counts for, the SslIoBuff.
     // Update the count of the original BufferBase before handing off to
     // the I/O layer.
+<<<<<<< HEAD
     buff = sslBuff->release();
+=======
+    buff = sslBuff->aioBuff;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     SecBuffer buffs[4];
     buffs[0].cbBuffer = schSizes.cbHeader;
     buffs[0].BufferType = SECBUFFER_STREAM_HEADER;
@@ -181,6 +255,7 @@ void SslAsynchIO::notifyPendingWrite() {
 }
 
 void SslAsynchIO::queueWriteClose() {
+<<<<<<< HEAD
     if (state == Negotiating) {
         // Never got going, so don't bother trying to close SSL down orderly.
         state = ShuttingDown;
@@ -203,12 +278,32 @@ void SslAsynchIO::queueWriteClose() {
     negotiateStep(0);
     // When the shutdown sequence is done, negotiateDone() will handle
     // shutting down aio.
+=======
+    qpid::sys::Mutex::ScopedLock l(lock);
+    if (queuedClose)
+        return;
+    queuedClose = true;
+    if (started) {
+        reapCheckPending = true;
+        // Move tear down logic to an IO thread.
+        aio->requestCallback(boost::bind(&SslAsynchIO::reapCheck, this));
+    }
+    aio->queueWriteClose();
+}
+
+void SslAsynchIO::reapCheck() {
+    // Serialized check in the IO thread whether to self-delete.
+    reapCheckPending = false;
+    if (queuedDelete)
+        delete(this);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool SslAsynchIO::writeQueueEmpty() {
     return aio->writeQueueEmpty();
 }
 
+<<<<<<< HEAD
 /*
  * Initiate a read operation. AsynchIO::readComplete() will be
  * called when the read is complete and data is available.
@@ -221,6 +316,8 @@ void SslAsynchIO::stopReading() {
     aio->stopReading();
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // Queue the specified callback for invocation from an I/O thread.
 void SslAsynchIO::requestCallback(RequestCallback callback) {
     aio->requestCallback(callback);
@@ -241,11 +338,23 @@ AsynchIO::BufferBase* SslAsynchIO::getQueuedBuffer() {
     return sslBuff;
 }
 
+<<<<<<< HEAD
 unsigned int SslAsynchIO::getSslKeySize() {
     SecPkgContext_KeyInfo info;
     memset(&info, 0, sizeof(info));
     ::QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_KEY_INFO, &info);
     return info.KeySize;
+=======
+SecuritySettings SslAsynchIO::getSecuritySettings() {
+    SecPkgContext_KeyInfo info;
+    memset(&info, 0, sizeof(info));
+    ::QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_KEY_INFO, &info);
+
+    SecuritySettings settings;
+    settings.ssf = info.KeySize;
+    settings.authid = std::string();
+    return settings;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslAsynchIO::negotiationDone() {
@@ -262,7 +371,10 @@ void SslAsynchIO::negotiationDone() {
         state = Running;
         break;
     case ShuttingDown:
+<<<<<<< HEAD
         aio->queueWriteClose();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         break;
     default:
         assert(0);
@@ -279,12 +391,22 @@ void SslAsynchIO::negotiationFailed(SECURITY_STATUS status) {
 }
 
 void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
+<<<<<<< HEAD
+=======
+    if (state == ShuttingDown) {
+        return;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (state != Running) {
         negotiateStep(buff);
         return;
     }
 
+<<<<<<< HEAD
     // Decrypt the buffer; if there's legit data, pass it on through.
+=======
+    // Decrypt one block; if there's legit data, pass it on through.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // However, it's also possible that the peer hasn't supplied enough
     // data yet, or the session needs to be renegotiated, or the session
     // is ending.
@@ -330,6 +452,11 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
     // actual decrypted data.
     // If there's extra data, copy that out to a new buffer and run through
     // this method again.
+<<<<<<< HEAD
+=======
+    char *extraBytes = 0;
+    int32_t extraLength = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BufferBase *extraBuff = 0;
     for (int i = 0; i < 4; i++) {
         switch (recvBuffs[i].BufferType) {
@@ -340,6 +467,7 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
             buff->dataCount -= recvBuffs[i].cbBuffer;
             break;
         case SECBUFFER_EXTRA:
+<<<<<<< HEAD
             // Very important to get this buffer from the downstream aio.
             // The ones constructed from the local getQueuedBuffer() are
             // restricted size for encrypting. However, data coming up from
@@ -352,6 +480,10 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
                     recvBuffs[i].pvBuffer,
                     recvBuffs[i].cbBuffer);
             extraBuff->dataCount = recvBuffs[i].cbBuffer;
+=======
+            extraBytes = (char *) recvBuffs[i].pvBuffer;
+            extraLength = recvBuffs[i].cbBuffer;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             break;
         default:
             break;
@@ -367,13 +499,18 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
     // (so we can count on more bytes being on the way via aio).
     do {
         BufferBase *temp = 0;
+<<<<<<< HEAD
         // Now that buff reflects only decrypted data, see if there was any
         // partial data left over from last time. If so, append this new
+=======
+        // See if there was partial data left over from last time. If so, append this new
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         // data to that and release the current buff back to aio. Assume that
         // leftoverPlaintext was squished so the data starts at 0.
         if (leftoverPlaintext != 0) {
             // There is leftover data; append all the new data that will fit.
             int32_t count = buff->dataCount;
+<<<<<<< HEAD
             if (leftoverPlaintext->dataCount + count > leftoverPlaintext->byteCount)
                 count = (leftoverPlaintext->byteCount - leftoverPlaintext->dataCount);
             ::memmove(&leftoverPlaintext->bytes[leftoverPlaintext->dataCount],
@@ -395,15 +532,68 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
             leftoverPlaintext = 0;
         }
         else {
+=======
+            if (count) {
+                if (leftoverPlaintext->dataCount + count > leftoverPlaintext->byteCount)
+                    count = (leftoverPlaintext->byteCount - leftoverPlaintext->dataCount);
+                ::memmove(&leftoverPlaintext->bytes[leftoverPlaintext->dataCount],
+                          &buff->bytes[buff->dataStart], count);
+                leftoverPlaintext->dataCount += count;
+                buff->dataCount -= count;
+                buff->dataStart += count;
+                // Prepare to pass the buffer up. Beware that the read callback
+                // may do an unread(), so move the leftoverPlaintext pointer
+                // out of the way. It also may release the buffer back to aio,
+                // so in either event, the pointer passed to the callback is not
+                // valid on return.
+                temp = leftoverPlaintext;
+                leftoverPlaintext = 0;
+            }
+            else {
+                // All decrypted data used up, decrypt some more or get more from the aio
+                if (extraLength) {
+                    buff->dataStart = extraBytes - buff->bytes;
+                    buff->dataCount = extraLength;
+                    sslDataIn(a, buff);
+                    return;
+                }
+                else {
+                    a.queueReadBuffer(buff);
+                    return;
+                }
+            }
+        }
+        else {
+            // Use buff, but first offload data not yet encrypted
+            if (extraLength) {
+                // Very important to get this buffer from the downstream aio.
+                // The ones constructed from the local getQueuedBuffer() are
+                // restricted size for encrypting. However, data coming up from
+                // TCP may have a bunch of SSL segments coalesced and be much
+                // larger than the maximum single SSL segment.
+                extraBuff = a.getQueuedBuffer();
+                if (0 == extraBuff) {
+                    // No leftoverPlaintext, so a spare buffer should be available
+                    throw QPID_WINDOWS_ERROR(WSAENOBUFS);
+                }
+                memmove(extraBuff->bytes, extraBytes, extraLength);
+                extraBuff->dataCount = extraLength;
+                extraLength = 0;
+            }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             temp = buff;
             buff = 0;
         }
         if (readCallback) {
             // The callback guard here is to prevent an upcall from deleting
             // this out from under us via queueForDeletion().
+<<<<<<< HEAD
             ++callbacksInProgress;
             readCallback(*this, temp);
             --callbacksInProgress;
+=======
+            readCallback(*this, temp);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
         else
             a.queueReadBuffer(temp); // What else can we do with this???
@@ -411,6 +601,7 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
 
     // Ok, the current decrypted data is done. If there was any extra data,
     // go back and handle that.
+<<<<<<< HEAD
     if (extraBuff != 0)
         sslDataIn(a, extraBuff);
 
@@ -418,6 +609,11 @@ void SslAsynchIO::sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff) {
     // callbacks are done.
     if (queuedDelete && callbacksInProgress == 0)
         delete this;
+=======
+    if (extraBuff != 0) {
+        sslDataIn(a, extraBuff);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SslAsynchIO::idle(qpid::sys::AsynchIO&) {
@@ -429,7 +625,26 @@ void SslAsynchIO::idle(qpid::sys::AsynchIO&) {
     }
 }
 
+<<<<<<< HEAD
   /**************************************************/
+=======
+/**************************************************/
+
+namespace {
+
+bool unsafeNegotiatedTlsVersion(CtxtHandle &ctxtHandle) {
+    // See if SChannel ultimately negotiated <= SSL3, perhaps due to
+    // global registry settings.
+    SecPkgContext_ConnectionInfo info;
+    ::QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_CONNECTION_INFO, &info);
+    // Ascending bit patterns denote newer SSL/TLS protocol versions
+    return (info.dwProtocol < SP_PROT_TLS1_SERVER) ? true : false;
+}
+
+} // namespace
+
+/**************************************************/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 ClientSslAsynchIO::ClientSslAsynchIO(const std::string& brokerHost,
                                      const qpid::sys::Socket& s,
@@ -442,7 +657,11 @@ ClientSslAsynchIO::ClientSslAsynchIO(const std::string& brokerHost,
                                      IdleCallback iCb,
                                      NegotiateDoneCallback nCb) :
     SslAsynchIO(s, hCred, rCb, eofCb, disCb, cCb, eCb, iCb, nCb),
+<<<<<<< HEAD
     serverHost(brokerHost)
+=======
+    serverHost(brokerHost), clientCertRequested(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
 }
 
@@ -452,7 +671,11 @@ void ClientSslAsynchIO::startNegotiate() {
 
     // Need a buffer to receive the token to send to the server.
     BufferBase *buff = aio->getQueuedBuffer();
+<<<<<<< HEAD
     ULONG ctxtRequested = ISC_REQ_STREAM;
+=======
+    ULONG ctxtRequested = ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ULONG ctxtAttrs;
     // sendBuffs gets information to forward to the peer.
     SecBuffer sendBuffs[2];
@@ -478,6 +701,10 @@ void ClientSslAsynchIO::startNegotiate() {
                                                          &sendBuffDesc,
                                                          &ctxtAttrs,
                                                          NULL);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (status == SEC_I_CONTINUE_NEEDED) {
         buff->dataCount = sendBuffs[0].cbBuffer;
         aio->queueWrite(buff);
@@ -487,7 +714,11 @@ void ClientSslAsynchIO::startNegotiate() {
 void ClientSslAsynchIO::negotiateStep(BufferBase* buff) {
     // SEC_CHAR is non-const, so do all the typing here.
     SEC_CHAR *host = const_cast<SEC_CHAR *>(serverHost.c_str());
+<<<<<<< HEAD
     ULONG ctxtRequested = ISC_REQ_STREAM;
+=======
+    ULONG ctxtRequested = ISC_REQ_STREAM | ISC_REQ_USE_SUPPLIED_CREDS;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ULONG ctxtAttrs;
 
     // tokenBuffs describe the buffer that's coming in. It should have
@@ -542,18 +773,52 @@ void ClientSslAsynchIO::negotiateStep(BufferBase* buff) {
     if (buff)
         aio->queueReadBuffer(buff);
     if (status == SEC_I_CONTINUE_NEEDED) {
+<<<<<<< HEAD
+=======
+        // check if server has requested a client certificate
+        if (!clientCertRequested) {
+            SecPkgContext_IssuerListInfoEx caList;
+            memset(&caList, 0, sizeof(caList));
+            ::QueryContextAttributes(&ctxtHandle, SECPKG_ATTR_ISSUER_LIST_EX, &caList);
+            if (caList.cIssuers > 0)
+                clientCertRequested = true;
+            if (caList.aIssuers)
+                ::FreeContextBuffer(caList.aIssuers);
+        }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         sendbuff->dataCount = sendBuffs[0].cbBuffer;
         aio->queueWrite(sendbuff);
         return;
     }
     // Nothing to send back to the server...
     aio->queueReadBuffer(sendbuff);
+<<<<<<< HEAD
+=======
+
+    if (status == SEC_E_OK && unsafeNegotiatedTlsVersion(ctxtHandle)) {
+        // Refuse a connection that negotiates to less than TLS 1.0.
+        QPID_LOG(notice, "client SSL negotiation to unsafe protocol version.");
+        status = SEC_E_UNSUPPORTED_FUNCTION;
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // SEC_I_CONTEXT_EXPIRED means session stop complete; SEC_E_OK can be
     // either session stop or negotiation done (session up).
     if (status == SEC_E_OK || status == SEC_I_CONTEXT_EXPIRED)
         negotiationDone();
+<<<<<<< HEAD
     else
         negotiationFailed(status);
+=======
+    else {
+        if (clientCertRequested && status == SEC_E_CERT_UNKNOWN)
+            // ISC_REQ_USE_SUPPLIED_CREDS makes us reponsible for this case
+            // (no client cert).  Map it to its counterpart:
+            status = SEC_E_INCOMPLETE_CREDENTIALS;
+        negotiationFailed(status);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 /*************************************************/
@@ -637,7 +902,11 @@ void ServerSslAsynchIO::negotiateStep(BufferBase* buff) {
         return;
     }
     // There may have been a token generated; if so, send it to the client.
+<<<<<<< HEAD
     if (sendBuffs[0].cbBuffer > 0) {
+=======
+    if (sendBuffs[0].cbBuffer > 0 && state != ShuttingDown) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         sendbuff->dataCount = sendBuffs[0].cbBuffer;
         aio->queueWrite(sendbuff);
     }
@@ -645,6 +914,15 @@ void ServerSslAsynchIO::negotiateStep(BufferBase* buff) {
         // Nothing to send back to the server...
         aio->queueReadBuffer(sendbuff);
 
+<<<<<<< HEAD
+=======
+    if (status == SEC_E_OK && unsafeNegotiatedTlsVersion(ctxtHandle)) {
+        // Refuse a connection that negotiates to less than TLS 1.0.
+        QPID_LOG(notice, "server SSL negotiation to unsafe protocol version.");
+        status = SEC_E_UNSUPPORTED_FUNCTION;
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // SEC_I_CONTEXT_EXPIRED means session stop complete; SEC_E_OK can be
     // either session stop or negotiation done (session up).
     if (status == SEC_E_OK || status == SEC_I_CONTEXT_EXPIRED) {

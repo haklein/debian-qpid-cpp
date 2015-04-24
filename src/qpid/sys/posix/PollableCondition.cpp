@@ -21,7 +21,10 @@
 
 #include "qpid/sys/PollableCondition.h"
 #include "qpid/sys/DispatchHandle.h"
+<<<<<<< HEAD
 #include "qpid/sys/IOHandle.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/posix/PrivatePosix.h"
 #include "qpid/Exception.h"
 
@@ -58,14 +61,24 @@ PollableConditionPrivate::PollableConditionPrivate(
     const sys::PollableCondition::Callback& cb,
     sys::PollableCondition& parent,
     const boost::shared_ptr<sys::Poller>& poller
+<<<<<<< HEAD
 ) : IOHandle(new sys::IOHandlePrivate), cb(cb), parent(parent)
+=======
+) : cb(cb), parent(parent)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     int fds[2];
     if (::pipe(fds) == -1)
         throw ErrnoException(QPID_MSG("Can't create PollableCondition"));
+<<<<<<< HEAD
     impl->fd = fds[0];
     writeFd = fds[1];
     if (::fcntl(impl->fd, F_SETFL, O_NONBLOCK) == -1)
+=======
+    fd = fds[0];
+    writeFd = fds[1];
+    if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         throw ErrnoException(QPID_MSG("Can't create PollableCondition"));
     if (::fcntl(writeFd, F_SETFL, O_NONBLOCK) == -1)
         throw ErrnoException(QPID_MSG("Can't create PollableCondition"));

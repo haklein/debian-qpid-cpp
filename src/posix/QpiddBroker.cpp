@@ -48,6 +48,13 @@ BootstrapOptions::BootstrapOptions(const char* argv0)
     add(log);
 }
 
+<<<<<<< HEAD
+=======
+void BootstrapOptions::usage() const {
+    cout << "Usage: qpidd [OPTIONS]" << endl << endl << *this << endl;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace {
 const std::string TCP = "tcp";
 }
@@ -55,12 +62,22 @@ const std::string TCP = "tcp";
 struct DaemonOptions : public qpid::Options {
     bool daemon;
     bool quit;
+<<<<<<< HEAD
     bool check;
+=======
+    bool kill;
+    bool check;
+    std::vector<int> closeFd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     int wait;
     std::string piddir;
     std::string transport;
 
+<<<<<<< HEAD
     DaemonOptions() : qpid::Options("Daemon options"), daemon(false), quit(false), check(false), wait(600), transport(TCP)
+=======
+    DaemonOptions() : qpid::Options("Daemon options"), daemon(false), quit(false), kill(false), check(false), wait(600), transport(TCP)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         char *home = ::getenv("HOME");
 
@@ -71,12 +88,23 @@ struct DaemonOptions : public qpid::Options {
         piddir += "/.qpidd";
 
         addOptions()
+<<<<<<< HEAD
             ("daemon,d", optValue(daemon), "Run as a daemon. Logs to syslog by default in this mode.")
             ("transport", optValue(transport, "TRANSPORT"), "The transport for which to return the port")
             ("pid-dir", optValue(piddir, "DIR"), "Directory where port-specific PID file is stored")
             ("wait,w", optValue(wait, "SECONDS"), "Sets the maximum wait time to initialize the daemon. If the daemon fails to initialize, prints an error and returns 1")
             ("check,c", optValue(check), "Prints the daemon's process ID to stdout and returns 0 if the daemon is running, otherwise returns 1")
             ("quit,q", optValue(quit), "Tells the daemon to shut down");
+=======
+            ("daemon,d", pure_switch(daemon), "Run as a daemon. Logs to syslog by default in this mode.")
+            ("transport", optValue(transport, "TRANSPORT"), "The transport for which to return the port")
+            ("pid-dir", optValue(piddir, "DIR"), "Directory where port-specific PID file is stored")
+            ("close-fd", optValue(closeFd, "FD"), "File descriptors that the daemon should close")
+            ("wait,w", optValue(wait, "SECONDS"), "Sets the maximum wait time to initialize or shutdown the daemon. If the daemon fails to initialize/shutdown, prints an error and returns 1")
+            ("check,c", pure_switch(check), "Prints the daemon's process ID to stdout and returns 0 if the daemon is running, otherwise returns 1")
+            ("quit,q", pure_switch(quit), "Tells the daemon to shut down with an INT signal")
+            ("kill,k", pure_switch(kill), "Kill the daemon with a KILL signal.");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 };
 
@@ -111,36 +139,62 @@ void QpiddOptions::usage() const {
 // Set the broker pointer on the signal handler, then reset at end of scope.
 // This is to ensure that the signal handler doesn't keep a broker
 // reference after main() has returned.
+<<<<<<< HEAD
 // 
+=======
+//
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 struct ScopedSetBroker {
     ScopedSetBroker(const boost::intrusive_ptr<Broker>& broker) {
         qpid::broker::SignalHandler::setBroker(broker.get());
     }
     ~ScopedSetBroker() { qpid::broker::SignalHandler::setBroker(0); }
 };
+<<<<<<< HEAD
     
 struct QpiddDaemon : public Daemon {
     QpiddPosixOptions *options;
   
+=======
+
+struct QpiddDaemon : public Daemon {
+    QpiddPosixOptions *options;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QpiddDaemon(std::string pidDir, QpiddPosixOptions *opts)
       : Daemon(pidDir), options(opts) {}
 
     /** Code for parent process */
     void parent() {
         uint16_t port = wait(options->daemon.wait);
+<<<<<<< HEAD
         if (options->parent->broker.port == 0 || options->daemon.transport != TCP)
             cout << port << endl; 
+=======
+        if (options->parent->broker.port == 0)
+            cout << port << endl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     /** Code for forked child process */
     void child() {
+<<<<<<< HEAD
+=======
+        // Close extra FDs requested in options.
+        for (size_t i = 0; i < options->daemon.closeFd.size(); ++i)
+            ::close(options->daemon.closeFd[i]);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         boost::intrusive_ptr<Broker> brokerPtr(new Broker(options->parent->broker));
         ScopedSetBroker ssb(brokerPtr);
         brokerPtr->accept();
         uint16_t port=brokerPtr->getPort(options->daemon.transport);
         ready(port);            // Notify parent.
         if (options->parent->broker.enableMgmt && (options->parent->broker.port == 0 || options->daemon.transport != TCP)) {
+<<<<<<< HEAD
             dynamic_cast<qmf::org::apache::qpid::broker::Broker*>(brokerPtr->GetManagementObject())->set_port(port);
+=======
+            boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(brokerPtr->GetManagementObject())->set_port(port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
         brokerPtr->run();
     }
@@ -153,6 +207,7 @@ int QpiddBroker::execute (QpiddOptions *options) {
     if (myOptions == 0)
         throw Exception("Internal error obtaining platform options");
 
+<<<<<<< HEAD
     if (myOptions->daemon.check || myOptions->daemon.quit) {
         pid_t pid;
         try {
@@ -171,6 +226,27 @@ int QpiddBroker::execute (QpiddOptions *options) {
                 throw Exception("Failed to stop daemon: " + qpid::sys::strError(errno));
             // Wait for the process to die before returning
             int retry=10000;    // Try up to 10 seconds
+=======
+    if (myOptions->daemon.check || myOptions->daemon.quit || myOptions->daemon.kill) {
+        pid_t pid;
+        try {
+            pid = Daemon::getPid(myOptions->daemon.piddir, options->broker.port);
+        } catch (const Exception& e) {
+            // This is not a critical error, usually means broker is not running
+            QPID_LOG(notice, "Broker is not running: " << e.what());
+            return 1;
+        }
+        if (pid < 0)
+            return 1;
+        if (myOptions->daemon.check)
+            cout << pid << endl;
+        if (myOptions->daemon.quit || myOptions->daemon.kill) {
+            int signal = myOptions->daemon.kill ? SIGKILL : SIGINT;
+            if (kill(pid, signal) < 0)
+                throw Exception("Failed to stop daemon: " + qpid::sys::strError(errno));
+            // Wait for the process to die before returning
+            int retry=myOptions->daemon.wait*1000;    // Try up to "--wait N" seconds, do retry every millisecond
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             while (kill(pid,0) == 0 && --retry)
                 sys::usleep(1000);
             if (retry == 0)
@@ -192,11 +268,19 @@ int QpiddBroker::execute (QpiddOptions *options) {
         boost::intrusive_ptr<Broker> brokerPtr(new Broker(options->broker));
         ScopedSetBroker ssb(brokerPtr);
         brokerPtr->accept();
+<<<<<<< HEAD
         if (options->broker.port == 0 || myOptions->daemon.transport != TCP) {
             uint16_t port = brokerPtr->getPort(myOptions->daemon.transport);
             cout << port << endl;
             if (options->broker.enableMgmt) {
                 dynamic_cast<qmf::org::apache::qpid::broker::Broker*>(brokerPtr->GetManagementObject())->set_port(port);
+=======
+        if (options->broker.port == 0) {
+            uint16_t port = brokerPtr->getPort(myOptions->daemon.transport);
+            cout << port << endl;
+            if (options->broker.enableMgmt) {
+                boost::dynamic_pointer_cast<qmf::org::apache::qpid::broker::Broker>(brokerPtr->GetManagementObject())->set_port(port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
         brokerPtr->run();

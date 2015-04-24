@@ -22,13 +22,21 @@
  *
  */
 
+<<<<<<< HEAD
+=======
+#include <boost/intrusive_ptr.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/shared_ptr.hpp>
 #include "qpid/framing/amqp_types.h"
 #include "qpid/framing/Buffer.h"
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 
+=======
+class Message;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /**
  * The interface through which messages are reloaded on recovery.
  */
@@ -38,6 +46,10 @@ public:
     typedef boost::shared_ptr<RecoverableMessage> shared_ptr;
     virtual void setPersistenceId(uint64_t id) = 0;
     virtual void setRedelivered() = 0;
+<<<<<<< HEAD
+=======
+    virtual void computeExpiration() = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /**
      * Used by store to determine whether to load content on recovery
      * or let message load its own content as and when it requires it.
@@ -50,6 +62,10 @@ public:
      * of length as necessary)
      */
     virtual void decodeContent(framing::Buffer& buffer) = 0;
+<<<<<<< HEAD
+=======
+    virtual Message getMessage() = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual ~RecoverableMessage() {};
 };
 

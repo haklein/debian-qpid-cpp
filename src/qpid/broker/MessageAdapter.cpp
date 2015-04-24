@@ -26,7 +26,11 @@
 #include "qpid/framing/MessageTransferBody.h"
 
 namespace {
+<<<<<<< HEAD
     const std::string empty;
+=======
+    const std::string EMPTY;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace qpid {
@@ -35,7 +39,11 @@ namespace broker{
     std::string TransferAdapter::getRoutingKey(const framing::FrameSet& f)
     {
         const framing::DeliveryProperties* p = f.getHeaders()->get<framing::DeliveryProperties>();
+<<<<<<< HEAD
         return p ? p->getRoutingKey() : empty;
+=======
+        return p ? p->getRoutingKey() : EMPTY;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     std::string TransferAdapter::getExchange(const framing::FrameSet& f)
@@ -76,6 +84,10 @@ namespace broker{
     std::string TransferAdapter::getAppId(const framing::FrameSet& f)
     {
         const framing::MessageProperties* p = f.getHeaders()->get<framing::MessageProperties>();
+<<<<<<< HEAD
         return p ? p->getAppId() : empty;
+=======
+        return p ? p->getAppId() : EMPTY;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }}

@@ -23,11 +23,30 @@
  */
 
 #include "qpid/broker/BrokerImportExport.h"
+<<<<<<< HEAD
 #include "qpid/sys/Timer.h"
 
 namespace qpid {
 namespace broker {
 
+=======
+#include "qpid/sys/PollableQueue.h"
+#include "qpid/sys/Time.h"
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+
+namespace qpid {
+
+namespace sys {
+    class Timer;
+    class TimerTask;
+}
+
+namespace broker {
+
+class Queue;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class QueueRegistry;
 /**
  * TimerTask to purge expired messages from queues
@@ -35,6 +54,7 @@ class QueueRegistry;
 class QueueCleaner
 {
   public:
+<<<<<<< HEAD
     QPID_BROKER_EXTERN QueueCleaner(QueueRegistry& queues, sys::Timer* timer);
     QPID_BROKER_EXTERN ~QueueCleaner();
     QPID_BROKER_EXTERN void start(sys::Duration period);
@@ -49,12 +69,31 @@ class QueueCleaner
         QueueCleaner& parent;
     };
 
+=======
+    QPID_BROKER_EXTERN QueueCleaner(QueueRegistry& queues, boost::shared_ptr<sys::Poller>, sys::Timer* timer);
+    QPID_BROKER_EXTERN ~QueueCleaner();
+    QPID_BROKER_EXTERN void start(sys::Duration period);
+    QPID_BROKER_EXTERN void setTimer(sys::Timer* timer);
+
+  private:
+    typedef boost::shared_ptr<Queue> QueuePtr;
+    typedef std::deque< QueuePtr > QueuePtrs;
+    typedef qpid::sys::PollableQueue< QueuePtr > PurgeSet;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     boost::intrusive_ptr<sys::TimerTask> task;
     QueueRegistry& queues;
     sys::Timer* timer;
     sys::Duration period;
+<<<<<<< HEAD
 
     void fired();
+=======
+    PurgeSet purging;
+
+    void fired();
+    QueuePtrs::const_iterator purge(const QueuePtrs&);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::broker
 

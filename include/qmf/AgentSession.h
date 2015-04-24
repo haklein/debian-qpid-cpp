@@ -21,6 +21,14 @@
  *
  */
 
+<<<<<<< HEAD
+=======
+#if !defined(QMF_USE_DEPRECATED_API) && !defined(qmf2_EXPORTS) && !defined(SWIG)
+#  error "The API defined in this file has been DEPRECATED and will be removed in the future."
+#  error "Define 'QMF_USE_DEPRECATED_API' to enable continued use of the API."
+#endif
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qmf/ImportExport.h>
 #include "qmf/Handle.h"
 #include "qpid/messaging/Duration.h"

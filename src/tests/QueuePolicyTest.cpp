@@ -22,14 +22,24 @@
 #include "unit_test.h"
 #include "test_tools.h"
 
+<<<<<<< HEAD
 #include "qpid/broker/QueuePolicy.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/client/QueueOptions.h"
 #include "qpid/sys/Time.h"
 #include "qpid/framing/reply_exceptions.h"
+<<<<<<< HEAD
 #include "MessageUtils.h"
 #include "BrokerFixture.h"
 
+=======
+#include "BrokerFixture.h"
+
+#include <boost/format.hpp>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using namespace qpid::broker;
 using namespace qpid::client;
 using namespace qpid::framing;
@@ -39,6 +49,7 @@ namespace tests {
 
 QPID_AUTO_TEST_SUITE(QueuePolicyTestSuite)
 
+<<<<<<< HEAD
 namespace {
 QueuedMessage createMessage(uint32_t size)
 {
@@ -151,6 +162,12 @@ QPID_AUTO_TEST_CASE(testRingPolicyCount)
     FieldTable args;
     std::auto_ptr<QueuePolicy> policy = QueuePolicy::createQueuePolicy("test", 5, 0, QueuePolicy::RING);
     policy->update(args);
+=======
+QPID_AUTO_TEST_CASE(testRingPolicyCount)
+{
+    QueueOptions args;
+    args.setSizePolicy(RING, 0, 5);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     SessionFixture f;
     std::string q("my-ring-queue");
@@ -177,6 +194,7 @@ QPID_AUTO_TEST_CASE(testRingPolicyCount)
 
 QPID_AUTO_TEST_CASE(testRingPolicySize)
 {
+<<<<<<< HEAD
     std::string hundredBytes = std::string(100, 'h');
     std::string fourHundredBytes = std::string (400, 'f');
     std::string thousandBytes = std::string(1000, 't');
@@ -189,6 +207,24 @@ QPID_AUTO_TEST_CASE(testRingPolicySize)
 
     SessionFixture f;
     std::string q("my-ring-queue");
+=======
+    //The message size now includes all headers as well as the content
+    //aka body, so compute the amount of data needed to hit a given
+    //overall size
+    std::string q("my-ring-queue");
+    size_t minMessageSize = 25/*minimum size of headers*/ + q.size()/*routing key length*/ + 4/*default exchange, added by broker*/;
+
+    std::string hundredBytes = std::string(100 - minMessageSize, 'h');
+    std::string fourHundredBytes = std::string (400 - minMessageSize, 'f');
+    std::string thousandBytes = std::string(1000 - minMessageSize, 't');
+
+    // Ring queue, 500 bytes maxSize
+
+    QueueOptions args;
+    args.setSizePolicy(RING, 500, 0);
+
+    SessionFixture f;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     f.session.queueDeclare(arg::queue=q, arg::exclusive=true, arg::autoDelete=true, arg::arguments=args);
 
     // A. Send messages 0 .. 5, each 100 bytes
@@ -255,9 +291,15 @@ QPID_AUTO_TEST_CASE(testRingPolicySize)
 
 QPID_AUTO_TEST_CASE(testStrictRingPolicy)
 {
+<<<<<<< HEAD
     FieldTable args;
     std::auto_ptr<QueuePolicy> policy = QueuePolicy::createQueuePolicy("test", 5, 0, QueuePolicy::RING_STRICT);
     policy->update(args);
+=======
+    QueueOptions args;
+    args.setSizePolicy(RING_STRICT, 0, 5);
+    args.setString("qpid.flow_stop_count", "0");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     SessionFixture f;
     std::string q("my-ring-queue");
@@ -281,9 +323,14 @@ QPID_AUTO_TEST_CASE(testStrictRingPolicy)
 
 QPID_AUTO_TEST_CASE(testPolicyWithDtx)
 {
+<<<<<<< HEAD
     FieldTable args;
     std::auto_ptr<QueuePolicy> policy = QueuePolicy::createQueuePolicy("test", 5, 0, QueuePolicy::REJECT);
     policy->update(args);
+=======
+    QueueOptions args;
+    args.setSizePolicy(REJECT, 0, 5);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     SessionFixture f;
     std::string q("my-policy-queue");
@@ -367,9 +414,14 @@ QPID_AUTO_TEST_CASE(testFlowToDiskWithNoStore)
 
 QPID_AUTO_TEST_CASE(testPolicyFailureOnCommit)
 {
+<<<<<<< HEAD
     FieldTable args;
     std::auto_ptr<QueuePolicy> policy = QueuePolicy::createQueuePolicy("test", 5, 0, QueuePolicy::REJECT);
     policy->update(args);
+=======
+    QueueOptions args;
+    args.setSizePolicy(REJECT, 0, 5);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     SessionFixture f;
     std::string q("q");

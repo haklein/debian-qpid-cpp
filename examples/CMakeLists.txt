@@ -35,8 +35,11 @@ include_directories( ${Boost_INCLUDE_DIR} )
 link_directories( ${Boost_LIBRARY_DIRS} )
 
 # Visual Studio needs some Windows-specific simplifications.
+<<<<<<< HEAD
 # Linux needs to reference the boost libs, even though they should be
 # resolved via the Qpid libs.
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 if (MSVC)
   add_definitions( /D "NOMINMAX" /D "WIN32_LEAN_AND_MEAN" /D "BOOST_ALL_DYN_LINK" )
   # On Windows, prevent the accidental inclusion of Boost headers from
@@ -44,9 +47,12 @@ if (MSVC)
   # Boost in the examples, and references via qpidclient/qpidcommon are
   # resolved in the Qpid libs.
   add_definitions( /D "BOOST_ALL_NO_LIB" )
+<<<<<<< HEAD
 else (MSVC)
   set(_boost_libs_needed ${Boost_PROGRAM_OPTIONS_LIBRARY}
                          ${Boost_FILESYSTEM_LIBRARY})
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 endif (MSVC)
 
 # There are numerous duplicate names within the examples. Since all target
@@ -90,6 +96,11 @@ if (MSVC)
            COMPONENT ${QPID_COMPONENT_EXAMPLES})
 endif (MSVC)
 
+<<<<<<< HEAD
 add_subdirectory(qmf-console)
 add_subdirectory(messaging)
 add_subdirectory(old_api)
+=======
+add_subdirectory(messaging)
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

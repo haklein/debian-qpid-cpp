@@ -20,19 +20,33 @@
  */
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/broker/Broker.h"
+<<<<<<< HEAD
 #include "qpid/broker/Queue.h"
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/broker/Queue.h"
+#include "qpid/broker/QueueSettings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/Exception.h"
 #include "qpid/framing/FieldValue.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/broker/SessionState.h"
+<<<<<<< HEAD
 #include "qpid/sys/ClusterSafe.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include "qmf/org/apache/qpid/broker/Queue.h"
 
 #include <sstream>
 
+<<<<<<< HEAD
+=======
+#include <boost/enable_shared_from_this.hpp>
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using namespace qpid::broker;
 using namespace qpid::framing;
 
@@ -43,6 +57,7 @@ namespace {
     template <typename T>
     void validateFlowConfig(T max, T& stop, T& resume, const std::string& type, const std::string& queue)
     {
+<<<<<<< HEAD
         if (resume > stop) {
             throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_resume_" << type
                                                     << "=" << resume
@@ -85,10 +100,29 @@ namespace {
         QPID_LOG(warning, "Cannot convert " << key << " to unsigned integer, using default (" << defaultValue << ")");
         return defaultValue;
     }
+=======
+        if (stop) {
+            if (resume > stop) {
+                throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_resume_" << type
+                                                    << "=" << resume
+                                                    << " must be less or equal to qpid.flow_stop_" << type
+                                                    << "=" << stop));
+            }
+            if (resume == 0) resume = stop;
+            if (max != 0 && (max < stop)) {
+                throw InvalidArgumentException(QPID_MSG("Queue \"" << queue << "\": qpid.flow_stop_" << type
+                                                    << "=" << stop
+                                                    << " must be less than qpid.max_" << type
+                                                    << "=" << max));
+            }
+        }
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
 
+<<<<<<< HEAD
 QueueFlowLimit::QueueFlowLimit(Queue *_queue,
                                uint32_t _flowStopCount, uint32_t _flowResumeCount,
                                uint64_t _flowStopSize,  uint64_t _flowResumeSize)
@@ -114,6 +148,16 @@ QueueFlowLimit::QueueFlowLimit(Queue *_queue,
     }
     validateFlowConfig( maxCount, flowStopCount, flowResumeCount, "count", queueName );
     validateFlowConfig( maxSize, flowStopSize, flowResumeSize, "size", queueName );
+=======
+QueueFlowLimit::QueueFlowLimit(const std::string& _queueName,
+                               uint32_t _flowStopCount, uint32_t _flowResumeCount,
+                               uint64_t _flowStopSize,  uint64_t _flowResumeSize)
+    : queue(0), queueName(_queueName),
+      flowStopCount(_flowStopCount), flowResumeCount(_flowResumeCount),
+      flowStopSize(_flowStopSize), flowResumeSize(_flowResumeSize),
+      flowStopped(false), count(0), size(0), broker(0)
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(info, "Queue \"" << queueName << "\": Flow limit created: flowStopCount=" << flowStopCount
              << ", flowResumeCount=" << flowResumeCount
              << ", flowStopSize=" << flowStopSize << ", flowResumeSize=" << flowResumeSize );
@@ -125,23 +169,39 @@ QueueFlowLimit::~QueueFlowLimit()
     sys::Mutex::ScopedLock l(indexLock);
     if (!index.empty()) {
         // we're gone - release all pending msgs
+<<<<<<< HEAD
         for (std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.begin();
              itr != index.end(); ++itr)
             if (itr->second)
                 try {
                     itr->second->getIngressCompletion().finishCompleter();
+=======
+        for (std::map<framing::SequenceNumber, Message >::iterator itr = index.begin();
+             itr != index.end(); ++itr)
+            if (itr->second)
+                try {
+                    itr->second.getPersistentContext()->getIngressCompletion().finishCompleter();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 } catch (...) {}    // ignore - not safe for a destructor to throw.
         index.clear();
     }
 }
 
 
+<<<<<<< HEAD
 void QueueFlowLimit::enqueued(const QueuedMessage& msg)
+=======
+void QueueFlowLimit::enqueued(const Message& msg)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     sys::Mutex::ScopedLock l(indexLock);
 
     ++count;
+<<<<<<< HEAD
     size += msg.payload->contentSize();
+=======
+    size += msg.getMessageSize();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if (!flowStopped) {
         if (flowStopCount && count > flowStopCount) {
@@ -158,6 +218,7 @@ void QueueFlowLimit::enqueued(const QueuedMessage& msg)
     }
 
     if (flowStopped || !index.empty()) {
+<<<<<<< HEAD
         // ignore flow control if we are populating the queue due to cluster replication:
         if (broker && broker->isClusterUpdatee()) {
             QPID_LOG(trace, "Queue \"" << queueName << "\": ignoring flow control for msg pos=" << msg.position);
@@ -167,6 +228,12 @@ void QueueFlowLimit::enqueued(const QueuedMessage& msg)
         msg.payload->getIngressCompletion().startCompleter();    // don't complete until flow resumes
         bool unique;
         unique = index.insert(std::pair<framing::SequenceNumber, boost::intrusive_ptr<Message> >(msg.position, msg.payload)).second;
+=======
+        QPID_LOG(trace, "Queue \"" << queueName << "\": setting flow control for msg pos=" << msg.getSequence());
+        msg.getPersistentContext()->getIngressCompletion().startCompleter();    // don't complete until flow resumes
+        bool unique;
+        unique = index.insert(std::pair<framing::SequenceNumber, Message >(msg.getSequence(), msg)).second;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         // Like this to avoid tripping up unused variable warning when NDEBUG set
         if (!unique) assert(unique);
     }
@@ -174,7 +241,11 @@ void QueueFlowLimit::enqueued(const QueuedMessage& msg)
 
 
 
+<<<<<<< HEAD
 void QueueFlowLimit::dequeued(const QueuedMessage& msg)
+=======
+void QueueFlowLimit::dequeued(const Message& msg)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     sys::Mutex::ScopedLock l(indexLock);
 
@@ -184,7 +255,11 @@ void QueueFlowLimit::dequeued(const QueuedMessage& msg)
         throw Exception(QPID_MSG("Flow limit count underflow on dequeue. Queue=" << queueName));
     }
 
+<<<<<<< HEAD
     uint64_t _size = msg.payload->contentSize();
+=======
+    uint64_t _size = msg.getMessageSize();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (_size <= size) {
         size -= _size;
     } else {
@@ -203,6 +278,7 @@ void QueueFlowLimit::dequeued(const QueuedMessage& msg)
     if (!index.empty()) {
         if (!flowStopped) {
             // flow enabled - release all pending msgs
+<<<<<<< HEAD
             for (std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.begin();
                  itr != index.end(); ++itr)
                 if (itr->second)
@@ -213,6 +289,18 @@ void QueueFlowLimit::dequeued(const QueuedMessage& msg)
             std::map<framing::SequenceNumber, boost::intrusive_ptr<Message> >::iterator itr = index.find(msg.position);
             if (itr != index.end()) {       // this msg is flow controlled, release it:
                 msg.payload->getIngressCompletion().finishCompleter();
+=======
+            for (std::map<framing::SequenceNumber, Message >::iterator itr = index.begin();
+                 itr != index.end(); ++itr)
+                if (itr->second)
+                    itr->second.getPersistentContext()->getIngressCompletion().finishCompleter();
+            index.clear();
+        } else {
+            // even if flow controlled, we must release this msg as it is being dequeued
+            std::map<framing::SequenceNumber, Message >::iterator itr = index.find(msg.getSequence());
+            if (itr != index.end()) {       // this msg is flow controlled, release it:
+                msg.getPersistentContext()->getIngressCompletion().finishCompleter();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 index.erase(itr);
             }
         }
@@ -279,6 +367,7 @@ void QueueFlowLimit::setDefaults(uint64_t maxQueueSize, uint flowStopRatio, uint
 }
 
 
+<<<<<<< HEAD
 void QueueFlowLimit::observe(Queue& queue, const qpid::framing::FieldTable& settings)
 {
     QueueFlowLimit *ptr = createLimit( &queue, settings );
@@ -397,6 +486,68 @@ void QueueFlowLimit::setState(const qpid::framing::FieldTable& state)
 
 namespace qpid {
     namespace broker {
+=======
+void QueueFlowLimit::observe(Queue& queue)
+{
+    /* set up management stuff */
+    broker = queue.getBroker();
+    queueMgmtObj = boost::dynamic_pointer_cast<_qmfBroker::Queue> (queue.GetManagementObject());
+    if (queueMgmtObj) {
+        queueMgmtObj->set_flowStopped(isFlowControlActive());
+    }
+
+    /* set up the observer */
+    queue.getObservers().add(shared_from_this());
+}
+
+/** returns ptr to a QueueFlowLimit, else 0 if no limit */
+boost::shared_ptr<QueueFlowLimit> QueueFlowLimit::createLimit(const std::string& queueName, const QueueSettings& settings)
+{
+    if (settings.dropMessagesAtLimit) {
+        // The size of a RING queue is limited by design - no need for flow control.
+        return boost::shared_ptr<QueueFlowLimit>();
+    }
+    if ((!settings.flowStop.hasCount()) && (!settings.flowStop.hasSize()) && (settings.flowResume.hasCount() || settings.flowResume.hasSize()))
+        QPID_LOG(warning, "queue " << queueName << ": user-configured flow limits are ignored as no stop limits provided");
+
+    uint32_t flowStopCount(0), flowResumeCount(0), maxMsgCount(settings.maxDepth.hasCount() ? settings.maxDepth.getCount() : 0);
+    uint64_t flowStopSize(0), flowResumeSize(0), maxByteCount(settings.maxDepth.hasSize() ? settings.maxDepth.getSize() : defaultMaxSize);
+
+    // pre-fill by defaults, if exist
+    if (defaultFlowStopRatio) {   // broker has a default ratio setup...
+        flowStopSize = (uint64_t)(maxByteCount * (defaultFlowStopRatio/100.0) + 0.5);
+        flowStopCount = (uint32_t)(maxMsgCount * (defaultFlowStopRatio/100.0) + 0.5);
+    }
+
+    if (defaultFlowResumeRatio) {   // broker has a default ratio setup...
+        flowResumeSize = (uint64_t)(maxByteCount * (defaultFlowResumeRatio/100.0));
+	flowResumeCount = (uint32_t)(maxMsgCount * (defaultFlowResumeRatio/100.0));
+    }
+
+    // update by user-specified thresholds
+    if (settings.flowStop.hasCount())
+        flowStopCount = settings.flowStop.getCount();
+    if (settings.flowStop.hasSize())
+        flowStopSize = settings.flowStop.getSize();
+    if (settings.flowResume.hasCount())
+        flowResumeCount = settings.flowResume.getCount();
+    if (settings.flowResume.hasSize())
+        flowResumeSize = settings.flowResume.getSize();
+
+    if (flowStopCount || flowStopSize) {
+	validateFlowConfig(maxMsgCount, flowStopCount, flowResumeCount, "count", queueName );
+        validateFlowConfig(maxByteCount, flowStopSize, flowResumeSize, "size", queueName );
+        return boost::shared_ptr<QueueFlowLimit>(new QueueFlowLimit(queueName, flowStopCount, flowResumeCount, flowStopSize, flowResumeSize));
+    }
+    else
+        //don't have a non-zero value for either the count or the
+        //size to stop at, so no flow limit applicable
+        return boost::shared_ptr<QueueFlowLimit>();
+}
+
+namespace qpid {
+namespace broker {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 std::ostream& operator<<(std::ostream& out, const QueueFlowLimit& f)
 {
@@ -405,6 +556,10 @@ std::ostream& operator<<(std::ostream& out, const QueueFlowLimit& f)
     return out;
 }
 
+<<<<<<< HEAD
     }
+=======
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 

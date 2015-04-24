@@ -97,8 +97,12 @@ Connection globalConnection;
 
 uint64_t current_time()
 {
+<<<<<<< HEAD
     Duration t(EPOCH, now());
     return t;
+=======
+    return Duration::FromEpoch();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 struct Stats
@@ -364,6 +368,7 @@ void Sender::sendByRate()
     AbsTime last = start;
     while (true) {
         AbsTime sentAt=now();
+<<<<<<< HEAD
         msg.getDeliveryProperties().setTimestamp(Duration(EPOCH, sentAt));
         async(session).messageTransfer(arg::content=msg, arg::acceptMode=1);
         if (opts.sync) session.sync();
@@ -375,6 +380,21 @@ void Sender::sendByRate()
             //report inability to stay within 1% of desired rate
             if (actualRate < opts.rate && opts.rate - actualRate > opts.rate/100) {
                 std::cerr << "WARNING: Desired send rate: " << opts.rate << ", actual send rate: " << actualRate << std::endl;
+=======
+        msg.getDeliveryProperties().setTimestamp(Duration::FromEpoch());
+        async(session).messageTransfer(arg::content=msg, arg::acceptMode=1);
+        if (opts.sync) session.sync();
+        ++sent;
+        if (Duration(last, sentAt) > (opts.reportFrequency*TIME_MSEC)) {
+            Duration t(start, now());
+            //check rate actually achieved thus far
+            if (t/TIME_SEC) {
+                uint actualRate = sent / (t/TIME_SEC);
+                //report inability to stay within 1% of desired rate
+                if (actualRate < opts.rate && opts.rate - actualRate > opts.rate/100) {
+                    std::cerr << "WARNING: Desired send rate: " << opts.rate << ", actual send rate: " << actualRate << std::endl;
+                }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
             last = sentAt;
         }

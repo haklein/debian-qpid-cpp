@@ -26,8 +26,11 @@
 #include "qpid/broker/MessageStore.h"
 #include "qpid/broker/TxOp.h"
 
+<<<<<<< HEAD
 #include <boost/intrusive_ptr.hpp>
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <algorithm>
 #include <functional>
 #include <list>
@@ -36,6 +39,7 @@ namespace qpid {
     namespace broker {
         class RecoveredDequeue : public TxOp{
             boost::shared_ptr<Queue> queue;
+<<<<<<< HEAD
             boost::intrusive_ptr<Message> msg;
 
         public:
@@ -48,6 +52,21 @@ namespace qpid {
 
             boost::shared_ptr<Queue> getQueue() const { return queue; }
             boost::intrusive_ptr<Message> getMessage() const { return msg; }
+=======
+            Message msg;
+
+        public:
+            RecoveredDequeue(boost::shared_ptr<Queue> queue, Message msg);
+            virtual bool prepare(TransactionContext* ctxt) throw();
+            virtual void commit() throw();
+            virtual void rollback() throw();
+            // TODO aconway 2013-07-08: revisit
+            virtual void callObserver(const boost::shared_ptr<TransactionObserver>&) {}
+            virtual ~RecoveredDequeue(){}
+
+            boost::shared_ptr<Queue> getQueue() const { return queue; }
+            Message getMessage() const { return msg; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         };
     }
 }

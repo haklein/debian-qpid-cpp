@@ -24,11 +24,15 @@
 #include "qpid/Exception.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/Shlib.h"
+<<<<<<< HEAD
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
 namespace fs=boost::filesystem;
+=======
+#include "qpid/sys/FileSysDir.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace {
 
@@ -43,7 +47,11 @@ inline std::string& suffix() {
 }
 
 bool isShlibName(const std::string& name) {
+<<<<<<< HEAD
     return name.find (suffix()) == name.length() - suffix().length();
+=======
+    return name.substr(name.size()-suffix().size()) == suffix();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }
@@ -59,6 +67,7 @@ ModuleOptions::ModuleOptions(const std::string& defaultModuleDir)
         ("no-module-dir", optValue(noLoad),          "Don't load modules from module directory");
 }
 
+<<<<<<< HEAD
 void tryShlib(const char* libname_, bool noThrow) {
     std::string libname(libname_);
     if (!isShlibName(libname)) libname += suffix();
@@ -92,6 +101,42 @@ void loadModuleDir (std::string dirname, bool isDefault)
         if (!fs::is_directory(*itr) && isShlibName(itr->string()))
             tryShlib (itr->string().data(), true);
     }
+=======
+void tryShlib(const std::string& libname) {
+    sys::Shlib shlib( isShlibName(libname) ? libname : (libname + suffix()));
+}
+
+namespace {
+
+void tryOnlyShlib(const std::string& libname) throw() {
+    try {
+        if (isShlibName(libname)) sys::Shlib shlib( libname );
+    }
+    catch (const std::exception& /*e*/) {
+    }
+}
+
+}
+
+void loadModuleDir (std::string dirname, bool isDefault)
+{
+
+    sys::FileSysDir dirPath (dirname);
+
+    bool exists;
+    try
+    {
+        exists = dirPath.exists();
+    } catch (Exception& e) {
+        throw Exception ("Invalid value for module-dir: " + e.getMessage());
+    }
+    if (!exists) {
+        if (isDefault) return;
+        throw Exception ("Directory not found: " + dirname);
+    }
+
+    dirPath.forEachFile(&tryOnlyShlib);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 } // namespace qpid

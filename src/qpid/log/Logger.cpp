@@ -24,6 +24,10 @@
 #include "qpid/sys/Time.h"
 #include "qpid/DisableExceptionLogging.h"
 
+<<<<<<< HEAD
+=======
+#include "boost/version.hpp"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #if (BOOST_VERSION >= 104000)
 #include <boost/serialization/singleton.hpp>
 #else
@@ -67,7 +71,11 @@ Logger::Logger() : flags(0) {
     // Initialize myself from env variables so all programs
     // (e.g. tests) can use logging even if they don't parse
     // command line args.
+<<<<<<< HEAD
     Options opts("");
+=======
+    Options opts;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     opts.parse(0, 0);
     configure(opts);
 }
@@ -105,7 +113,11 @@ void Logger::log(const Statement& s, const std::string& msg) {
         os << s.file << ":";
     if (flags&LINE)
         os << dec << s.line << ":";
+<<<<<<< HEAD
     if (flags&FUNCTION)
+=======
+    if ((flags&FUNCTION) && s.function)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         os << s.function << ":";
     if (flags & (FILE|LINE|FUNCTION))
         os << " ";
@@ -172,9 +184,32 @@ void Logger::configure(const Options& opts) {
 
 void Logger::reconfigure(const std::vector<std::string>& selectors) {
     options.selectors = selectors;
+<<<<<<< HEAD
+=======
+    options.deselectors.clear();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     select(Selector(options));
 }
 
 void Logger::setPrefix(const std::string& p) { prefix = p; }
 
+<<<<<<< HEAD
+=======
+
+bool Logger::getHiresTimestamp()
+{
+    return flags & HIRES;
+}
+
+
+void Logger::setHiresTimestamp(bool setting)
+{
+    ScopedLock l(lock);
+    if (setting)
+        flags |= HIRES;
+    else
+        flags &= ~HIRES;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::log

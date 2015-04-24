@@ -35,7 +35,11 @@
 #include "qpid/sys/Thread.h"
 
 #include <boost/shared_ptr.hpp>
+<<<<<<< HEAD
 #include <boost/weak_ptr.hpp>
+=======
+#include <boost/scoped_ptr.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <deque>
 #include <string>
 
@@ -50,7 +54,10 @@ namespace client {
 class TCPConnector : public Connector, public sys::Codec
 {
     typedef std::deque<framing::AMQFrame> Frames;
+<<<<<<< HEAD
     struct Buff;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     const uint16_t maxFrameSize;
 
@@ -67,7 +74,11 @@ class TCPConnector : public Connector, public sys::Codec
     sys::ShutdownHandler* shutdownHandler;
     framing::InputHandler* input;
 
+<<<<<<< HEAD
     sys::Socket socket;
+=======
+    boost::scoped_ptr<sys::Socket> socket;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     sys::AsynchConnector* connector;
     sys::AsynchIO* aio;
@@ -79,6 +90,7 @@ class TCPConnector : public Connector, public sys::Codec
     void writeDataBlock(const framing::AMQDataBlock& data);
 
     void close();
+<<<<<<< HEAD
     void send(framing::AMQFrame& frame);
     void abort();
 
@@ -86,12 +98,24 @@ class TCPConnector : public Connector, public sys::Codec
     void setShutdownHandler(sys::ShutdownHandler* handler);
     sys::ShutdownHandler* getShutdownHandler() const;
     framing::OutputHandler* getOutputHandler();
+=======
+    void handle(framing::AMQFrame& frame);
+    void abort();
+    void connectAborted();
+
+    void setInputHandler(framing::InputHandler* handler);
+    void setShutdownHandler(sys::ShutdownHandler* handler);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string& getIdentifier() const;
     void activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer>);
     const qpid::sys::SecuritySettings* getSecuritySettings() { return 0; }
 
     size_t decode(const char* buffer, size_t size);
+<<<<<<< HEAD
     size_t encode(const char* buffer, size_t size);
+=======
+    size_t encode(char* buffer, size_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool canEncode();
 
 protected:
@@ -100,7 +124,11 @@ protected:
     void start(sys::AsynchIO* aio_);
     void initAmqp();
     virtual void connectFailed(const std::string& msg);
+<<<<<<< HEAD
     bool readbuff(qpid::sys::AsynchIO&, qpid::sys::AsynchIOBufferBase*);
+=======
+    void readbuff(qpid::sys::AsynchIO&, qpid::sys::AsynchIOBufferBase*);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void writebuff(qpid::sys::AsynchIO&);
     void eof(qpid::sys::AsynchIO&);
     void disconnected(qpid::sys::AsynchIO&);

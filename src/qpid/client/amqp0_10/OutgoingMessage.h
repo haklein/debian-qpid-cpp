@@ -21,8 +21,15 @@
  * under the License.
  *
  */
+<<<<<<< HEAD
 #include "qpid/client/Completion.h"
 #include "qpid/client/Message.h"
+=======
+#include "qpid/client/AsyncSession.h"
+#include "qpid/client/Completion.h"
+#include "qpid/client/Message.h"
+#include "qpid/sys/Time.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace messaging {
@@ -31,6 +38,7 @@ class Message;
 namespace client {
 namespace amqp0_10 {
 
+<<<<<<< HEAD
 struct OutgoingMessage
 {
     qpid::client::Message message;
@@ -40,6 +48,26 @@ struct OutgoingMessage
     void convert(const qpid::messaging::Message&);
     void setSubject(const std::string& subject);
     std::string getSubject() const;
+=======
+class OutgoingMessage
+{
+  private:
+    qpid::client::Message message;
+    qpid::client::Completion status;
+    std::string subject;
+    qpid::sys::AbsTime base;
+    bool expired;
+
+  public:
+    OutgoingMessage();
+    void convert(const qpid::messaging::Message&);
+    void setSubject(const std::string& subject);
+    std::string getSubject() const;
+    void send(qpid::client::AsyncSession& session, const std::string& destination, const std::string& routingKey);
+    void send(qpid::client::AsyncSession& session,const std::string& routingKey);
+    bool isComplete();
+    void markRedelivered();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 

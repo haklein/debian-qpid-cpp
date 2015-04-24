@@ -55,8 +55,13 @@ namespace Messaging {
 
     // unmanaged clone
     Session::Session(const ::qpid::messaging::Session & session,
+<<<<<<< HEAD
         Org::Apache::Qpid::Messaging::Connection ^ connRef) :
     parentConnectionp(connRef)
+=======
+        Org::Apache::Qpid::Messaging::Connection ^ connRef)
+        : parentConnectionp(connRef)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Exception ^ newException = nullptr;
 

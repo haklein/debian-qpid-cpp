@@ -143,6 +143,7 @@ public:
     /**
      * @name Methods inherited from qpid::broker::MessageStore
      */
+<<<<<<< HEAD
     //@{
     /**
      * If called after init() but before recovery, will discard the database
@@ -157,6 +158,8 @@ public:
      *                           otherwise empty.
      */
     virtual void truncateInit(const bool pushDownStoreFiles = false) = 0;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Record the existence of a durable queue

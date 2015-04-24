@@ -17,6 +17,11 @@
 # under the License.
 #
 
+<<<<<<< HEAD
+=======
+warn 'The qmf2 module is deprecated.  It will be removed in the future.'
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 require 'cqmf2'
 require 'cqpid'
 require 'thread'

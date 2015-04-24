@@ -64,7 +64,11 @@ void ThroughputAndLatency::message(const messaging::Message& m) {
     if (i != m.getProperties().end()) {
         ++samples;
         int64_t start(i->second.asInt64());
+<<<<<<< HEAD
         int64_t end(sys::Duration(sys::EPOCH, sys::now()));
+=======
+        int64_t end(sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         double latency = double(end - start)/sys::TIME_MSEC;
         if (latency > 0) {
             total += latency;

@@ -23,7 +23,10 @@
 
 #include "qpid/broker/BrokerImportExport.h"
 #include "qpid/broker/DtxBuffer.h"
+<<<<<<< HEAD
 #include "qpid/broker/DtxTimeout.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/TransactionalStore.h"
 
 #include "qpid/framing/amqp_types.h"
@@ -38,6 +41,11 @@
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
+=======
+struct DtxTimeout;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /**
  * Represents the work done under a particular distributed transaction
  * across potentially multiple channels. Identified by a xid. Allows
@@ -45,7 +53,11 @@ namespace broker {
  */
 class DtxWorkRecord
 {
+<<<<<<< HEAD
     typedef std::vector<DtxBuffer::shared_ptr> Work;
+=======
+    typedef std::vector<boost::intrusive_ptr<DtxBuffer> >Work;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     const std::string xid;
     TransactionalStore* const store;
@@ -68,22 +80,33 @@ public:
     QPID_BROKER_EXTERN bool prepare();
     QPID_BROKER_EXTERN bool commit(bool onePhase);
     QPID_BROKER_EXTERN void rollback();
+<<<<<<< HEAD
     QPID_BROKER_EXTERN void add(DtxBuffer::shared_ptr ops);
     void recover(std::auto_ptr<TPCTransactionContext> txn, DtxBuffer::shared_ptr ops);
     void timedout();
     void setTimeout(boost::intrusive_ptr<DtxTimeout> t) { timeout = t; }
     boost::intrusive_ptr<DtxTimeout> getTimeout() { return timeout; }
+=======
+    QPID_BROKER_EXTERN void add(boost::intrusive_ptr<DtxBuffer> ops);
+    void recover(std::auto_ptr<TPCTransactionContext> txn, boost::intrusive_ptr<DtxBuffer> ops);
+    void timedout();
+    void setTimeout(boost::intrusive_ptr<DtxTimeout> t);
+    boost::intrusive_ptr<DtxTimeout> getTimeout();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     std::string getXid() const { return xid; }
     bool isCompleted() const { return completed; }
     bool isRolledback() const { return rolledback; }
     bool isPrepared() const { return prepared; }
     bool isExpired() const { return expired; }
+<<<<<<< HEAD
 
     // Used by cluster update;
     size_t size() const { return work.size(); }
     DtxBuffer::shared_ptr operator[](size_t i) const;
     uint32_t getTimeout() const { return timeout? timeout->timeout : 0; }
     size_t indexOf(const DtxBuffer::shared_ptr&);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // qpid::broker

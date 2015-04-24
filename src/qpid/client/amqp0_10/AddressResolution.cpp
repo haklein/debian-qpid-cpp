@@ -24,6 +24,10 @@
 #include "qpid/client/amqp0_10/MessageSink.h"
 #include "qpid/client/amqp0_10/OutgoingMessage.h"
 #include "qpid/messaging/Address.h"
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/AddressImpl.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/Message.h"
 #include "qpid/types/Variant.h"
 #include "qpid/messaging/exceptions.h"
@@ -54,6 +58,10 @@ using qpid::messaging::AssertionFailed;
 using qpid::framing::ExchangeBoundResult;
 using qpid::framing::ExchangeQueryResult;
 using qpid::framing::FieldTable;
+<<<<<<< HEAD
+=======
+using qpid::framing::FieldValue;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using qpid::framing::QueueQueryResult;
 using qpid::framing::ReplyTo;
 using qpid::framing::Uuid;
@@ -88,11 +96,21 @@ const std::string NODE("node");
 const std::string LINK("link");
 const std::string MODE("mode");
 const std::string RELIABILITY("reliability");
+<<<<<<< HEAD
+=======
+const std::string TIMEOUT("timeout");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string NAME("name");
 const std::string DURABLE("durable");
 const std::string X_DECLARE("x-declare");
 const std::string X_SUBSCRIBE("x-subscribe");
 const std::string X_BINDINGS("x-bindings");
+<<<<<<< HEAD
+=======
+const std::string SELECTOR("selector");
+const std::string APACHE_SELECTOR("x-apache-selector");
+const std::string QPID_FILTER("qpid.filter");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string EXCHANGE("exchange");
 const std::string QUEUE("queue");
 const std::string KEY("key");
@@ -135,6 +153,14 @@ const std::string PREFIX_AMQ("amq.");
 const std::string PREFIX_QPID("qpid.");
 
 const Verifier verifier;
+<<<<<<< HEAD
+=======
+
+bool areEquivalent(const FieldValue& a, const FieldValue& b)
+{
+    return ((a == b) || (a.convertsTo<int64_t>() && b.convertsTo<int64_t>() && a.get<int64_t>() == b.get<int64_t>()));
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 struct Binding
@@ -190,8 +216,13 @@ class Queue : protected Node
     void checkDelete(qpid::client::AsyncSession&, CheckMode);
   private:
     const bool durable;
+<<<<<<< HEAD
     const bool autoDelete;
     const bool exclusive;
+=======
+    bool autoDelete;
+    bool exclusive;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string alternateExchange;
     FieldTable arguments;
 };
@@ -210,7 +241,11 @@ class Exchange : protected Node
     const std::string specifiedType;
   private:
     const bool durable;
+<<<<<<< HEAD
     const bool autoDelete;
+=======
+    bool autoDelete;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string alternateExchange;
     FieldTable arguments;
 };
@@ -222,8 +257,13 @@ class QueueSource : public Queue, public MessageSource
     void subscribe(qpid::client::AsyncSession& session, const std::string& destination);
     void cancel(qpid::client::AsyncSession& session, const std::string& destination);
   private:
+<<<<<<< HEAD
     const AcceptMode acceptMode;
     const AcquireMode acquireMode;
+=======
+    const AcquireMode acquireMode;
+    const AcceptMode acceptMode;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool exclusive;
     FieldTable options;
 };
@@ -236,10 +276,18 @@ class Subscription : public Exchange, public MessageSource
     void cancel(qpid::client::AsyncSession& session, const std::string& destination);
   private:
     const std::string queue;
+<<<<<<< HEAD
     const bool reliable;
     const bool durable;
     const std::string actualType;
     const bool exclusiveQueue;
+=======
+    const bool durable;
+    const bool reliable;
+    const std::string actualType;
+    const bool exclusiveQueue;
+    const bool autoDeleteQueue;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const bool exclusiveSubscription;
     const std::string alternateExchange;
     FieldTable queueOptions;
@@ -315,10 +363,18 @@ struct Opt
     Opt(const Variant::Map& base);
     Opt& operator/(const std::string& name);
     operator bool() const;
+<<<<<<< HEAD
+=======
+    operator std::string() const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     std::string str() const;
     bool asBool(bool defaultValue) const;
     const Variant::List& asList() const;
     void collect(qpid::framing::FieldTable& args) const;
+<<<<<<< HEAD
+=======
+    bool hasKey(const std::string&) const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     const Variant::Map* options;
     const Variant* value;
@@ -348,6 +404,14 @@ Opt::operator bool() const
     return value && !value->isVoid() && value->asBool();
 }
 
+<<<<<<< HEAD
+=======
+Opt::operator std::string() const
+{
+    return str();
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool Opt::asBool(bool defaultValue) const
 {
     if (value) return value->asBool();
@@ -372,6 +436,18 @@ void Opt::collect(qpid::framing::FieldTable& args) const
         translate(value->asMap(), args);
     }
 }
+<<<<<<< HEAD
+=======
+bool Opt::hasKey(const std::string& key) const
+{
+    if (value) {
+        Variant::Map::const_iterator i = value->asMap().find(key);
+        return i != value->asMap().end();
+    } else {
+        return false;
+    }
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 bool AddressResolution::is_unreliable(const Address& address)
 {
@@ -461,6 +537,7 @@ bool isBrowse(const Address& address)
 
 QueueSource::QueueSource(const Address& address) :
     Queue(address),
+<<<<<<< HEAD
     acceptMode(AddressResolution::is_unreliable(address) ? ACCEPT_MODE_NONE : ACCEPT_MODE_EXPLICIT),
     acquireMode(isBrowse(address) ? ACQUIRE_MODE_NOT_ACQUIRED : ACQUIRE_MODE_PRE_ACQUIRED),
     exclusive(false)
@@ -470,6 +547,19 @@ QueueSource::QueueSource(const Address& address) :
     //options)
     exclusive = Opt(address)/LINK/X_SUBSCRIBE/EXCLUSIVE;
     (Opt(address)/LINK/X_SUBSCRIBE/ARGUMENTS).collect(options);
+=======
+    acquireMode(isBrowse(address) ? ACQUIRE_MODE_NOT_ACQUIRED : ACQUIRE_MODE_PRE_ACQUIRED),
+    //since this client does not provide any means by which an
+    //unacquired message can be acquired, there is no value in an
+    //explicit accept
+    acceptMode(acquireMode == ACQUIRE_MODE_NOT_ACQUIRED || AddressResolution::is_unreliable(address) ? ACCEPT_MODE_NONE : ACCEPT_MODE_EXPLICIT),
+    exclusive(false)
+{
+    exclusive = Opt(address)/LINK/X_SUBSCRIBE/EXCLUSIVE;
+    (Opt(address)/LINK/X_SUBSCRIBE/ARGUMENTS).collect(options);
+    std::string selector = Opt(address)/LINK/SELECTOR;
+    if (!selector.empty()) options.setString(APACHE_SELECTOR, selector);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void QueueSource::subscribe(qpid::client::AsyncSession& session, const std::string& destination)
@@ -504,6 +594,7 @@ std::string Subscription::getSubscriptionName(const std::string& base, const std
 Subscription::Subscription(const Address& address, const std::string& type)
     : Exchange(address),
       queue(getSubscriptionName(name, (Opt(address)/LINK/NAME).str())),
+<<<<<<< HEAD
       reliable(AddressResolution::is_reliable(address)),
       durable(Opt(address)/LINK/DURABLE),
       actualType(type.empty() ? (specifiedType.empty() ? TOPIC_EXCHANGE : specifiedType) : type),
@@ -513,6 +604,32 @@ Subscription::Subscription(const Address& address, const std::string& type)
 {
     (Opt(address)/LINK/X_DECLARE/ARGUMENTS).collect(queueOptions);
     (Opt(address)/LINK/X_SUBSCRIBE/ARGUMENTS).collect(subscriptionOptions);
+=======
+      durable(Opt(address)/LINK/DURABLE),
+      //if the link is durable, then assume it is also reliable unless explicitly stated otherwise
+      //if not assume it is unreliable unless explicitly stated otherwise
+      reliable(durable ? !AddressResolution::is_unreliable(address) : AddressResolution::is_reliable(address)),
+      actualType(type.empty() ? (specifiedType.empty() ? TOPIC_EXCHANGE : specifiedType) : type),
+      exclusiveQueue((Opt(address)/LINK/X_DECLARE/EXCLUSIVE).asBool(true)),
+      autoDeleteQueue((Opt(address)/LINK/X_DECLARE/AUTO_DELETE).asBool(!(durable || reliable))),
+      exclusiveSubscription((Opt(address)/LINK/X_SUBSCRIBE/EXCLUSIVE).asBool(exclusiveQueue)),
+      alternateExchange((Opt(address)/LINK/X_DECLARE/ALTERNATE_EXCHANGE).str())
+{
+
+    if ((Opt(address)/LINK).hasKey(TIMEOUT)) {
+        const Variant* timeout = (Opt(address)/LINK/TIMEOUT).value;
+        if (timeout->asUint32()) queueOptions.setInt("qpid.auto_delete_timeout", timeout->asUint32());
+    } else if (durable && !AddressResolution::is_reliable(address) && !(Opt(address)/LINK/X_DECLARE).hasKey(AUTO_DELETE)) {
+        //if durable, not explicitly reliable, and auto-delete not
+        //explicitly set, then set a non-zero default for the
+        //autodelete timeout
+        queueOptions.setInt("qpid.auto_delete_timeout", 2*60);
+    }
+    (Opt(address)/LINK/X_DECLARE/ARGUMENTS).collect(queueOptions);
+    (Opt(address)/LINK/X_SUBSCRIBE/ARGUMENTS).collect(subscriptionOptions);
+    std::string selector = Opt(address)/LINK/SELECTOR;
+    if (!selector.empty()) queueOptions.setString(QPID_FILTER, selector);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if (!address.getSubject().empty()) bindSubject(address.getSubject());
     else if (linkBindings.empty()) bindAll();
@@ -570,7 +687,11 @@ void Subscription::subscribe(qpid::client::AsyncSession& session, const std::str
 
     //create subscription queue:
     session.queueDeclare(arg::queue=queue, arg::exclusive=exclusiveQueue,
+<<<<<<< HEAD
                          arg::autoDelete=!reliable, arg::durable=durable,
+=======
+                         arg::autoDelete=autoDeleteQueue, arg::durable=durable,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                          arg::alternateExchange=alternateExchange,
                          arg::arguments=queueOptions);
     //'default' binding:
@@ -603,9 +724,13 @@ void ExchangeSink::declare(qpid::client::AsyncSession& session, const std::strin
 
 void ExchangeSink::send(qpid::client::AsyncSession& session, const std::string&, OutgoingMessage& m)
 {
+<<<<<<< HEAD
     m.message.getDeliveryProperties().setRoutingKey(m.getSubject());
     m.status = session.messageTransfer(arg::destination=name, arg::content=m.message);
     QPID_LOG(debug, "Sending to exchange " << name << " " << m.message.getMessageProperties() << " " << m.message.getDeliveryProperties());
+=======
+    m.send(session, name, m.getSubject());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void ExchangeSink::cancel(qpid::client::AsyncSession& session, const std::string&)
@@ -624,9 +749,13 @@ void QueueSink::declare(qpid::client::AsyncSession& session, const std::string&)
 }
 void QueueSink::send(qpid::client::AsyncSession& session, const std::string&, OutgoingMessage& m)
 {
+<<<<<<< HEAD
     m.message.getDeliveryProperties().setRoutingKey(name);
     m.status = session.messageTransfer(arg::content=m.message);
     QPID_LOG(debug, "Sending to queue " << name << " " << m.message.getMessageProperties() << " " << m.message.getDeliveryProperties());
+=======
+    m.send(session, name);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void QueueSink::cancel(qpid::client::AsyncSession& session, const std::string&)
@@ -639,8 +768,15 @@ Address AddressResolution::convert(const qpid::framing::ReplyTo& rt)
 {
     Address address;
     if (rt.getExchange().empty()) {//if default exchange, treat as queue
+<<<<<<< HEAD
         address.setName(rt.getRoutingKey());
         address.setType(QUEUE_ADDRESS);
+=======
+        if (!rt.getRoutingKey().empty()) {
+            address.setName(rt.getRoutingKey());
+            address.setType(QUEUE_ADDRESS);
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     } else {
         address.setName(rt.getExchange());
         address.setSubject(rt.getRoutingKey());
@@ -696,6 +832,15 @@ Queue::Queue(const Address& a) : Node(a),
     (Opt(a)/NODE/X_DECLARE/ARGUMENTS).collect(arguments);
     nodeBindings.setDefaultQueue(name);
     linkBindings.setDefaultQueue(name);
+<<<<<<< HEAD
+=======
+    if (qpid::messaging::AddressImpl::isTemporary(a) && createPolicy.isVoid()) {
+        createPolicy = "always";
+        Opt specified = Opt(a)/NODE/X_DECLARE;
+        if (!specified.hasKey(AUTO_DELETE)) autoDelete = true;
+        if (!specified.hasKey(EXCLUSIVE)) exclusive = true;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void Queue::checkCreate(qpid::client::AsyncSession& session, CheckMode mode)
@@ -763,7 +908,11 @@ void Queue::checkAssert(qpid::client::AsyncSession& session, CheckMode mode)
                 FieldTable::ValuePtr v = result.getArguments().get(i->first);
                 if (!v) {
                     throw AssertionFailed((boost::format("Option %1% not set for %2%") % i->first % name).str());
+<<<<<<< HEAD
                 } else if (*i->second != *v) {
+=======
+                } else if (!areEquivalent(*i->second, *v)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     throw AssertionFailed((boost::format("Option %1% does not match for %2%, expected %3%, got %4%")
                                           % i->first % name % *(i->second) % *v).str());
                 }
@@ -782,6 +931,13 @@ Exchange::Exchange(const Address& a) : Node(a),
     (Opt(a)/NODE/X_DECLARE/ARGUMENTS).collect(arguments);
     nodeBindings.setDefaultExchange(name);
     linkBindings.setDefaultExchange(name);
+<<<<<<< HEAD
+=======
+    if (qpid::messaging::AddressImpl::isTemporary(a) && createPolicy.isVoid()) {
+        createPolicy = "always";
+        if (!(Opt(a)/NODE/X_DECLARE).hasKey(AUTO_DELETE)) autoDelete = true;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool Exchange::isReservedName()
@@ -859,7 +1015,11 @@ void Exchange::checkAssert(qpid::client::AsyncSession& session, CheckMode mode)
                 FieldTable::ValuePtr v = result.getArguments().get(i->first);
                 if (!v) {
                     throw AssertionFailed((boost::format("Option %1% not set for %2%") % i->first % name).str());
+<<<<<<< HEAD
                 } else if (*i->second != *v) {
+=======
+                } else if (!areEquivalent(*i->second, *v)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                     throw AssertionFailed((boost::format("Option %1% does not match for %2%, expected %3%, got %4%")
                                           % i->first % name % *(i->second) % *v).str());
                 }
@@ -978,9 +1138,17 @@ Verifier::Verifier()
     link[NAME] = true;
     link[DURABLE] = true;
     link[RELIABILITY] = true;
+<<<<<<< HEAD
     link[X_SUBSCRIBE] = true;
     link[X_DECLARE] = true;
     link[X_BINDINGS] = true;
+=======
+    link[TIMEOUT] = true;
+    link[X_SUBSCRIBE] = true;
+    link[X_DECLARE] = true;
+    link[X_BINDINGS] = true;
+    link[SELECTOR] = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     defined[LINK] = link;
 }
 void Verifier::verify(const Address& address) const

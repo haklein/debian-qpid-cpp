@@ -25,6 +25,11 @@
 #include "qpid/messaging/exceptions.h"
 #include "qpid/messaging/Receiver.h"
 #include "qpid/messaging/Session.h"
+<<<<<<< HEAD
+=======
+#include "qpid/amqp_0_10/Codecs.h"
+#include "qpid/types/encodings.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace client {
@@ -83,6 +88,10 @@ void ReceiverImpl::start()
     if (state == STOPPED) {
         state = STARTED;
         startFlow(l);
+<<<<<<< HEAD
+=======
+        session.sendCompletion();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -123,7 +132,10 @@ void ReceiverImpl::init(qpid::client::AsyncSession s, AddressResolution& resolve
 }
 
 const std::string& ReceiverImpl::getName() const {
+<<<<<<< HEAD
     sys::Mutex::ScopedLock l(lock);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return destination;
 }
 
@@ -143,19 +155,61 @@ uint32_t ReceiverImpl::getUnsettled()
     return parent->getUnsettledAcks(destination);
 }
 
+<<<<<<< HEAD
 ReceiverImpl::ReceiverImpl(SessionImpl& p, const std::string& name,
                            const qpid::messaging::Address& a) :
 
     parent(&p), destination(name), address(a), byteCredit(0xFFFFFFFF),
     state(UNRESOLVED), capacity(0), window(0) {}
 
+=======
+qpid::messaging::Address ReceiverImpl::getAddress() const
+{
+    return address;
+}
+
+ReceiverImpl::ReceiverImpl(SessionImpl& p, const std::string& name,
+                           const qpid::messaging::Address& a, bool autoDecode_) :
+
+    parent(&p), destination(name), address(a), byteCredit(0xFFFFFFFF), autoDecode(autoDecode_),
+    state(UNRESOLVED), capacity(0), window(0) {}
+
+namespace {
+const std::string TEXT_PLAIN("text/plain");
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool ReceiverImpl::getImpl(qpid::messaging::Message& message, qpid::messaging::Duration timeout)
 {
     {
         sys::Mutex::ScopedLock l(lock);
         if (state == CANCELLED) return false;
     }
+<<<<<<< HEAD
     return parent->get(*this, message, timeout);
+=======
+    if (parent->get(*this, message, timeout)) {
+        if (autoDecode) {
+            if (message.getContentType() == qpid::amqp_0_10::MapCodec::contentType) {
+                message.getContentObject() = qpid::types::Variant::Map();
+                decode(message, message.getContentObject().asMap());
+            } else if (message.getContentType() == qpid::amqp_0_10::ListCodec::contentType) {
+                message.getContentObject() = qpid::types::Variant::List();
+                decode(message, message.getContentObject().asList());
+            } else if (!message.getContentBytes().empty()) {
+                message.getContentObject() = message.getContentBytes();
+                if (message.getContentType() == TEXT_PLAIN) {
+                    message.getContentObject().setEncoding(qpid::types::encodings::UTF8);
+                } else {
+                    message.getContentObject().setEncoding(qpid::types::encodings::BINARY);
+                }
+            }
+        }
+        return true;
+    } else {
+        return false;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool ReceiverImpl::fetchImpl(qpid::messaging::Message& message, qpid::messaging::Duration timeout)
@@ -183,6 +237,10 @@ bool ReceiverImpl::fetchImpl(qpid::messaging::Message& message, qpid::messaging:
         {
             sys::Mutex::ScopedLock l(lock);
             startFlow(l); //reallocate credit
+<<<<<<< HEAD
+=======
+            session.sendCompletion();//ensure previously received messages are signalled as completed
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
         return getImpl(message, Duration::IMMEDIATE);
     }
@@ -194,9 +252,21 @@ void ReceiverImpl::closeImpl()
     if (state != CANCELLED) {
         state = CANCELLED;
         sync(session).messageStop(destination);
+<<<<<<< HEAD
         parent->releasePending(destination);
         source->cancel(session, destination);
         parent->receiverCancelled(destination);
+=======
+        {
+            sys::Mutex::ScopedUnlock l(lock);
+            parent->releasePending(destination);
+        }
+        source->cancel(session, destination);
+        {
+            sys::Mutex::ScopedUnlock l(lock);
+            parent->receiverCancelled(destination);
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 

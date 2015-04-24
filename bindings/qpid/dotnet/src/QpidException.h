@@ -29,6 +29,7 @@ using namespace System;
 [Serializable]
 public ref class QpidException : System::Exception
 {
+<<<<<<< HEAD
  public:
 
  QpidException()
@@ -36,6 +37,15 @@ public ref class QpidException : System::Exception
 
  QpidException(String^ estring)
     : System::Exception(estring) {}
+=======
+public:
+
+    QpidException()
+        : System::Exception() {}
+
+    QpidException(String^ estring)
+        : System::Exception(estring) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 };
 

@@ -39,6 +39,7 @@
    fun:_sasl_load_plugins
    fun:sasl_client_init
 }
+<<<<<<< HEAD
 {
    Benign leak in CPG - patched version.
    Memcheck:Leak
@@ -54,6 +55,8 @@
    obj:*/libpthread-2.5.so
    obj:*/libcpg.so.2.0.0
 }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 {
    Uninitialised value problem in _dl_relocate (F7, F8)
@@ -161,6 +164,7 @@
 }
 
 {
+<<<<<<< HEAD
   CPG error - seems benign.
    Memcheck:Param
    socketcall.sendmsg(msg.msg_iov[i])
@@ -169,6 +173,8 @@
 }
 
 {
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
    Known leak in boost.thread 1.33.1. Wildcards for 64/32 bit diffs.
    Memcheck:Leak
    fun:*

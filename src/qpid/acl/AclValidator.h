@@ -24,6 +24,10 @@
 #include "qpid/acl/AclData.h"
 #include "qpid/sys/IntegerTypes.h"
 #include <boost/shared_ptr.hpp>
+<<<<<<< HEAD
+=======
+#include <boost/concept_check.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <vector>
 #include <sstream>
 
@@ -33,15 +37,25 @@ namespace acl {
 class AclValidator {
 
     /* Base Property */
+<<<<<<< HEAD
    class PropertyType{
+=======
+    class PropertyType{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         public:
             virtual ~PropertyType(){};
             virtual bool validate(const std::string& val)=0;
             virtual std::string allowedValues()=0;
+<<<<<<< HEAD
    };
 
    class IntPropertyType : public PropertyType{
+=======
+    };
+
+    class IntPropertyType : public PropertyType{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             int64_t min;
             int64_t max;
 
@@ -50,9 +64,15 @@ class AclValidator {
             virtual ~IntPropertyType (){};
             virtual bool validate(const std::string& val);
             virtual std::string allowedValues();
+<<<<<<< HEAD
    };
 
    class EnumPropertyType : public PropertyType{
+=======
+    };
+
+    class EnumPropertyType : public PropertyType{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             std::vector<std::string> values;
 
         public:
@@ -60,6 +80,7 @@ class AclValidator {
             virtual ~EnumPropertyType (){};
             virtual bool validate(const std::string& val);
             virtual std::string allowedValues();
+<<<<<<< HEAD
    };
 
    typedef std::pair<acl::SpecProperty,boost::shared_ptr<PropertyType> > Validator;
@@ -76,6 +97,46 @@ public:
    void validate(boost::shared_ptr<AclData> d);
    AclValidator();
    ~AclValidator();
+=======
+    };
+
+    typedef std::pair<acl::SpecProperty,boost::shared_ptr<PropertyType> > Validator;
+    typedef std::map<acl::SpecProperty,boost::shared_ptr<PropertyType> > ValidatorMap;
+    typedef ValidatorMap::iterator ValidatorItr;
+    typedef boost::shared_ptr<std::set<Property> >         AllowedProperties    [ACTIONSIZE][OBJECTSIZE];
+    typedef boost::shared_ptr<std::vector<AclData::Rule> > AllowedSpecProperties[ACTIONSIZE][OBJECTSIZE];
+
+    ValidatorMap validators;
+    AllowedProperties     allowedProperties;
+    AllowedSpecProperties allowedSpecProperties;
+
+public:
+
+    void validateRuleSet(std::pair<const std::string, qpid::acl::AclData::ruleSet>& rules);
+    void validateRule(qpid::acl::AclData::Rule& rule);
+    void validateProperty(std::pair<const qpid::acl::SpecProperty, std::string>& prop);
+    void validate(boost::shared_ptr<AclData> d);
+    bool validateAllowedProperties(qpid::acl::Action action,
+                                   qpid::acl::ObjectType object,
+                                   const AclData::specPropertyMap& props,
+                                   bool emitLog) const;
+    void findPossibleLookupMatch(qpid::acl::Action action,
+                                 qpid::acl::ObjectType object,
+                                 const AclData::specPropertyMap& props,
+                                 std::vector<int>& result) const;
+    void tracePropertyDefs();
+
+    AclValidator();
+    ~AclValidator();
+
+private:
+    void registerProperties(const std::string& source,
+                            const std::string& description,
+                            Action action,
+                            ObjectType object,
+                            const std::string& properties = "");
+    int propertyIndex;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::acl

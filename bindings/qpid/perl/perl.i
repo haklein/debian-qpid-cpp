@@ -19,7 +19,11 @@
 
 %module cqpid_perl
 %include "std_string.i"
+<<<<<<< HEAD
 %include "../../swig_perl_typemaps.i"
+=======
+%include "qpid/swig_perl_typemaps.i"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /* Define the general-purpose exception handling */
 %exception {
@@ -27,9 +31,17 @@
         $action
     }
     catch (qpid::messaging::MessagingException& mex) {
+<<<<<<< HEAD
         Perl_croak(aTHX_ mex.what());
     }
 }
 
 %include "../qpid.i"
+=======
+      Perl_croak(aTHX_ "%s", mex.what());
+    }
+}
+
+%include "qpid/qpid.i"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 

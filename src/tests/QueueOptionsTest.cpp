@@ -63,6 +63,7 @@ QPID_AUTO_TEST_CASE(testFlags)
 {
     QueueOptions ft;
 
+<<<<<<< HEAD
     ft.setPersistLastNode();
     ft.setOrdering(LVQ);
 
@@ -73,6 +74,11 @@ QPID_AUTO_TEST_CASE(testFlags)
     ft.setOrdering(FIFO);
 
     BOOST_CHECK(!ft.isSet(QueueOptions::strPersistLastNode));
+=======
+    ft.setOrdering(LVQ);
+    BOOST_CHECK(1 == ft.getAsInt(QueueOptions::strLastValueQueue));
+    ft.setOrdering(FIFO);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK(!ft.isSet(QueueOptions::strLastValueQueue));
 
 }
@@ -87,6 +93,7 @@ QPID_AUTO_TEST_CASE(testSetOrdering)
 
 }
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testClearPersistLastNode)
 {
     //ensure clear works even if not preceded by the setting on the
@@ -97,6 +104,8 @@ QPID_AUTO_TEST_CASE(testClearPersistLastNode)
 }
 
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

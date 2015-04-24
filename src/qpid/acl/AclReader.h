@@ -26,8 +26,16 @@
 #include <string>
 #include <vector>
 #include <sstream>
+<<<<<<< HEAD
 #include "qpid/acl/AclData.h"
 #include "qpid/broker/AclModule.h"
+=======
+#include <memory>
+#include "qpid/acl/AclData.h"
+#include "qpid/acl/Acl.h"
+#include "qpid/broker/AclModule.h"
+#include "qpid/acl/AclValidator.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace acl {
@@ -68,11 +76,15 @@ class AclReader {
         void setObjectType(const ObjectType o);
         void setObjectTypeAll();
         bool addProperty(const SpecProperty p, const std::string v);
+<<<<<<< HEAD
         bool validate(const AclHelper::objectMapPtr& validationMap);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         std::string toString(); // debug aid
       private:
         void processName(const std::string& name, const groupMap& groups);
     };
+<<<<<<< HEAD
     typedef boost::shared_ptr<aclRule>          aclRulePtr;
     typedef std::vector<aclRulePtr>             ruleList;
     typedef ruleList::const_iterator            rlCitr;
@@ -83,6 +95,22 @@ class AclReader {
     typedef std::set<std::string>               keywordSet;
     typedef keywordSet::const_iterator          ksCitr;
     typedef std::pair<std::string, std::string> nvPair; // Name-Value pair
+=======
+    typedef boost::shared_ptr<AclData::quotaRuleSet> aclQuotaRuleSet;
+    typedef boost::shared_ptr<aclRule>               aclRulePtr;
+    typedef std::vector<aclRulePtr>                  ruleList;
+    typedef ruleList::const_iterator                 rlCitr;
+
+    typedef std::vector<std::string>                 tokList;
+    typedef tokList::const_iterator                  tlCitr;
+
+    typedef std::set<std::string>                    keywordSet;
+    typedef keywordSet::const_iterator               ksCitr;
+    typedef std::pair<std::string, std::string>      nvPair; // Name-Value pair
+
+    typedef boost::shared_ptr<std::vector<acl::AclBWHostRule> >      aclGlobalHostRuleSet;
+    typedef boost::shared_ptr<std::map<std::string, std::vector<acl::AclBWHostRule> > > aclUserHostRuleSet;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     std::string             fileName;
     int                     lineNumber;
@@ -91,18 +119,30 @@ class AclReader {
     nameSet                 names;
     groupMap                groups;
     ruleList                rules;
+<<<<<<< HEAD
     AclHelper::objectMapPtr validationMap;
     std::ostringstream      errorStream;
 
   public:
     AclReader();
+=======
+    AclValidator            validator;
+    std::ostringstream      errorStream;
+
+  public:
+    AclReader(uint16_t cliMaxConnPerUser, uint16_t cliMaxQueuesPerUser);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual ~AclReader();
     int read(const std::string& fn, boost::shared_ptr<AclData> d); // return=0 for success
     std::string getError();
 
   private:
     bool processLine(char* line);
+<<<<<<< HEAD
     void loadDecisionData( boost::shared_ptr<AclData> d);
+=======
+    void loadDecisionData(boost::shared_ptr<AclData> d);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     int tokenize(char* line, tokList& toks);
 
     bool processGroupLine(tokList& toks, const bool cont);
@@ -110,6 +150,7 @@ class AclReader {
     void addName(const std::string& name, nameSetPtr groupNameSet);
     void addName(const std::string& name);
     void printNames() const; // debug aid
+<<<<<<< HEAD
 
     bool processAclLine(tokList& toks);
     void printRules() const; // debug aid
@@ -117,6 +158,35 @@ class AclReader {
 
     static bool isValidGroupName(const std::string& name);
     static nvPair splitNameValuePair(const std::string& nvpString);
+=======
+    int  printNamesFieldWidth() const;
+
+    bool processAclLine(tokList& toks);
+    void printRules() const; // debug aid
+    void printConnectionRules(const std::string name, const AclData::bwHostRuleSet& rules) const;
+    void printGlobalConnectRules() const;
+    void printUserConnectRules() const;
+    bool isValidUserName(const std::string& name);
+
+    bool processQuotaLine(tokList& toks);
+    bool processQuotaLine(tokList& toks, const std::string theNoun, uint16_t maxSpec, aclQuotaRuleSet theRules);
+    bool processQuotaGroup(const std::string&, uint16_t, aclQuotaRuleSet theRules);
+    void printQuotas(const std::string theNoun, aclQuotaRuleSet theRules) const;
+
+    static bool isValidGroupName(const std::string& name);
+    static nvPair splitNameValuePair(const std::string& nvpString);
+
+    const uint16_t cliMaxConnPerUser;
+    bool connQuotaRulesExist;
+    aclQuotaRuleSet connQuota;
+
+    const uint16_t cliMaxQueuesPerUser;
+    bool queueQuotaRulesExist;
+    aclQuotaRuleSet queueQuota;
+
+    aclGlobalHostRuleSet  globalHostRules;
+    aclUserHostRuleSet    userHostRules;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::acl

@@ -26,6 +26,9 @@
 #include "qpid/framing/AMQContentBody.h"
 #include "qpid/framing/AMQHeartbeatBody.h"
 #include "qpid/framing/InputHandler.h"
+<<<<<<< HEAD
 #include "qpid/framing/OutputHandler.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/ProtocolInitiation.h"
 #include "qpid/framing/ProtocolVersion.h"

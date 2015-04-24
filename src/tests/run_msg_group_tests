@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -20,6 +24,7 @@
 #
 #script to run a sequence of message group queue tests via make
 
+<<<<<<< HEAD
 #setup path to find qpid-config and msg_group_test progs
 source ./test_env.sh
 test -d $PYTHON_DIR || { echo "Skipping message group tests, no python dir."; exit 0; }
@@ -30,6 +35,11 @@ export PATH=$PWD:$srcdir:$PYTHON_COMMANDS:$PATH
 test -s qpidd.port && QPID_PORT=`cat qpidd.port`
 
 #trap cleanup INT TERM QUIT
+=======
+source $QPID_TEST_COMMON
+
+ensure_python_tests
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 QUEUE_NAME="group-queue"
 GROUP_KEY="My-Group-Id"
@@ -37,7 +47,11 @@ GROUP_KEY="My-Group-Id"
 BROKER_URL="${QPID_BROKER:-localhost}:${QPID_PORT:-5672}"
 
 run_test() {
+<<<<<<< HEAD
     $@
+=======
+    "$@"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 ##set -x

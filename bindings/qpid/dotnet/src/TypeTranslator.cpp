@@ -42,8 +42,14 @@ namespace Messaging {
     // The given object is a Dictionary.
     // Add its elements to the qpid map.
     //
+<<<<<<< HEAD
     void TypeTranslator::ManagedToNative(QpidMap ^ theDictionary,
                                          ::qpid::types::Variant::Map & qpidMap)
+=======
+    void TypeTranslator::ManagedToNative(
+        QpidMap ^ theDictionary,
+        ::qpid::types::Variant::Map & qpidMap)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         // iterate the items, converting each to a variant and adding to the map
         for each (System::Collections::Generic::KeyValuePair
@@ -65,7 +71,11 @@ namespace Messaging {
                 std::string entryName = QpidMarshal::ToNative(kvp.Key);
 
                 // Add inner map to outer map
+<<<<<<< HEAD
                 qpidMap.insert(std::make_pair<std::string, ::qpid::types::Variant>(entryName, *newVariantp));
+=======
+                qpidMap.insert(std::make_pair(entryName, *newVariantp));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
             else if (QpidTypeCheck::ObjectIsList(kvp.Value))
             {
@@ -85,7 +95,11 @@ namespace Messaging {
                 std::string entryName = QpidMarshal::ToNative(kvp.Key);
 
                 // Add inner list to outer map
+<<<<<<< HEAD
                 qpidMap.insert(std::make_pair<std::string, ::qpid::types::Variant>(entryName, newVariant));
+=======
+                qpidMap.insert(std::make_pair(entryName, newVariant));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
             else
             {
@@ -96,7 +110,11 @@ namespace Messaging {
                     ManagedToNativeObject(kvp.Value, entryValue);
                 }
                 std::string entryName = QpidMarshal::ToNative(kvp.Key);
+<<<<<<< HEAD
                 qpidMap.insert(std::make_pair<std::string, ::qpid::types::Variant>(entryName, entryValue));
+=======
+                qpidMap.insert(std::make_pair(entryName, entryValue));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
     }
@@ -107,8 +125,14 @@ namespace Messaging {
     // The given object is a List.
     // Add its elements to the qpid list.
     //
+<<<<<<< HEAD
     void TypeTranslator::ManagedToNative(QpidList ^ theList,
                                          ::qpid::types::Variant::List & qpidList)
+=======
+    void TypeTranslator::ManagedToNative(
+        QpidList ^ theList,
+        ::qpid::types::Variant::List & qpidList)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         // iterate the items, converting each to a variant and adding to the map
         for each (System::Object ^ listObj in theList)
@@ -162,8 +186,14 @@ namespace Messaging {
     // Returns a variant representing simple native type object.
     // Not to be called for Map/List objects.
     //
+<<<<<<< HEAD
     void TypeTranslator::ManagedToNativeObject(System::Object ^ managedValue,
                                ::qpid::types::Variant & qpidVariant)
+=======
+    void TypeTranslator::ManagedToNativeObject(
+        System::Object ^ managedValue,
+        ::qpid::types::Variant & qpidVariant)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         System::Type     ^ typeP    = (*managedValue).GetType();
         System::TypeCode   typeCode = System::Type::GetTypeCode( typeP );
@@ -239,6 +269,21 @@ namespace Messaging {
                     ::qpid::types::Uuid newUuid = ::qpid::types::Uuid(pinnedBuf);
                     qpidVariant = newUuid;
                 }
+<<<<<<< HEAD
+=======
+                else if (QpidTypeCheck::ObjectIsMap(managedValue))
+                {
+                    ::qpid::types::Variant::Map newMap;
+                    ManagedToNative((QpidMap ^)managedValue, newMap);
+                    qpidVariant = newMap;
+                }
+                else if (QpidTypeCheck::ObjectIsList(managedValue))
+                {
+                    ::qpid::types::Variant::List newList;
+                    ManagedToNative((QpidList ^)managedValue, newList);
+                    qpidVariant = newList;
+                }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 else
                 {
                     throw gcnew System::NotImplementedException();
@@ -257,6 +302,7 @@ namespace Messaging {
     // Given a user Dictionary and a qpid map,
     //   extract the qpid elements and put them into the dictionary.
     //
+<<<<<<< HEAD
     void TypeTranslator::NativeToManaged(::qpid::types::Variant::Map & qpidMap,
                                          QpidMap ^ dict)
     {
@@ -353,17 +399,37 @@ namespace Messaging {
                 }
                 break;
             }
+=======
+    void TypeTranslator::NativeToManaged(
+        ::qpid::types::Variant::Map & qpidMap,
+        QpidMap ^ dict)
+    {
+        // For each object in the message map,
+        //  create a .NET object and add it to the dictionary.
+        for (::qpid::types::Variant::Map::const_iterator i = qpidMap.begin(); i != qpidMap.end(); ++i)
+        {
+            System::String ^ elementName = gcnew String(i->first.c_str());
+            ::qpid::types::Variant variant = i->second;
+            dict[elementName] = NativeToManagedObject(variant);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 
 
+<<<<<<< HEAD
     void TypeTranslator::NativeToManaged(::qpid::types::Variant::List & qpidList, QpidList ^ managedList)
+=======
+    void TypeTranslator::NativeToManaged(
+        ::qpid::types::Variant::List & qpidList,
+        QpidList ^ managedList)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         // For each object in the qpidList
         //  create a .NET object and add it to the managed List.
         for (::qpid::types::Variant::List::const_iterator i = qpidList.begin(); i != qpidList.end(); ++i)
         {
             ::qpid::types::Variant     variant = *i;
+<<<<<<< HEAD
             ::qpid::types::VariantType vType   = variant.getType();
 
             switch (vType)
@@ -451,5 +517,139 @@ namespace Messaging {
                 break;
             }
         }
+=======
+            (*managedList).Add( NativeToManagedObject(variant) );
+        }
+    }
+
+
+    System::Object ^ TypeTranslator::NativeToManagedObject(
+        ::qpid::types::Variant & nativeObject)
+    {
+        //  create a .NET object and return it
+        ::qpid::types::VariantType vType   = nativeObject.getType();
+        System::Object ^ managedObject = nullptr;
+
+        switch (vType)
+        {
+        case ::qpid::types::VAR_VOID:
+            {
+                break;
+            }
+
+        case ::qpid::types::VAR_BOOL:
+            {
+                bool result = nativeObject.asBool();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_UINT8:
+            {
+                byte result = nativeObject.asUint8();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_UINT16:
+            {
+                unsigned short result = nativeObject.asUint16();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_UINT32:
+            {
+                unsigned long result = nativeObject.asUint32();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_UINT64:
+            {
+                unsigned __int64 result = nativeObject.asUint64();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_INT8:
+            {
+                System::SByte result = nativeObject.asInt8();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_INT16:
+            {
+                short result = nativeObject.asInt16();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_INT32:
+            {
+                long result = nativeObject.asInt32();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_INT64:
+            {
+                __int64 result = nativeObject.asInt64();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_FLOAT:
+            {
+                float result = nativeObject.asFloat();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_DOUBLE:
+            {
+                double result = nativeObject.asDouble();
+                managedObject = result;
+                break;
+            }
+
+        case ::qpid::types::VAR_STRING:
+            {
+                System::String ^ elementValue = gcnew System::String(nativeObject.asString().c_str());
+                managedObject = elementValue;
+                break;
+            }
+        case ::qpid::types::VAR_MAP:
+            {
+                QpidMap ^ newDict = gcnew QpidMap();
+
+                NativeToManaged(nativeObject.asMap(), newDict);
+
+                managedObject = newDict;
+                break;
+            }
+
+        case ::qpid::types::VAR_LIST:
+            {
+                QpidList ^ newList = gcnew QpidList();
+
+                NativeToManaged(nativeObject.asList(), newList);
+
+                managedObject = newList;
+                break;
+            }
+
+        case ::qpid::types::VAR_UUID:
+            {
+                System::String ^ elementValue = gcnew System::String(nativeObject.asUuid().str().c_str());
+                System::Guid ^ newGuid = System::Guid(elementValue);
+                managedObject = newGuid;
+            }
+            break;
+        }
+
+        return managedObject;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }}}}

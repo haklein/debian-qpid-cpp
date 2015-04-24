@@ -19,6 +19,11 @@
 
 #include <qpid/messaging/Connection.h>
 #include <qpid/messaging/Duration.h>
+<<<<<<< HEAD
+=======
+
+#define QMF_USE_DEPRECATED_API
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qmf/ConsoleSession.h>
 #include <qmf/ConsoleEvent.h>
 #include <qmf/Data.h>

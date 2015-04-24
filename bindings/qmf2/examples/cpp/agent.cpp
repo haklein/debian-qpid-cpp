@@ -19,6 +19,11 @@
 
 #include <qpid/messaging/Connection.h>
 #include <qpid/messaging/Duration.h>
+<<<<<<< HEAD
+=======
+
+#define QMF_USE_DEPRECATED_API
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qmf/AgentSession.h>
 #include <qmf/AgentEvent.h>
 #include <qmf/Schema.h>
@@ -176,6 +181,11 @@ void ExampleAgent::run()
             case AGENT_METHOD:
                 running = method(event);
                 break;
+<<<<<<< HEAD
+=======
+            default:
+                break;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
     }

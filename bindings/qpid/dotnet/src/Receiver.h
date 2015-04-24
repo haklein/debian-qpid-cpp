@@ -25,6 +25,10 @@
 #include <limits>
 
 #include "qpid/messaging/Receiver.h"
+<<<<<<< HEAD
+=======
+#include "qpid/messaging/Address.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/messaging/Session.h"
 #include "qpid/messaging/Message.h"
 #include "qpid/messaging/Duration.h"
@@ -44,6 +48,10 @@ namespace Messaging {
     /// Receiver is a managed wrapper for a ::qpid::messaging::Receiver
     /// </summary>
 
+<<<<<<< HEAD
+=======
+    ref class Address;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ref class Session;
     ref class Message;
     ref class Duration;
@@ -232,5 +240,13 @@ namespace Messaging {
                 return parentSession;
             }
         }
+<<<<<<< HEAD
+=======
+
+        //
+        // Address
+        //
+        Org::Apache::Qpid::Messaging::Address ^ GetAddress();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 }}}}

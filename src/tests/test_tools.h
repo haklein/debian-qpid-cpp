@@ -23,12 +23,19 @@
 #include <limits.h>             // Include before boost/test headers.
 #include <boost/test/test_tools.hpp>
 #include <boost/assign/list_of.hpp>
+<<<<<<< HEAD
 #include <boost/assign/list_of.hpp>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <vector>
 #include <set>
 #include <ostream>
 #include <sstream>
 #include <exception>
+<<<<<<< HEAD
+=======
+#include <stdexcept>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 // Print a sequence
 template <class T> std::ostream& seqPrint(std::ostream& o, const T& seq) {

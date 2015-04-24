@@ -19,6 +19,12 @@
  *
  */
 #include "qpid/broker/HeadersExchange.h"
+<<<<<<< HEAD
+=======
+
+#include "qpid/amqp/CharSequence.h"
+#include "qpid/amqp/MapHandler.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/FieldValue.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/log/Statement.h"
@@ -28,6 +34,10 @@
 using namespace qpid::broker;
 
 using std::string;
+<<<<<<< HEAD
+=======
+using qpid::amqp::MapHandler;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 using namespace qpid::framing;
 using namespace qpid::sys;
@@ -47,6 +57,10 @@ namespace {
     const std::string empty;
 
     // federation related args and values
+<<<<<<< HEAD
+=======
+    const std::string QPID_RESERVED("qpid.");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string qpidFedOp("qpid.fed.op");
     const std::string qpidFedTags("qpid.fed.tags");
     const std::string qpidFedOrigin("qpid.fed.origin");
@@ -55,6 +69,7 @@ namespace {
     const std::string fedOpUnbind("U");
     const std::string fedOpReorigin("R");
     const std::string fedOpHello("H");
+<<<<<<< HEAD
 }
 
 HeadersExchange::HeadersExchange(const string& _name, Manageable* _parent, Broker* b) :
@@ -73,6 +88,10 @@ HeadersExchange::HeadersExchange(const std::string& _name, bool _durable,
 }
 
 std::string HeadersExchange::getMatch(const FieldTable* args)
+=======
+
+std::string getMatch(const FieldTable* args)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (!args) {
         throw InternalErrorException(QPID_MSG("No arguments given."));
@@ -86,6 +105,105 @@ std::string HeadersExchange::getMatch(const FieldTable* args)
     }
     return what->get<std::string>();
 }
+<<<<<<< HEAD
+=======
+class Matcher : public MapHandler
+{
+  public:
+    Matcher(const FieldTable& b) : binding(b), matched(0) {}
+    void handleBool(const qpid::amqp::CharSequence& key, bool value) { processUint(std::string(key.data, key.size), value); }
+    void handleUint8(const qpid::amqp::CharSequence& key, uint8_t value) { processUint(std::string(key.data, key.size), value); }
+    void handleUint16(const qpid::amqp::CharSequence& key, uint16_t value) { processUint(std::string(key.data, key.size), value); }
+    void handleUint32(const qpid::amqp::CharSequence& key, uint32_t value) { processUint(std::string(key.data, key.size), value); }
+    void handleUint64(const qpid::amqp::CharSequence& key, uint64_t value) { processUint(std::string(key.data, key.size), value); }
+    void handleInt8(const qpid::amqp::CharSequence& key, int8_t value) { processInt(std::string(key.data, key.size), value); }
+    void handleInt16(const qpid::amqp::CharSequence& key, int16_t value) { processInt(std::string(key.data, key.size), value); }
+    void handleInt32(const qpid::amqp::CharSequence& key, int32_t value) { processInt(std::string(key.data, key.size), value); }
+    void handleInt64(const qpid::amqp::CharSequence& key, int64_t value) { processInt(std::string(key.data, key.size), value); }
+    void handleFloat(const qpid::amqp::CharSequence& key, float value) { processFloat(std::string(key.data, key.size), value); }
+    void handleDouble(const qpid::amqp::CharSequence& key, double value) { processFloat(std::string(key.data, key.size), value); }
+    void handleString(const qpid::amqp::CharSequence& key, const qpid::amqp::CharSequence& value, const qpid::amqp::CharSequence& /*encoding*/)
+    {
+        processString(std::string(key.data, key.size), std::string(value.data, value.size));
+    }
+    void handleVoid(const qpid::amqp::CharSequence& key)
+    {
+        valueCheckRequired(std::string(key.data, key.size));
+    }
+    bool matches()
+    {
+        std::string what = getMatch(&binding);
+        if (what == all) {
+            //must match all entries in the binding, except the match mode indicator
+            return matched == binding.size() - 1;
+        } else if (what == any) {
+            //match any of the entries in the binding
+            return matched > 0;
+        } else {
+            return false;
+        }
+    }
+  private:
+    bool valueCheckRequired(const std::string& key)
+    {
+        FieldTable::ValuePtr v = binding.get(key);
+        if (v) {
+            if (v->getType() == 0xf0/*VOID*/) {
+                ++matched;
+                return false;
+            } else {
+                return true;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    void processString(const std::string& key, const std::string& actual)
+    {
+        if (valueCheckRequired(key) && binding.getAsString(key) == actual) {
+            ++matched;
+        }
+    }
+    void processFloat(const std::string& key, double actual)
+    {
+        double bound;
+        if (valueCheckRequired(key) && binding.getDouble(key, bound) && bound == actual) {
+            ++matched;
+        }
+    }
+    void processInt(const std::string& key, int64_t actual)
+    {
+        if (valueCheckRequired(key) && binding.getAsInt64(key) == actual) {
+            ++matched;
+        }
+    }
+    void processUint(const std::string& key, uint64_t actual)
+    {
+        if (valueCheckRequired(key) && binding.getAsUInt64(key) == actual) {
+            ++matched;
+        }
+    }
+    const FieldTable& binding;
+    size_t matched;
+};
+}
+
+HeadersExchange::HeadersExchange(const string& _name, Manageable* _parent, Broker* b) :
+    Exchange(_name, _parent, b)
+{
+    if (mgmtExchange != 0)
+        mgmtExchange->set_type (typeName);
+}
+
+HeadersExchange::HeadersExchange(const std::string& _name, bool _durable, bool autodelete,
+                                 const FieldTable& _args, Manageable* _parent, Broker* b) :
+    Exchange(_name, _durable, autodelete, _args, _parent, b)
+{
+    if (mgmtExchange != 0)
+        mgmtExchange->set_type (typeName);
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 bool HeadersExchange::bind(Queue::shared_ptr queue, const string& bindingKey, const FieldTable* args)
 {
@@ -113,6 +231,22 @@ bool HeadersExchange::bind(Queue::shared_ptr queue, const string& bindingKey, co
             throw InternalErrorException(QPID_MSG("Invalid or missing x-match value binding to headers exchange. Must be a string [\"all\" or \"any\"]"));
         }
 
+<<<<<<< HEAD
+=======
+        Bindings::ConstPtr p = bindings.snapshot();
+        if (p.get()) {
+            MatchArgs matchArgs(queue, &extra_args);
+            MatchKey matchKey(queue, bindingKey);
+            for (std::vector<BoundKey>::const_iterator i = p->begin(); i != p->end(); ++i) {
+                if (matchKey(*i) && !matchArgs(*i)) {
+                    throw InternalErrorException(QPID_MSG("Exchange: " << getName()
+                        << ", binding key: " << bindingKey
+                        << " Duplicate binding key not allowed." ));
+                }
+            }
+        }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         {
             Mutex::ScopedLock l(lock);
             //NOTE: do not include the fed op/tags/origin in the
@@ -120,8 +254,13 @@ bool HeadersExchange::bind(Queue::shared_ptr queue, const string& bindingKey, co
             //matching (they are internally added properties
             //controlling binding propagation but not relevant to
             //actual routing)
+<<<<<<< HEAD
             Binding::shared_ptr binding (new Binding (bindingKey, queue, this, extra_args));
             BoundKey bk(binding);
+=======
+            Binding::shared_ptr binding (new Binding (bindingKey, queue, this, args ? *args : FieldTable()));
+            BoundKey bk(binding, extra_args);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (bindings.add_unless(bk, MatchArgs(queue, &extra_args))) {
                 binding->startManagement();
                 propagate = bk.fedBinding.addOrigin(queue->getName(), fedOrigin);
@@ -190,12 +329,17 @@ bool HeadersExchange::unbind(Queue::shared_ptr queue, const string& bindingKey, 
     if (propagate) {
         propagateFedOp(bindingKey, string(), fedOpUnbind, string());
     }
+<<<<<<< HEAD
+=======
+    if (bindings.empty()) checkAutodelete();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return true;
 }
 
 
 void HeadersExchange::route(Deliverable& msg)
 {
+<<<<<<< HEAD
     const FieldTable* args = msg.getMessage().getApplicationHeaders();
     if (!args) {
         //can't match if there were no headers passed in
@@ -210,14 +354,26 @@ void HeadersExchange::route(Deliverable& msg)
         return;
     }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     PreRoute pr(msg, this);
 
     BindingList b(new std::vector<boost::shared_ptr<qpid::broker::Exchange::Binding> >);
     Bindings::ConstPtr p = bindings.snapshot();
     if (p.get()) {
         for (std::vector<BoundKey>::const_iterator i = p->begin(); i != p->end(); ++i) {
+<<<<<<< HEAD
             if (match((*i).binding->args, *args)) {
                 b->push_back((*i).binding);
+=======
+            if (match(i->args, msg.getMessage())) {
+                /* check if a binding tothe same queue has not been already added to b */
+                std::vector<boost::shared_ptr<qpid::broker::Exchange::Binding> >::iterator bi = b->begin();
+                while ((bi != b->end()) && ((*bi)->queue != i->binding->queue))
+                    ++bi;
+                if (bi == b->end())
+                    b->push_back(i->binding);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
     }
@@ -230,7 +386,11 @@ bool HeadersExchange::isBound(Queue::shared_ptr queue, const string* const, cons
     Bindings::ConstPtr p = bindings.snapshot();
     if (p.get()){
         for (std::vector<BoundKey>::const_iterator i = p->begin(); i != p->end(); ++i) {
+<<<<<<< HEAD
             if ( (!args || equal((*i).binding->args, *args)) && (!queue || (*i).binding->queue == queue)) {
+=======
+            if ( (!args || equal((*i).args, *args)) && (!queue || (*i).binding->queue == queue)) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 return true;
             }
         }
@@ -247,10 +407,14 @@ void HeadersExchange::getNonFedArgs(const FieldTable* args, FieldTable& nonFedAr
 
     for (qpid::framing::FieldTable::ValueMap::const_iterator i=args->begin(); i != args->end(); ++i)
     {
+<<<<<<< HEAD
         const string & name(i->first);
         if (name == qpidFedOp ||
             name == qpidFedTags ||
             name == qpidFedOrigin)
+=======
+        if (i->first.find(QPID_RESERVED) == 0)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         {
             continue;
         }
@@ -258,7 +422,14 @@ void HeadersExchange::getNonFedArgs(const FieldTable* args, FieldTable& nonFedAr
     }
 }
 
+<<<<<<< HEAD
 HeadersExchange::~HeadersExchange() {}
+=======
+HeadersExchange::~HeadersExchange() {
+    if (mgmtExchange != 0)
+        mgmtExchange->debugStats("destroying");
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 const std::string HeadersExchange::typeName("headers");
 
@@ -271,6 +442,7 @@ namespace
 
 }
 
+<<<<<<< HEAD
 
 bool HeadersExchange::match(const FieldTable& bind, const FieldTable& msg) {
     typedef FieldTable::ValueMap Map;
@@ -305,6 +477,12 @@ bool HeadersExchange::match(const FieldTable& bind, const FieldTable& msg) {
     } else {
         return false;
     }
+=======
+bool HeadersExchange::match(const FieldTable& bindArgs, const Message& msg) {
+    Matcher matcher(bindArgs);
+    msg.processProperties(matcher);
+    return matcher.matches();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool HeadersExchange::equal(const FieldTable& a, const FieldTable& b) {
@@ -323,7 +501,11 @@ bool HeadersExchange::equal(const FieldTable& a, const FieldTable& b) {
 //---------
 HeadersExchange::MatchArgs::MatchArgs(Queue::shared_ptr q, const qpid::framing::FieldTable* a) : queue(q), args(a) {}
 
+<<<<<<< HEAD
 bool HeadersExchange::MatchArgs::operator()(BoundKey & bk)
+=======
+bool HeadersExchange::MatchArgs::operator()(const BoundKey & bk)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     return bk.binding->queue == queue && bk.binding->args == *args;
 }
@@ -331,7 +513,11 @@ bool HeadersExchange::MatchArgs::operator()(BoundKey & bk)
 //---------
 HeadersExchange::MatchKey::MatchKey(Queue::shared_ptr q, const std::string& k) : queue(q), key(k) {}
 
+<<<<<<< HEAD
 bool HeadersExchange::MatchKey::operator()(BoundKey & bk)
+=======
+bool HeadersExchange::MatchKey::operator()(const BoundKey & bk)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     return bk.binding->queue == queue && bk.binding->key == key;
 }
@@ -350,3 +536,11 @@ bool HeadersExchange::FedUnbindModifier::operator()(BoundKey & bk)
     return true;
 }
 
+<<<<<<< HEAD
+=======
+bool HeadersExchange::hasBindings()
+{
+    Bindings::ConstPtr ptr = bindings.snapshot();
+    return ptr && !ptr->empty();
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

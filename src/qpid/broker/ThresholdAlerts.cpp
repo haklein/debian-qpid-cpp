@@ -20,14 +20,23 @@
  */
 #include "qpid/broker/ThresholdAlerts.h"
 #include "qpid/broker/Queue.h"
+<<<<<<< HEAD
 #include "qpid/broker/QueuedMessage.h"
 #include "qpid/amqp_0_10/Codecs.h"
 #include "qpid/log/Statement.h"
 #include "qpid/management/ManagementAgent.h"
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/log/Statement.h"
+#include "qpid/management/ManagementAgent.h"
+#include "qmf/org/apache/qpid/broker/EventQueueThresholdCrossedUpward.h"
+#include "qmf/org/apache/qpid/broker/EventQueueThresholdCrossedDownward.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qmf/org/apache/qpid/broker/EventQueueThresholdExceeded.h"
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 namespace {
 const qmf::org::apache::qpid::broker::EventQueueThresholdExceeded EVENT("dummy", 0, 0);
 bool isQMFv2(const boost::intrusive_ptr<Message> message)
@@ -108,12 +117,61 @@ void ThresholdAlerts::dequeued(const QueuedMessage& m)
     --count;
     if ((countThreshold && count < countThreshold) || (sizeThreshold && size < sizeThreshold)) {
         lastAlert = qpid::sys::EPOCH;
+=======
+
+ThresholdAlerts::ThresholdAlerts(const std::string& n,
+                                 qpid::management::ManagementAgent& a,
+                                 const uint32_t ctu,
+                                 const uint32_t ctd,
+                                 const uint64_t stu,
+                                 const uint64_t std,
+                                 const bool bw)
+    : name(n), agent(a),
+      countThreshold(ctu), countThresholdDown(ctd),
+      sizeThreshold(stu), sizeThresholdDown(std),
+      count(0), size(0), countGoingUp(true), sizeGoingUp(true), backwardCompat(bw)  {}
+
+void ThresholdAlerts::enqueued(const Message& m)
+{
+    size += m.getMessageSize();
+    ++count;
+
+    if (sizeGoingUp && sizeThreshold && size >= sizeThreshold) {
+        sizeGoingUp = false;
+        agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdCrossedUpward(name, count, size));
+        if (backwardCompat)
+            agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdExceeded(name, count, size));
+    }
+
+    if (countGoingUp && countThreshold && count >= countThreshold) {
+        countGoingUp = false;
+        agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdCrossedUpward(name, count, size));
+        if (backwardCompat)
+            agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdExceeded(name, count, size));
+    }
+}
+
+void ThresholdAlerts::dequeued(const Message& m)
+{
+    size -= m.getMessageSize();
+    --count;
+
+    if (!sizeGoingUp && sizeThreshold && size <= sizeThresholdDown) {
+        sizeGoingUp = true;
+        agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdCrossedDownward(name, count, size));
+    }
+
+    if (!countGoingUp && countThreshold && count <= countThresholdDown) {
+        countGoingUp = true;
+        agent.raiseEvent(qmf::org::apache::qpid::broker::EventQueueThresholdCrossedDownward(name, count, size));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 
 
 void ThresholdAlerts::observe(Queue& queue, qpid::management::ManagementAgent& agent,
+<<<<<<< HEAD
                               const uint64_t countThreshold,
                               const uint64_t sizeThreshold,
                               const long repeatInterval)
@@ -123,10 +181,26 @@ void ThresholdAlerts::observe(Queue& queue, qpid::management::ManagementAgent& a
             new ThresholdAlerts(queue.getName(), agent, countThreshold, sizeThreshold, repeatInterval)
         );
         queue.addObserver(observer);
+=======
+                              const uint64_t ctu,
+                              const uint64_t _ctd,
+                              const uint64_t stu,
+                              const uint64_t _std)
+{
+    if (ctu || stu) {
+        uint64_t ctd = (_ctd == 0 || _ctd >= ctu) ? ctu >> 1 : _ctd;
+        uint64_t std = (_std == 0 || _std >= stu) ? stu >> 1 : _std;
+
+        boost::shared_ptr<QueueObserver> observer(
+        new ThresholdAlerts(queue.getName(), agent, ctu, ctd, stu, std, (_ctd == 0 && _std == 0))
+        );
+        queue.getObservers().add(observer);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void ThresholdAlerts::observe(Queue& queue, qpid::management::ManagementAgent& agent,
+<<<<<<< HEAD
                               const qpid::framing::FieldTable& settings, uint16_t limitRatio)
 
 {
@@ -186,6 +260,18 @@ void ThresholdAlerts::observe(Queue& queue, qpid::management::ManagementAgent& a
     sizeThreshold.addAlias("x-qpid-maximum-message-size");
 
     observe(queue, agent, countThreshold.get(settings), sizeThreshold.get(settings), repeatInterval.get(settings));
+=======
+                              const QueueSettings& settings, uint16_t limitRatio)
+{
+    //If no explicit threshold settings were given use specified
+    //percentage of any limit from the policy.
+    uint32_t countThreshold = settings.alertThreshold.hasCount() ? settings.alertThreshold.getCount() : (settings.maxDepth.getCount()*limitRatio/100);
+    uint32_t sizeThreshold = settings.alertThreshold.hasSize() ? settings.alertThreshold.getSize() : (settings.maxDepth.getSize()*limitRatio/100);
+    uint32_t countThresholdDown = settings.alertThresholdDown.hasCount() ? settings.alertThresholdDown.getCount() : 0;
+    uint32_t sizeThresholdDown = settings.alertThresholdDown.hasSize() ? settings.alertThresholdDown.getSize() : 0;
+
+    observe(queue, agent, countThreshold, countThresholdDown , sizeThreshold, sizeThresholdDown);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }}

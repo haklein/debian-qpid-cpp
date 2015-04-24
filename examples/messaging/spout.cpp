@@ -22,6 +22,10 @@
 #include <qpid/messaging/Address.h>
 #include <qpid/messaging/Connection.h>
 #include <qpid/messaging/Message.h>
+<<<<<<< HEAD
+=======
+#include <qpid/messaging/Message_io.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qpid/messaging/Sender.h>
 #include <qpid/messaging/Session.h>
 #include <qpid/types/Variant.h>
@@ -43,6 +47,10 @@ struct Options : OptionParser
     std::string url;
     std::string address;
     int timeout;
+<<<<<<< HEAD
+=======
+    bool durable;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     int count;
     std::string id;
     std::string replyto;
@@ -50,15 +58,28 @@ struct Options : OptionParser
     string_vector entries;
     std::string content;
     std::string connectionOptions;
+<<<<<<< HEAD
+=======
+    bool print;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Options()
         : OptionParser("Usage: spout [OPTIONS] ADDRESS", "Send messages to the specified address"),
           url("127.0.0.1"),
           timeout(0),
+<<<<<<< HEAD
           count(1)
     {
         add("broker,b", url, "url of broker to connect to");
         add("timeout,t", timeout, "exit after the specified time");
+=======
+          count(1),
+          durable(false)
+    {
+        add("broker,b", url, "url of broker to connect to");
+        add("timeout,t", timeout, "exit after the specified time");
+        add("durable,d", durable, "make the message durable (def. transient)");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         add("count,c", count, "stop after count messages have been sent, zero disables");
         add("id,i", id, "use the supplied id instead of generating one");
         add("reply-to", replyto, "specify reply-to address");
@@ -66,6 +87,10 @@ struct Options : OptionParser
         add("map,M", entries, "specify entry for map content");
         add("content", content, "specify textual content");
         add("connection-options", connectionOptions, "connection options string in the form {name1:value1, name2:value2}");
+<<<<<<< HEAD
+=======
+        add("print", print, "print each message sent");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     static bool nameval(const std::string& in, std::string& name, std::string& value)
@@ -91,6 +116,10 @@ struct Options : OptionParser
         std::string value;
         if (nameval(property, name, value)) {
             message.getProperties()[name] = value;
+<<<<<<< HEAD
+=======
+            message.getProperties()[name].setEncoding("utf8");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             message.getProperties()[name] = Variant();
         }    
@@ -126,8 +155,17 @@ struct Options : OptionParser
             return true;
         }
     }
+<<<<<<< HEAD
 };
 
+=======
+
+    bool isDurable() const
+    {
+      return durable;
+    }
+};
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 int main(int argc, char** argv)
 {
@@ -140,6 +178,7 @@ int main(int argc, char** argv)
             Sender sender = session.createSender(options.address);
 
             Message message;
+<<<<<<< HEAD
             options.setProperties(message);
             if (options.entries.size()) {
                 Variant::Map content;
@@ -148,6 +187,18 @@ int main(int argc, char** argv)
             } else if (options.content.size()) {
                 message.setContent(options.content);
                 message.setContentType("text/plain");
+=======
+            message.setDurable(options.isDurable());
+            options.setProperties(message);
+            Variant& obj = message.getContentObject();
+            if (options.entries.size()) {
+                Variant::Map content;
+                options.setEntries(content);
+                obj = content;
+            } else if (options.content.size()) {
+                obj = options.content;
+                obj.setEncoding("utf8");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
             std::time_t start = std::time(0);
             for (int count = 0; 
@@ -159,6 +210,10 @@ int main(int argc, char** argv)
                 std::stringstream spoutid;
                 spoutid << id << ":" << count;
                 message.getProperties()["spout-id"] = spoutid.str();
+<<<<<<< HEAD
+=======
+                if (options.print) std::cout << message << std::endl;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 sender.send(message);
             }
             session.sync();

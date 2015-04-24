@@ -87,6 +87,7 @@ public:
 
     Future send(const framing::AMQBody& command);
     Future send(const framing::AMQBody& command, const framing::MethodContent& content);
+<<<<<<< HEAD
     /**
      * This method takes the content as a FrameSet; if reframe=false,
      * the caller is resposnible for ensuring that the header and
@@ -96,6 +97,9 @@ public:
      * reframed correctly for the connection.
      */
     QPID_CLIENT_EXTERN Future send(const framing::AMQBody& command, const framing::FrameSet& content, bool reframe=false);
+=======
+    QPID_CLIENT_EXTERN Future send(const framing::AMQBody& command, const framing::FrameSet& content);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void sendRawFrame(framing::AMQFrame& frame);
 
     Demux& getDemux();
@@ -108,7 +112,11 @@ public:
     void sendCompletion();
     void sendFlush();
 
+<<<<<<< HEAD
     void setException(const sys::ExceptionHolder&);
+=======
+    QPID_CLIENT_EXTERN void setException(const sys::ExceptionHolder&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     
     //NOTE: these are called by the network thread when the connection is closed or dies
     void connectionClosed(uint16_t code, const std::string& text);
@@ -125,11 +133,14 @@ public:
      */
     boost::shared_ptr<ConnectionImpl> getConnection();
 
+<<<<<<< HEAD
     void setDoClearDeliveryPropertiesExchange(bool b=true) { doClearDeliveryPropertiesExchange = b; }
 
     /** Suppress sending detach in destructor. Used by cluster to build session state */
     void disableAutoDetach();
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 private:
     enum State {
         INACTIVE,
@@ -225,10 +236,13 @@ private:
 
     SessionState sessionState;
 
+<<<<<<< HEAD
     bool doClearDeliveryPropertiesExchange;
 
     bool autoDetach;
     
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   friend class client::SessionHandler;
 };
 

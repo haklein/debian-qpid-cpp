@@ -19,6 +19,10 @@
  *
  */
 #include "qpid/amqp_0_10/Codecs.h"
+<<<<<<< HEAD
+=======
+#include "qpid/amqp_0_10/CodecsInternal.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/Array.h"
 #include "qpid/framing/Buffer.h"
 #include "qpid/framing/FieldTable.h"
@@ -52,7 +56,10 @@ template <class T, class U, class F> void convert(const T& from, U& to, F f)
 }
 
 Variant::Map::value_type toVariantMapEntry(const FieldTable::value_type& in);
+<<<<<<< HEAD
 Variant toVariant(boost::shared_ptr<FieldValue> in);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 template <class T, class U, class F> void translate(boost::shared_ptr<FieldValue> in, U& u, F f) 
 {
@@ -61,6 +68,7 @@ template <class T, class U, class F> void translate(boost::shared_ptr<FieldValue
     convert(t, u, f);
 }
 
+<<<<<<< HEAD
 template <class T, class U, class F> T* toFieldValueCollection(const U& u, F f) 
 {
     typename T::ValueType t;
@@ -68,6 +76,8 @@ template <class T, class U, class F> T* toFieldValueCollection(const U& u, F f)
     return new T(t);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void setEncodingFor(Variant& out, uint8_t code)
 {
     switch(code){
@@ -110,9 +120,15 @@ Variant toVariant(boost::shared_ptr<FieldValue> in)
     //based on AMQP 0-10 typecode, pick most appropriate variant type
     switch (in->getType()) {
         //Fixed Width types:
+<<<<<<< HEAD
       case 0x01: out.setEncoding(amqp0_10_binary);
       case 0x02: out = in->getIntegerValue<int8_t>(); break;
       case 0x03: out = in->getIntegerValue<uint8_t>(); break;
+=======
+      case 0x00: out.setEncoding(amqp0_10_binary);
+      case 0x01: out = in->getIntegerValue<int8_t>(); break;
+      case 0x02: out = in->getIntegerValue<uint8_t>(); break;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       case 0x04: break; //TODO: iso-8859-15 char
       case 0x08: out = static_cast<bool>(in->getIntegerValue<uint8_t>()); break;
       case 0x10: out.setEncoding(amqp0_10_binary);
@@ -173,6 +189,7 @@ Variant toVariant(boost::shared_ptr<FieldValue> in)
     return out;
 }
 
+<<<<<<< HEAD
 boost::shared_ptr<FieldValue> convertString(const std::string& value, const std::string& encoding)
 {
     bool large = value.size() > std::numeric_limits<uint16_t>::max();
@@ -201,6 +218,8 @@ boost::shared_ptr<FieldValue> convertString(const std::string& value, const std:
     }
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Variant::Map::value_type toVariantMapEntry(const FieldTable::value_type& in)
 {
     return Variant::Map::value_type(in.first, toVariant(in.second));
@@ -224,10 +243,13 @@ template <class T, class U, class F> void _decode(const std::string& data, U& va
     convert(t, value, f);
 }
 
+<<<<<<< HEAD
 uint32_t encodedSize(const Variant::Map& values);
 uint32_t encodedSize(const Variant::List& values);
 uint32_t encodedSize(const std::string& value);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 uint32_t encodedSize(const Variant& value)
 {
     switch (value.getType()) {
@@ -326,9 +348,12 @@ void encode(const std::string& value, const std::string& encoding, qpid::framing
     }
 }
 
+<<<<<<< HEAD
 void encode(const Variant::Map& map, uint32_t len, qpid::framing::Buffer& buffer);
 void encode(const Variant::List& list, uint32_t len, qpid::framing::Buffer& buffer);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void encode(const Variant& value, qpid::framing::Buffer& buffer)
 {
     switch (value.getType()) {
@@ -527,6 +552,104 @@ void translate(const FieldTable& from, Variant::Map& to)
     convert(from, to, &toVariantMapEntry);
 }
 
+<<<<<<< HEAD
+=======
+namespace {
+boost::shared_ptr<FieldValue> convertString(const std::string& value, const std::string& encoding);
+FieldTableValue* toFieldTableValue(const Variant::Map& map);
+ListValue* toListValue(const Variant::List& list);
+
+boost::shared_ptr<FieldValue> toFieldValue(const Variant& in)
+{
+    boost::shared_ptr<FieldValue> out;
+    switch (in.getType()) {
+        case VAR_VOID: out = boost::shared_ptr<FieldValue>(new VoidValue()); break;
+        case VAR_BOOL: out = boost::shared_ptr<FieldValue>(new BoolValue(in.asBool())); break;
+        case VAR_UINT8: out = boost::shared_ptr<FieldValue>(new Unsigned8Value(in.asUint8())); break;
+        case VAR_UINT16: out = boost::shared_ptr<FieldValue>(new Unsigned16Value(in.asUint16())); break;
+        case VAR_UINT32: out = boost::shared_ptr<FieldValue>(new Unsigned32Value(in.asUint32())); break;
+        case VAR_UINT64: out = boost::shared_ptr<FieldValue>(new Unsigned64Value(in.asUint64())); break;
+        case VAR_INT8: out = boost::shared_ptr<FieldValue>(new Integer8Value(in.asInt8())); break;
+        case VAR_INT16: out = boost::shared_ptr<FieldValue>(new Integer16Value(in.asInt16())); break;
+        case VAR_INT32: out = boost::shared_ptr<FieldValue>(new Integer32Value(in.asInt32())); break;
+        case VAR_INT64: out = boost::shared_ptr<FieldValue>(new Integer64Value(in.asInt64())); break;
+        case VAR_FLOAT: out = boost::shared_ptr<FieldValue>(new FloatValue(in.asFloat())); break;
+        case VAR_DOUBLE: out = boost::shared_ptr<FieldValue>(new DoubleValue(in.asDouble())); break;
+        case VAR_STRING: out = convertString(in.asString(), in.getEncoding()); break;
+        case VAR_UUID: out = boost::shared_ptr<FieldValue>(new UuidValue(in.asUuid().data())); break;
+        case VAR_MAP:
+            out = boost::shared_ptr<FieldValue>(toFieldTableValue(in.asMap()));
+            break;
+        case VAR_LIST:
+            out = boost::shared_ptr<FieldValue>(toListValue(in.asList()));
+    }
+    return out;
+}
+
+boost::shared_ptr<FieldValue> convertString(const std::string& value, const std::string& encoding)
+{
+    bool large = value.size() > std::numeric_limits<uint16_t>::max();
+    if (encoding.empty() || encoding == amqp0_10_binary || encoding == binary) {
+        if (large) {
+            return boost::shared_ptr<FieldValue>(new Var32Value(value, 0xa0));
+        } else {
+            return boost::shared_ptr<FieldValue>(new Var16Value(value, 0x90));
+        }
+    } else if (encoding == utf8) {
+        if (!large)
+            return boost::shared_ptr<FieldValue>(new Str16Value(value));
+        throw Exception(QPID_MSG("Could not encode utf8 character string - too long (" << value.size() << " bytes)"));
+    } else if (encoding == utf16) {
+        if (!large)
+            return boost::shared_ptr<FieldValue>(new Var16Value(value, 0x96));
+        throw Exception(QPID_MSG("Could not encode utf16 character string - too long (" << value.size() << " bytes)"));
+    } else if (encoding == iso885915) {
+        if (!large)
+            return boost::shared_ptr<FieldValue>(new Var16Value(value, 0x94));
+        throw Exception(QPID_MSG("Could not encode iso-8859-15 character string - too long (" << value.size() << " bytes)"));
+    } else {
+        // the encoding was not recognised
+        QPID_LOG(warning, "Unknown byte encoding: [" << encoding << "], encoding as vbin32.");
+        return boost::shared_ptr<FieldValue>(new Var32Value(value, 0xa0));
+    }
+}
+
+FieldTable::value_type toFieldTableEntry(const Variant::Map::value_type& in)
+{
+    return FieldTable::value_type(in.first, toFieldValue(in.second));
+}
+
+FieldTableValue* toFieldTableValue(const Variant::Map& map)
+{
+    FieldTable ft;
+    convert(map, ft, &toFieldTableEntry);
+    return new FieldTableValue(ft);
+}
+
+ListValue* toListValue(const Variant::List& list)
+{
+    List l;
+    convert(list, l, &toFieldValue);
+    return new ListValue(l);
+}
+}
+
+void translate(const types::Variant& from, boost::shared_ptr<framing::FieldValue> to)
+{
+    to = toFieldValue(from);
+}
+
+void translate(const boost::shared_ptr<FieldValue> from, Variant& to)
+{
+    to = toVariant(from);
+}
+
+boost::shared_ptr<framing::FieldValue> translate(const types::Variant& from)
+{
+    return toFieldValue(from);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string ListCodec::contentType("amqp/list");
 const std::string MapCodec::contentType("amqp/map");
 

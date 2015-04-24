@@ -7,9 +7,15 @@
 // to you under the Apache License, Version 2.0 (the
 // "License"); you may not use this file except in compliance
 // with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
 // 
 //   http://www.apache.org/licenses/LICENSE-2.0
 // 
+=======
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // Unless required by applicable law or agreed to in writing,
 // software distributed under the License is distributed on an
 // "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -27,6 +33,12 @@
 #include "qpid//*MGEN:Class.AgentHeaderLocation*//ManagementAgent.h"
 #include "/*MGEN:Class.NameCap*/.h"
 /*MGEN:Class.MethodArgIncludes*/
+<<<<<<< HEAD
+=======
+/*MGEN:IF(Root.GenLogs)*/
+#include "qpid/log/Statement.h"
+/*MGEN:ENDIF*/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <iostream>
 #include <sstream>
 #include <string.h>
@@ -59,6 +71,13 @@ uint8_t /*MGEN:Class.NameCap*/::md5Sum[MD5_LEN]   =
     for (int idx = 0; idx < maxThreads; idx++)
         perThreadStatsArray[idx] = 0;
 /*MGEN:ENDIF*/
+<<<<<<< HEAD
+=======
+/*MGEN:IF(Root.GenLogs)*/
+    QPID_LOG_CAT(trace, model, "Mgmt create " << className
+        << ". id:" << getKey());
+/*MGEN:ENDIF*/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 /*MGEN:Class.NameCap*/::~/*MGEN:Class.NameCap*/ ()
@@ -71,6 +90,26 @@ uint8_t /*MGEN:Class.NameCap*/::md5Sum[MD5_LEN]   =
 /*MGEN:ENDIF*/
 }
 
+<<<<<<< HEAD
+=======
+void /*MGEN:Class.NameCap*/::debugStats (const std::string& comment)
+{
+/*MGEN:IF(Root.GenLogs)*/
+    bool logEnabled;
+    QPID_LOG_TEST_CAT(trace, model, logEnabled);
+    if (logEnabled)
+    {
+        ::qpid::types::Variant::Map map;
+        mapEncodeValues(map, false, true);
+        QPID_LOG_CAT(trace, model, "Mgmt " << comment << ((comment!="")?(" "):("")) << className
+            << ". id:" << getKey()
+            << " Statistics: " << map);
+    }
+/*MGEN:ENDIF*/
+}
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace {
     const string NAME("name");
     const string TYPE("type");
@@ -275,7 +314,10 @@ std::string /*MGEN:Class.NameCap*/::getKey() const
 }
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void /*MGEN:Class.NameCap*/::mapEncodeValues (::qpid::types::Variant::Map& _map,
                                               bool includeProperties,
                                               bool includeStatistics)

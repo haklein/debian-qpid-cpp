@@ -22,6 +22,10 @@
  *
  */
 
+<<<<<<< HEAD
+=======
+#include "qpid/RefCounted.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/intrusive_ptr.hpp>
 
 #include "qpid/broker/BrokerImportExport.h"
@@ -77,7 +81,11 @@ namespace broker {
  * assuming no need for synchronization with Completer threads.
  */
 
+<<<<<<< HEAD
 class AsyncCompletion
+=======
+class AsyncCompletion : public virtual RefCounted
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
  public:
 
@@ -90,7 +98,17 @@ class AsyncCompletion
      */
     class Callback : public RefCounted
     {
+<<<<<<< HEAD
   public:
+=======
+      public:
+        // Normally RefCounted objects cannot be copied.
+        // Allow Callback objects to be copied (by subclasses implementing clone())
+        // The copy has an initial refcount of 0
+        Callback(const Callback&) : RefCounted() {}
+        Callback() {}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         virtual void completed(bool) = 0;
         virtual boost::intrusive_ptr<Callback> clone() = 0;
     };
@@ -104,6 +122,7 @@ class AsyncCompletion
         qpid::sys::Mutex::ScopedLock l(callbackLock);
         if (active) {
             if (callback.get()) {
+<<<<<<< HEAD
                 inCallback = true;
                 {
                     qpid::sys::Mutex::ScopedUnlock ul(callbackLock);
@@ -111,6 +130,16 @@ class AsyncCompletion
                 }
                 inCallback = false;
                 callback = boost::intrusive_ptr<Callback>();
+=======
+                boost::intrusive_ptr<Callback> save = callback;
+                callback = boost::intrusive_ptr<Callback>(); // Nobody else can run callback.
+                inCallback = true;
+                {
+                    qpid::sys::Mutex::ScopedUnlock ul(callbackLock);
+                    save->completed(sync);
+                }
+                inCallback = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 callbackLock.notifyAll();
             }
             active = false;

@@ -38,9 +38,15 @@ FanOutExchange::FanOutExchange(const std::string& _name, Manageable* _parent, Br
         mgmtExchange->set_type (typeName);
 }
 
+<<<<<<< HEAD
 FanOutExchange::FanOutExchange(const std::string& _name, bool _durable,
                                const FieldTable& _args, Manageable* _parent, Broker* b) :
     Exchange(_name, _durable, _args, _parent, b)
+=======
+FanOutExchange::FanOutExchange(const std::string& _name, bool _durable, bool autodelete,
+                               const FieldTable& _args, Manageable* _parent, Broker* b) :
+    Exchange(_name, _durable, autodelete, _args, _parent, b)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (mgmtExchange != 0)
         mgmtExchange->set_type (typeName);
@@ -54,7 +60,11 @@ bool FanOutExchange::bind(Queue::shared_ptr queue, const string& /*key*/, const 
     bool propagate = false;
 
     if (args == 0 || fedOp.empty() || fedOp == fedOpBind) {
+<<<<<<< HEAD
         Binding::shared_ptr binding (new Binding ("", queue, this, FieldTable(), fedOrigin));
+=======
+        Binding::shared_ptr binding (new Binding ("", queue, this, args ? *args : FieldTable(), fedOrigin));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (bindings.add_unless(binding, MatchQueue(queue))) {
             binding->startManagement();
             propagate = fedBinding.addOrigin(queue->getName(), fedOrigin);
@@ -101,6 +111,10 @@ bool FanOutExchange::unbind(Queue::shared_ptr queue, const string& /*key*/, cons
 
     if (propagate)
         propagateFedOp(string(), string(), fedOpUnbind, string());
+<<<<<<< HEAD
+=======
+    if (bindings.empty()) checkAutodelete();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return true;
 }
 
@@ -109,7 +123,11 @@ void FanOutExchange::route(Deliverable& msg)
     PreRoute pr(msg, this);
     doRoute(msg, bindings.snapshot());
 }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool FanOutExchange::isBound(Queue::shared_ptr queue, const string* const, const FieldTable* const)
 {
     BindingsArray::ConstPtr ptr = bindings.snapshot();
@@ -117,6 +135,21 @@ bool FanOutExchange::isBound(Queue::shared_ptr queue, const string* const, const
 }
 
 
+<<<<<<< HEAD
 FanOutExchange::~FanOutExchange() {}
 
 const std::string FanOutExchange::typeName("fanout");
+=======
+FanOutExchange::~FanOutExchange() {
+    if (mgmtExchange != 0)
+        mgmtExchange->debugStats("destroying");
+}
+
+const std::string FanOutExchange::typeName("fanout");
+
+bool FanOutExchange::hasBindings()
+{
+    BindingsArray::ConstPtr ptr = bindings.snapshot();
+    return ptr && !ptr->empty();
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

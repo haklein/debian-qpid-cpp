@@ -19,6 +19,7 @@
  *
  */
 
+<<<<<<< HEAD
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #endif
@@ -34,6 +35,25 @@
 #if HAVE_SASL
 #include <sys/stat.h>
 #include <sasl/sasl.h>
+=======
+#include "qpid/broker/AclModule.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+#include "qpid/framing/reply_exceptions.h"
+#include "qpid/framing/FieldValue.h"
+#include "qpid/log/Statement.h"
+#include "qpid/sys/ConnectionOutputHandler.h"
+#include "qpid/sys/SecuritySettings.h"
+
+#include <boost/format.hpp>
+
+#include "config.h"
+
+#if HAVE_SASL
+#include <sys/stat.h>
+#include <sasl/sasl.h>
+#include <sasl/saslplug.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/cyrus/CyrusSecurityLayer.h"
 using qpid::sys::cyrus::CyrusSecurityLayer;
 #endif
@@ -53,12 +73,20 @@ namespace broker {
 
 class NullAuthenticator : public SaslAuthenticator
 {
+<<<<<<< HEAD
     Connection& connection;
+=======
+    amqp_0_10::Connection& connection;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::AMQP_ClientProxy::Connection client;
     std::string realm;
     const bool encrypt;
 public:
+<<<<<<< HEAD
     NullAuthenticator(Connection& connection, bool encrypt);
+=======
+    NullAuthenticator(amqp_0_10::Connection& connection, bool encrypt);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ~NullAuthenticator();
     void getMechanisms(framing::Array& mechanisms);
     void start(const std::string& mechanism, const std::string* response);
@@ -73,7 +101,11 @@ public:
 class CyrusAuthenticator : public SaslAuthenticator
 {
     sasl_conn_t *sasl_conn;
+<<<<<<< HEAD
     Connection& connection;
+=======
+    amqp_0_10::Connection& connection;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::AMQP_ClientProxy::Connection client;
     const bool encrypt;
 
@@ -81,7 +113,11 @@ class CyrusAuthenticator : public SaslAuthenticator
     bool getUsername(std::string& uid);
 
 public:
+<<<<<<< HEAD
     CyrusAuthenticator(Connection& connection, bool encrypt);
+=======
+    CyrusAuthenticator(amqp_0_10::Connection& connection, bool encrypt);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ~CyrusAuthenticator();
     void init();
     void getMechanisms(framing::Array& mechanisms);
@@ -96,6 +132,41 @@ bool SaslAuthenticator::available(void) {
     return true;
 }
 
+<<<<<<< HEAD
+=======
+// Called by sasl_server_init() when config file name is constructed to allow clients to verify file
+// Returning SASL_FAIL here will cause sasl_server_init() to fail and an exception will be thrown
+int _sasl_verifyfile_callback(void *, const char *configFileName, sasl_verify_type_t type)
+{
+    if (type == SASL_VRFY_CONF) {
+        struct stat st;
+        // verify the file exists
+        if ( ::stat ( configFileName, & st) ) {
+            QPID_LOG(error, "SASL: config file doesn't exist: " << configFileName);
+            return SASL_FAIL;
+        }
+        // verify the file can be read by the broker
+        if ( ::access ( configFileName, R_OK ) ) {
+            QPID_LOG(error, "SASL: broker unable to read the config file. Check file permissions: " << configFileName);
+            return SASL_FAIL;
+        }
+    }
+    return SASL_OK;
+}
+
+#ifndef sasl_callback_ft
+typedef int (*sasl_callback_ft)(void);
+#endif
+
+// passed to sasl_server_init()
+static sasl_callback_t _callbacks[] =
+{
+        {   SASL_CB_VERIFYFILE, (sasl_callback_ft)&_sasl_verifyfile_callback, NULL },
+    {   SASL_CB_LIST_END,   NULL,                                         NULL }
+};
+sasl_callback_t *callbacks = _callbacks;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // Initialize the SASL mechanism; throw if it fails.
 void SaslAuthenticator::init(const std::string& saslName, std::string const & saslConfigPath )
 {
@@ -103,6 +174,11 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
 #if (SASL_VERSION_FULL >= ((2<<16)|(1<<8)|22))
     //  If we are not given a sasl path, do nothing and allow the default to be used.
     if ( saslConfigPath.empty() ) {
+<<<<<<< HEAD
+=======
+        // don't pass callbacks if there is no config path
+        callbacks = NULL;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         QPID_LOG ( info, "SASL: no config path set - using default." );
     }
     else {
@@ -119,6 +195,14 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
           throw Exception ( QPID_MSG ( "SASL: sasl_set_path failed: cannot stat: " << saslConfigPath ) );
         }
 
+<<<<<<< HEAD
+=======
+        // Make sure that saslConfigPath is a directory.
+        if (!S_ISDIR(st.st_mode)) {
+            throw Exception ( QPID_MSG ( "SASL: not a directory: " << saslConfigPath ) );
+        }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         // Make sure the directory is readable.
         if ( ::access ( saslConfigPath.c_str(), R_OK ) ) {
             throw Exception ( QPID_MSG ( "SASL: sasl_set_path failed: directory not readable:" << saslConfigPath ) );
@@ -133,11 +217,19 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
     }
 #endif
 
+<<<<<<< HEAD
     int code = sasl_server_init(NULL, saslName.c_str());
     if (code != SASL_OK) {
         // TODO: Figure out who owns the char* returned by
         // sasl_errstring, though it probably does not matter much
         throw Exception(sasl_errstring(code, NULL, NULL));
+=======
+    int code = sasl_server_init(callbacks, saslName.c_str());
+    if (code != SASL_OK) {
+        // TODO: Figure out who owns the char* returned by
+        // sasl_errstring, though it probably does not matter much
+        throw Exception(QPID_MSG("SASL: failed to parse SASL configuration file in (" << saslConfigPath << "), error: " << sasl_errstring(code, NULL, NULL)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -166,6 +258,7 @@ void SaslAuthenticator::fini(void)
 
 #endif
 
+<<<<<<< HEAD
 std::auto_ptr<SaslAuthenticator> SaslAuthenticator::createAuthenticator(Connection& c )
 {
     if (c.getBroker().getOptions().auth) {
@@ -180,12 +273,27 @@ std::auto_ptr<SaslAuthenticator> SaslAuthenticator::createAuthenticator(Connecti
     } else {
         QPID_LOG(debug, "SASL: No Authentication Performed");
         return std::auto_ptr<SaslAuthenticator>(new NullAuthenticator(c, c.getBroker().getOptions().requireEncrypted));
+=======
+std::auto_ptr<SaslAuthenticator> SaslAuthenticator::createAuthenticator(amqp_0_10::Connection& c )
+{
+    if (c.getBroker().isAuthenticating()) {
+        return std::auto_ptr<SaslAuthenticator>(
+            new CyrusAuthenticator(c, c.getBroker().requireEncrypted()));
+    } else {
+        QPID_LOG(debug, "SASL: No Authentication Performed");
+        return std::auto_ptr<SaslAuthenticator>(new NullAuthenticator(c, c.getBroker().requireEncrypted()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 
+<<<<<<< HEAD
 NullAuthenticator::NullAuthenticator(Connection& c, bool e) : connection(c), client(c.getOutput()),
                                                               realm(c.getBroker().getOptions().realm), encrypt(e) {}
+=======
+NullAuthenticator::NullAuthenticator(amqp_0_10::Connection& c, bool e) : connection(c), client(c.getOutput()),
+                                                              realm(c.getBroker().getRealm()), encrypt(e) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 NullAuthenticator::~NullAuthenticator() {}
 
 void NullAuthenticator::getMechanisms(Array& mechanisms)
@@ -197,6 +305,7 @@ void NullAuthenticator::getMechanisms(Array& mechanisms)
 void NullAuthenticator::start(const string& mechanism, const string* response)
 {
     if (encrypt) {
+<<<<<<< HEAD
 #if HAVE_SASL
         // encryption required - check to see if we are running over an
         // encrypted SSL connection.
@@ -204,6 +313,12 @@ void NullAuthenticator::start(const string& mechanism, const string* response)
         sasl_ssf_t external_ssf = (sasl_ssf_t) external.ssf;
         if (external_ssf < 1)    // < 1 == unencrypted
 #endif
+=======
+        // encryption required - check to see if we are running over an
+        // encrypted SSL connection.
+        SecuritySettings external = connection.getExternalSecuritySettings();
+        if (external.ssf < 1)    // < 1 == unencrypted
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         {
             QPID_LOG(error, "Rejected un-encrypted connection.");
             throw ConnectionForcedException("Connection must be encrypted.");
@@ -238,6 +353,13 @@ void NullAuthenticator::start(const string& mechanism, const string* response)
     {
         throw ConnectionForcedException("User connection denied by configured limit");
     }
+<<<<<<< HEAD
+=======
+    qmf::org::apache::qpid::broker::Connection::shared_ptr cnxMgmt = connection.getMgmtObject();
+    if ( cnxMgmt )
+        cnxMgmt->set_saslMechanism(mechanism);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     client.tune(framing::CHANNEL_MAX, connection.getFrameMax(), 0, connection.getHeartbeatMax());
 }
 
@@ -251,7 +373,11 @@ std::auto_ptr<SecurityLayer> NullAuthenticator::getSecurityLayer(uint16_t)
 
 #if HAVE_SASL
 
+<<<<<<< HEAD
 CyrusAuthenticator::CyrusAuthenticator(Connection& c, bool _encrypt) :
+=======
+CyrusAuthenticator::CyrusAuthenticator(amqp_0_10::Connection& c, bool _encrypt) :
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     sasl_conn(0), connection(c), client(c.getOutput()), encrypt(_encrypt)
 {
     init();
@@ -273,10 +399,17 @@ void CyrusAuthenticator::init()
           */
     int code;
 
+<<<<<<< HEAD
     const char *realm = connection.getBroker().getOptions().realm.c_str();
     code = sasl_server_new(BROKER_SASL_NAME, /* Service name */
                            NULL, /* Server FQDN, gethostname() */
                            realm, /* Authentication realm */
+=======
+    std::string realm = connection.getBroker().getRealm();
+    code = sasl_server_new(BROKER_SASL_NAME, /* Service name */
+                           NULL, /* Server FQDN, gethostname() */
+                           realm.c_str(), /* Authentication realm */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                            NULL, /* Local IP, needed for some mechanism */
                            NULL, /* Remote IP, needed for some mechanism */
                            NULL, /* Callbacks */
@@ -302,6 +435,14 @@ void CyrusAuthenticator::init()
     SecuritySettings external = connection.getExternalSecuritySettings();
     QPID_LOG(debug, "External ssf=" << external.ssf << " and auth=" << external.authid);
     sasl_ssf_t external_ssf = (sasl_ssf_t) external.ssf;
+<<<<<<< HEAD
+=======
+
+    if ((external_ssf) && (external.authid.empty())) {
+        QPID_LOG(warning, "SASL error: unable to offer EXTERNAL mechanism as authid cannot be determined");
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (external_ssf) {
         int result = sasl_setprop(sasl_conn, SASL_SSF_EXTERNAL, &external_ssf);
         if (result != SASL_OK) {
@@ -424,7 +565,11 @@ void CyrusAuthenticator::start(const string& mechanism, const string* response)
                                  &challenge, &challenge_len);
 
     processAuthenticationStep(code, challenge, challenge_len);
+<<<<<<< HEAD
     qmf::org::apache::qpid::broker::Connection* cnxMgmt = connection.getMgmtObject();
+=======
+    qmf::org::apache::qpid::broker::Connection::shared_ptr cnxMgmt = connection.getMgmtObject();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if ( cnxMgmt )
         cnxMgmt->set_saslMechanism(mechanism);
 }
@@ -474,6 +619,16 @@ void CyrusAuthenticator::processAuthenticationStep(int code, const char *challen
         std::string errordetail = sasl_errdetail(sasl_conn);
         if (!getUsername(uid)) {
             QPID_LOG(info, "SASL: Authentication failed (no username available yet):" << errordetail);
+<<<<<<< HEAD
+=======
+        } else if (SASL_NOUSER == code) {
+            // SASL_NOUSER is returned when either:
+            // - the user name supplied was not in the sasl db or
+            // - the sasl db could not be read
+            //       - because of file permissions or
+            //       - because the file was not found
+            QPID_LOG(info, "SASL: Authentication failed. User not found or sasldb not accessible.(" << code << ") for " << uid);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             QPID_LOG(info, "SASL: Authentication failed for " << uid << ":" << errordetail);
         }
@@ -505,9 +660,15 @@ std::auto_ptr<SecurityLayer> CyrusAuthenticator::getSecurityLayer(uint16_t maxFr
     uint ssf = *(reinterpret_cast<const unsigned*>(value));
     std::auto_ptr<SecurityLayer> securityLayer;
     if (ssf) {
+<<<<<<< HEAD
         securityLayer = std::auto_ptr<SecurityLayer>(new CyrusSecurityLayer(sasl_conn, maxFrameSize));
     }
     qmf::org::apache::qpid::broker::Connection* cnxMgmt = connection.getMgmtObject();
+=======
+        securityLayer = std::auto_ptr<SecurityLayer>(new CyrusSecurityLayer(sasl_conn, maxFrameSize, ssf));
+    }
+    qmf::org::apache::qpid::broker::Connection::shared_ptr cnxMgmt = connection.getMgmtObject();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if ( cnxMgmt )
         cnxMgmt->set_saslSsf(ssf);
     return securityLayer;

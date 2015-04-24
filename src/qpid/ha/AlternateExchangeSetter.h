@@ -25,7 +25,10 @@
 #include "qpid/log/Statement.h"
 #include "qpid/broker/Exchange.h"
 #include "qpid/broker/ExchangeRegistry.h"
+<<<<<<< HEAD
 #include "boost/function.hpp"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <map>
 
 namespace qpid {
@@ -43,12 +46,22 @@ class AlternateExchangeSetter
 
     AlternateExchangeSetter(broker::ExchangeRegistry& er) : exchanges(er) {}
 
+<<<<<<< HEAD
     void setAlternate(const std::string& altEx, const SetFunction& setter) {
         broker::Exchange::shared_ptr ex = exchanges.find(altEx);
+=======
+    /** If altEx is already known, call setter(altEx) now else save for later */
+    void setAlternate(const std::string& altEx, const SetFunction& setter) {
+        boost::shared_ptr<broker::Exchange> ex = exchanges.find(altEx);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (ex) setter(ex);     // Set immediately.
         else setters.insert(Setters::value_type(altEx, setter)); // Save for later.
     }
 
+<<<<<<< HEAD
+=======
+    /** Add an exchange and call any setters that are waiting for it. */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void addExchange(boost::shared_ptr<broker::Exchange> exchange) {
         // Update the setters for this exchange
         std::pair<Setters::iterator, Setters::iterator> range = setters.equal_range(exchange->getName());

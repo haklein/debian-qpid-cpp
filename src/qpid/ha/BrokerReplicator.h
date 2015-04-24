@@ -27,10 +27,20 @@
 #include "AlternateExchangeSetter.h"
 #include "qpid/Address.h"
 #include "qpid/broker/Exchange.h"
+<<<<<<< HEAD
 #include "qpid/types/Variant.h"
 #include "qpid/management/ManagementObject.h"
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
+=======
+#include "qpid/broker/ConnectionObserver.h"
+#include "qpid/types/Variant.h"
+#include "qpid/management/ManagementObject.h"
+#include "qpid/sys/unordered_map.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
+#include <set>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 
@@ -39,6 +49,12 @@ class Broker;
 class Link;
 class Bridge;
 class SessionHandler;
+<<<<<<< HEAD
+=======
+class Connection;
+class QueueRegistry;
+class ExchangeRegistry;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace framing {
@@ -46,6 +62,10 @@ class FieldTable;
 }
 
 namespace ha {
+<<<<<<< HEAD
+=======
+class LogPrefix;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class HaBroker;
 class QueueReplicator;
 
@@ -57,6 +77,7 @@ class QueueReplicator;
  * exchanges and bindings to replicate the primary.
  * It also creates QueueReplicators for newly replicated queues.
  *
+<<<<<<< HEAD
  * THREAD UNSAFE: Only called in Link connection thread, no need for locking.
  *
  */
@@ -68,6 +89,26 @@ class BrokerReplicator : public broker::Exchange,
     ~BrokerReplicator();
 
     void initialize();
+=======
+ * THREAD UNSAFE:
+ * All members except shutdown are only called in the Link's connection thread context.
+ * shutdown() does not use any mutable state.
+ *
+ */
+class BrokerReplicator : public broker::Exchange,
+                         public boost::enable_shared_from_this<BrokerReplicator>,
+                         public broker::ConnectionObserver
+{
+  public:
+    typedef boost::shared_ptr<QueueReplicator> QueueReplicatorPtr;
+
+    static boost::shared_ptr<BrokerReplicator> create(
+        HaBroker&, const boost::shared_ptr<broker::Link>&);
+
+    ~BrokerReplicator();
+
+    void shutdown();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Exchange methods
     std::string getType() const;
@@ -75,11 +116,40 @@ class BrokerReplicator : public broker::Exchange,
     bool unbind(boost::shared_ptr<broker::Queue>, const std::string&, const framing::FieldTable*);
     void route(broker::Deliverable&);
     bool isBound(boost::shared_ptr<broker::Queue>, const std::string* const, const framing::FieldTable* const);
+<<<<<<< HEAD
 
   private:
     typedef boost::shared_ptr<QueueReplicator> QueueReplicatorPtr;
 
     void initializeBridge(broker::Bridge&, broker::SessionHandler&);
+=======
+    bool hasBindings();
+
+    // ConnectionObserver methods
+    void connection(broker::Connection&);
+    void opened(broker::Connection&);
+    void closed(broker::Connection&);
+    void forced(broker::Connection&, const std::string& /*message*/);
+
+    QueueReplicatorPtr findQueueReplicator(const std::string& qname);
+
+  private:
+    BrokerReplicator(HaBroker&, const boost::shared_ptr<broker::Link>&);
+    void initialize();          // Called in create()
+
+    typedef std::pair<boost::shared_ptr<broker::Queue>, bool> CreateQueueResult;
+    typedef std::pair<boost::shared_ptr<broker::Exchange>, bool> CreateExchangeResult;
+
+    typedef void (BrokerReplicator::*DispatchFunction)(types::Variant::Map&);
+    typedef qpid::sys::unordered_map<std::string, DispatchFunction> EventDispatchMap;
+
+    class UpdateTracker;
+    class ErrorListener;
+
+    void connected(broker::Bridge&, broker::SessionHandler&);
+    void existingQueue(const boost::shared_ptr<broker::Queue>&);
+    void existingExchange(const boost::shared_ptr<broker::Exchange>&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     void doEventQueueDeclare(types::Variant::Map& values);
     void doEventQueueDelete(types::Variant::Map& values);
@@ -88,23 +158,34 @@ class BrokerReplicator : public broker::Exchange,
     void doEventBind(types::Variant::Map&);
     void doEventUnbind(types::Variant::Map&);
     void doEventMembersUpdate(types::Variant::Map&);
+<<<<<<< HEAD
+=======
+    void doEventSubscribe(types::Variant::Map&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     void doResponseQueue(types::Variant::Map& values);
     void doResponseExchange(types::Variant::Map& values);
     void doResponseBind(types::Variant::Map& values);
     void doResponseHaBroker(types::Variant::Map& values);
 
+<<<<<<< HEAD
     QueueReplicatorPtr findQueueReplicator(const std::string& qname);
     void startQueueReplicator(const boost::shared_ptr<broker::Queue>&);
     void stopQueueReplicator(const std::string& name);
 
     boost::shared_ptr<broker::Queue> createQueue(
+=======
+    QueueReplicatorPtr startQueueReplicator(const boost::shared_ptr<broker::Queue>&);
+
+    QueueReplicatorPtr replicateQueue(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         const std::string& name,
         bool durable,
         bool autodelete,
         const qpid::framing::FieldTable& arguments,
         const std::string& alternateExchange);
 
+<<<<<<< HEAD
     boost::shared_ptr<broker::Exchange> createExchange(
         const std::string& name,
         const std::string& type,
@@ -117,10 +198,43 @@ class BrokerReplicator : public broker::Exchange,
     ReplicationTest replicationTest;
     HaBroker& haBroker;
     broker::Broker& broker;
+=======
+    CreateExchangeResult createExchange(
+        const std::string& name,
+        const std::string& type,
+        bool durable,
+        bool autodelete,
+        const qpid::framing::FieldTable& args,
+        const std::string& alternateExchange);
+
+    bool deactivate(boost::shared_ptr<broker::Exchange> ex, bool destroy);
+    void deleteQueue(const std::string& name, bool purge=true);
+    void deleteExchange(const std::string& name);
+
+    void disconnectedQueueReplicator(const boost::shared_ptr<QueueReplicator>&);
+    void disconnected();
+
+    void setMembership(const types::Variant::List&); // Set membership from list.
+
+    const LogPrefix& logPrefix;
+    ReplicationTest replicationTest;
+    std::string userId, remoteHost;
+    HaBroker& haBroker;
+    broker::Broker& broker;
+    broker::ExchangeRegistry& exchanges;
+    broker::QueueRegistry& queues;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     boost::shared_ptr<broker::Link> link;
     bool initialized;
     AlternateExchangeSetter alternates;
     qpid::Address primary;
+<<<<<<< HEAD
+=======
+    broker::Connection* connect;
+    EventDispatchMap dispatch;
+    std::auto_ptr<UpdateTracker> queueTracker;
+    std::auto_ptr<UpdateTracker> exchangeTracker;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::broker
 

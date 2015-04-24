@@ -63,6 +63,13 @@
 # define QPID_AUTO_TEST_CASE(name)  BOOST_AUTO_TEST_CASE(name)
 #endif
 
+<<<<<<< HEAD
+=======
+#ifndef QPID_FIXTURE_TEST_CASE
+# define QPID_FIXTURE_TEST_CASE(name, f)  BOOST_FIXTURE_TEST_CASE(name, f)
+#endif
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #ifndef QPID_AUTO_TEST_SUITE_END
 # define QPID_AUTO_TEST_SUITE_END() BOOST_AUTO_TEST_SUITE_END()
 #endif

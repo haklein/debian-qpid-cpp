@@ -20,7 +20,14 @@
  */
 #include "qpid/broker/DtxWorkRecord.h"
 #include "qpid/broker/DtxManager.h"
+<<<<<<< HEAD
 #include "qpid/framing/reply_exceptions.h"
+=======
+#include "qpid/broker/DtxTimeout.h"
+#include "qpid/framing/reply_exceptions.h"
+#include "qpid/sys/Timer.h"
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/format.hpp>
 #include <boost/mem_fn.hpp>
 using boost::mem_fn;
@@ -39,6 +46,15 @@ DtxWorkRecord::~DtxWorkRecord()
     }
 }
 
+<<<<<<< HEAD
+=======
+void DtxWorkRecord::setTimeout(boost::intrusive_ptr<DtxTimeout> t)
+{ timeout = t; }
+
+boost::intrusive_ptr<DtxTimeout> DtxWorkRecord::getTimeout()
+{ return timeout; }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool DtxWorkRecord::prepare()
 {
     Mutex::ScopedLock locker(lock);
@@ -113,7 +129,11 @@ void DtxWorkRecord::rollback()
     abort();
 }
 
+<<<<<<< HEAD
 void DtxWorkRecord::add(DtxBuffer::shared_ptr ops)
+=======
+void DtxWorkRecord::add(boost::intrusive_ptr<DtxBuffer> ops)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     Mutex::ScopedLock locker(lock);
     if (expired) {
@@ -153,7 +173,11 @@ void DtxWorkRecord::abort()
     std::for_each(work.begin(), work.end(), mem_fn(&TxBuffer::rollback));
 }
 
+<<<<<<< HEAD
 void DtxWorkRecord::recover(std::auto_ptr<TPCTransactionContext> _txn, DtxBuffer::shared_ptr ops)
+=======
+void DtxWorkRecord::recover(std::auto_ptr<TPCTransactionContext> _txn, boost::intrusive_ptr<DtxBuffer> ops)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     add(ops);
     txn = _txn;
@@ -176,6 +200,7 @@ void DtxWorkRecord::timedout()
     }
     abort();
 }
+<<<<<<< HEAD
 
 size_t DtxWorkRecord::indexOf(const DtxBuffer::shared_ptr& buf) {
     Work::iterator i = std::find(work.begin(), work.end(), buf);
@@ -190,3 +215,5 @@ DtxBuffer::shared_ptr DtxWorkRecord::operator[](size_t i) const {
             QPID_MSG("Can't find DTX buffer " << i << " for xid: " << xid));
     return work[i];
 }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

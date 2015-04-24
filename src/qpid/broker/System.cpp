@@ -31,7 +31,11 @@ using namespace qpid::broker;
 using namespace std;
 namespace _qmf = qmf::org::apache::qpid::broker;
 
+<<<<<<< HEAD
 System::System (string _dataDir, Broker* broker) : mgmtObject(0)
+=======
+System::System (string _dataDir, Broker* broker)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     ManagementAgent* agent = broker ? broker->getManagementAgent() : 0;
 
@@ -64,7 +68,11 @@ System::System (string _dataDir, Broker* broker) : mgmtObject(0)
             }
         }
 
+<<<<<<< HEAD
         mgmtObject = new _qmf::System(agent, this, types::Uuid(systemId.c_array()));
+=======
+        mgmtObject = _qmf::System::shared_ptr(new _qmf::System(agent, this, systemId));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         qpid::sys::SystemInfo::getSystemId (osName,
                                             nodeName,
                                             release,
@@ -80,3 +88,12 @@ System::System (string _dataDir, Broker* broker) : mgmtObject(0)
     }
 }
 
+<<<<<<< HEAD
+=======
+System::~System ()
+{
+    if (mgmtObject != 0)
+        mgmtObject->debugStats("destroying");
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

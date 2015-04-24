@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+=======
+#ifndef QPID_SYS_OUTPUT_CONTROL_H
+#define QPID_SYS_OUTPUT_CONTROL_H
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -21,9 +27,12 @@
 
 #include "qpid/sys/IntegerTypes.h"
 
+<<<<<<< HEAD
 #ifndef _OutputControl_
 #define _OutputControl_
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace qpid {
 namespace sys {
 
@@ -32,12 +41,21 @@ namespace sys {
     public:
         virtual ~OutputControl() {}
         virtual void abort() = 0;
+<<<<<<< HEAD
         virtual void activateOutput() = 0;
         virtual void giveReadCredit(int32_t credit) = 0;
+=======
+        virtual void connectionEstablished() = 0;
+        virtual void activateOutput() = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     };
 
 }
 }
 
 
+<<<<<<< HEAD
 #endif
+=======
+#endif /*!QPID_SYS_OUTPUT_CONTROL_H*/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

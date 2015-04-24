@@ -32,7 +32,11 @@ namespace broker {
 /**
  * Base class for all persistable objects
  */
+<<<<<<< HEAD
 class Persistable : public RefCounted
+=======
+class Persistable : public virtual RefCounted
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
 public:
     /**

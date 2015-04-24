@@ -21,11 +21,15 @@
 
 #include <string>
 
+<<<<<<< HEAD
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #else
 #  error "config.h not generated"
 #endif
+=======
+#include "config.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
   const std::string product  = PACKAGE_NAME;

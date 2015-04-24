@@ -31,9 +31,15 @@ namespace sys {
 /**
  * A monitor that keeps track of waiting threads.  Threads declare a
  * ScopedWait around wait() inside a ScopedLock to be considered
+<<<<<<< HEAD
  * waiters. 
  *
  * Allows waiting threads to be interrupted by an exception. 
+=======
+ * waiters.
+ *
+ * Allows waiting threads to be interrupted by an exception.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  */
 class Waitable : public Monitor {
   public:
@@ -56,7 +62,11 @@ class Waitable : public Monitor {
      *@pre Must be called inside a ScopedLock but NOT a ScopedWait.
      */
     void waitWaiters() {
+<<<<<<< HEAD
         while (waiters != 0) 
+=======
+        while (waiters != 0)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             Monitor::wait();
     }
 
@@ -73,7 +83,11 @@ class Waitable : public Monitor {
     void setException(const ExceptionHolder& e) {
         exception = e;
         notifyAll();
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     /** True if the waitable has an exception */
@@ -87,12 +101,19 @@ class Waitable : public Monitor {
 
     /** Throws an exception if one is set before or during the wait. */
     void wait() {
+<<<<<<< HEAD
         ExCheck e(exception);
         Monitor::wait();
+=======
+        exception.raise();
+        Monitor::wait();
+        exception.raise();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     /** Throws an exception if one is set before or during the wait. */
     bool wait(const AbsTime& absoluteTime) {
+<<<<<<< HEAD
         ExCheck e(exception);
         return Monitor::wait(absoluteTime);
     }
@@ -104,6 +125,15 @@ class Waitable : public Monitor {
         ~ExCheck() { exception.raise(); }
     };
         
+=======
+        exception.raise();
+        bool result = Monitor::wait(absoluteTime);
+        exception.raise();
+        return result;
+    }
+
+  private:
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     size_t waiters;
     ExceptionHolder exception;
 

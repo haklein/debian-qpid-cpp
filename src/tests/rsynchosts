@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #
 # Licensed to the Apache Software Foundation (ASF) under onemake
 # or more contributor license agreements.  See the NOTICE file
@@ -27,13 +31,28 @@ abspath() {
 }
 
 usage() {
+<<<<<<< HEAD
     echo "Usage: $(basename $0) file [file...]
+=======
+    echo "Usage: $(basename $0) [-l user] file [file...]
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Synchronize the contents of each file or directory to the same absolute path on
 each host in \$HOSTS.
 "
     exit 1
 }
 
+<<<<<<< HEAD
+=======
+while getopts "l:" opt; do
+    case $opt in
+	l) RSYNC_USER="$OPTARG@" ;;
+	*) usage ;;
+    esac
+done
+shift `expr $OPTIND - 1`
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 test "$*" || usage
 
 for f in $*; do FILES="$FILES $(abspath $f)" || exit 1; done
@@ -42,7 +61,11 @@ OK_FILE=`mktemp`		# Will be deleted if anything goes wrong.
 trap "rm -f $OK_FILE" EXIT
 
 for h in $HOSTS; do
+<<<<<<< HEAD
     rsync -aRO --delete $FILES $h:/ || { echo "rsync to $h failed"; rm -f $OK_FILE; } &
+=======
+    rsync -vaRO --delete $FILES $RSYNC_USER$h:/ || { echo "rsync to $h failed"; rm -f $OK_FILE; } &
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 done
 wait
 test -f $OK_FILE

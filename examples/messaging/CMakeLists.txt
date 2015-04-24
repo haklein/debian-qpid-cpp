@@ -23,12 +23,25 @@
 macro(add_messaging_example example)
   add_executable(${example} ${example}.cpp OptionParser.cpp)
   set_target_properties(${example} PROPERTIES OUTPUT_NAME ${example})
+<<<<<<< HEAD
   target_link_libraries(${example} qpidmessaging ${_boost_libs_needed})
   # For installs, don't install the built example; that would be pointless.
   # Install the things a user needs to build the example on-site.
   install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/${example}.cpp ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.h ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.cpp
            DESTINATION ${QPID_INSTALL_EXAMPLESDIR}/messaging
            COMPONENT ${QPID_COMPONENT_EXAMPLES})
+=======
+  target_link_libraries(${example} qpidmessaging qpidtypes ${_boost_libs_needed})
+  # For installs, don't install the built example; that would be pointless.
+  # Install the things a user needs to build the example on-site.
+  install (FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/${example}.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.cpp
+    DESTINATION ${QPID_INSTALL_EXAMPLESDIR}/messaging
+    COMPONENT ${QPID_COMPONENT_EXAMPLES})
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   if (MSVC)
     install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/messaging_${example}.vcproj
              DESTINATION ${QPID_INSTALL_EXAMPLESDIR}/messaging
@@ -45,19 +58,45 @@ add_messaging_example(map_sender)
 
 add_messaging_example(client)
 add_messaging_example(server)
+<<<<<<< HEAD
+=======
+add_messaging_example(server_reconnect)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 # These don't need Boost or OptionParser
 add_executable(hello_world hello_world.cpp)
 set_target_properties(hello_world PROPERTIES OUTPUT_NAME hello_world)
+<<<<<<< HEAD
 target_link_libraries(hello_world qpidmessaging)
+=======
+target_link_libraries(hello_world qpidmessaging qpidtypes)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/hello_world.cpp
            DESTINATION ${QPID_INSTALL_EXAMPLESDIR}/messaging
            COMPONENT ${QPID_COMPONENT_EXAMPLES})
 
 add_executable(hello_xml hello_xml.cpp)
 set_target_properties(hello_xml PROPERTIES OUTPUT_NAME hello_xml)
+<<<<<<< HEAD
 target_link_libraries(hello_xml qpidmessaging)
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/hello_xml.cpp
+=======
+target_link_libraries(hello_xml qpidmessaging qpidtypes)
+
+install (FILES
+           ${CMAKE_CURRENT_SOURCE_DIR}/extra_dist/CMakeLists.txt
+           ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/OptionParser.h
+           ${CMAKE_CURRENT_SOURCE_DIR}/hello_world.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/hello_xml.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/drain.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/spout.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/map_receiver.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/map_sender.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/server.cpp
+           ${CMAKE_CURRENT_SOURCE_DIR}/server_reconnect.cpp
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
            DESTINATION ${QPID_INSTALL_EXAMPLESDIR}/messaging
            COMPONENT ${QPID_COMPONENT_EXAMPLES})
 

@@ -96,18 +96,26 @@ void TimerTask::cancel() {
     state = CANCELLED;
 }
 
+<<<<<<< HEAD
 void TimerTask::setFired() {
     // Set nextFireTime to just before now, making readyToFire() true.
     nextFireTime = AbsTime(sys::now(), Duration(-1));
 }
 
 
+=======
+// TODO AStitcher 21/08/09 The threshholds for emitting warnings are a little arbitrary
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Timer::Timer() :
     active(false),
     late(50 * TIME_MSEC),
     overran(2 * TIME_MSEC),
     lateCancel(500 * TIME_MSEC),
+<<<<<<< HEAD
     warn(5 * TIME_SEC)
+=======
+    warn(60 * TIME_SEC)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     start();
 }
@@ -133,7 +141,10 @@ public:
     }
 };
 
+<<<<<<< HEAD
 // TODO AStitcher 21/08/09 The threshholds for emitting warnings are a little arbitrary
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void Timer::run()
 {
     Monitor::ScopedLock l(monitor);
@@ -151,10 +162,13 @@ void Timer::run()
             {
             TimerTaskCallbackScope s(*t);
             if (s) {
+<<<<<<< HEAD
                 {
                     Monitor::ScopedUnlock u(monitor);
                     drop(t);
                 }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 if (delay > lateCancel) {
                     QPID_LOG(debug, t->name << " cancelled timer woken up " <<
                              delay / TIME_MSEC << "ms late");
@@ -171,8 +185,13 @@ void Timer::run()
                 if (!tasks.empty()) {
                     overrun = Duration(tasks.top()->nextFireTime, end);
                 }
+<<<<<<< HEAD
                 bool warningsEnabled;
                 QPID_LOG_TEST(warning, warningsEnabled);
+=======
+                bool warningsEnabled;                  // TimerWarning enabled
+                QPID_LOG_TEST(debug, warningsEnabled); // TimerWarning emitted at debug level
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 if (warningsEnabled) {
                     if (overrun > overran) {
                         if (delay > overran) // if delay is significant to an overrun.
@@ -235,9 +254,12 @@ void Timer::fire(boost::intrusive_ptr<TimerTask> t) {
     }
 }
 
+<<<<<<< HEAD
 // Provided for subclasses: called when a task is droped.
 void Timer::drop(boost::intrusive_ptr<TimerTask>) {}
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 bool operator<(const intrusive_ptr<TimerTask>& a,
                        const intrusive_ptr<TimerTask>& b)
 {

@@ -38,6 +38,7 @@ class FifoDistributor : public MessageDistributor
  public:
     FifoDistributor(Messages& container);
 
+<<<<<<< HEAD
     /** Locking Note: all methods assume the caller is holding the Queue::messageLock
      * during the method call.
      */
@@ -47,6 +48,9 @@ class FifoDistributor : public MessageDistributor
     bool nextConsumableMessage( Consumer::shared_ptr& consumer, QueuedMessage& next );
     bool allocate(const std::string& consumer, const QueuedMessage& target);
     bool nextBrowsableMessage( Consumer::shared_ptr& consumer, QueuedMessage& next );
+=======
+    bool acquire(const std::string& consumer, Message& target);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void query(qpid::types::Variant::Map&) const;
 
  private:

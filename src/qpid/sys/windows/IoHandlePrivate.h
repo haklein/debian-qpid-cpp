@@ -38,6 +38,7 @@ namespace sys {
 // completer from an I/O thread. If the callback mechanism is used, there
 // can be a RequestCallback set - this carries the callback object through
 // from AsynchIO::requestCallback() through to the I/O completion processing.
+<<<<<<< HEAD
 class IOHandlePrivate {
     friend QPID_COMMON_EXTERN SOCKET toSocketHandle(const Socket& s);
     static IOHandlePrivate* getImpl(const IOHandle& h);
@@ -47,6 +48,16 @@ public:
                     windows::AsynchIoResult::Completer cb = 0,
                     AsynchIO::RequestCallback reqCallback = 0) :
     fd(f), event(cb), cbRequest(reqCallback)
+=======
+class IOHandle {
+public:
+    IOHandle(SOCKET f = INVALID_SOCKET,
+             windows::AsynchIoResult::Completer cb = 0,
+             AsynchIO::RequestCallback reqCallback = 0) :
+        fd(f),
+        event(cb),
+        cbRequest(reqCallback)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {}
     
     SOCKET fd;
@@ -54,8 +65,11 @@ public:
     AsynchIO::RequestCallback cbRequest;
 };
 
+<<<<<<< HEAD
 QPID_COMMON_EXTERN SOCKET toSocketHandle(const Socket& s);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }}
 
 #endif /* _sys_windows_IoHandlePrivate_h */

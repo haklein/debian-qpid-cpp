@@ -24,6 +24,7 @@
 
 #include <string>
 #include <list>
+<<<<<<< HEAD
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include "qpid/broker/BrokerImportExport.h"
@@ -37,16 +38,39 @@ namespace qpid {
 namespace broker {
 
 class MessageStore;
+=======
+#include <map>
+#include <boost/intrusive_ptr.hpp>
+#include "qpid/broker/BrokerImportExport.h"
+#include "qpid/broker/Persistable.h"
+#include "qpid/framing/amqp_types.h"
+#include "qpid/framing/amqp_framing.h"
+#include "qpid/sys/Mutex.h"
+#include "qpid/broker/IngressCompletion.h"
+#include <boost/shared_ptr.hpp>
+
+namespace qpid {
+namespace types {
+class Variant;
+}
+namespace broker {
+
+class MessageStore;
+class Queue;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * Base class for persistable messages.
  */
 class PersistableMessage : public Persistable
 {
+<<<<<<< HEAD
     typedef std::list< boost::weak_ptr<PersistableQueue> > syncList;
     sys::Mutex asyncDequeueLock;
     sys::Mutex storeLock;
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /**
      * "Ingress" messages == messages sent _to_ the broker.
      * Tracks the number of outstanding asynchronous operations that must
@@ -56,6 +80,7 @@ class PersistableMessage : public Persistable
      * operations have completed, the transfer of this message from the client
      * may be considered complete.
      */
+<<<<<<< HEAD
     AsyncCompletion ingressCompletion;
 
     /**
@@ -111,10 +136,20 @@ class PersistableMessage : public Persistable
     bool checkContentReleasable();
     bool isContentReleaseBlocked();
     bool isContentReleaseRequested();
+=======
+    IngressCompletion* ingressCompletion;
+    boost::intrusive_ptr<IngressCompletion> holder;
+    mutable uint64_t persistenceId;
+
+  public:
+    QPID_BROKER_EXTERN virtual ~PersistableMessage();
+    QPID_BROKER_EXTERN PersistableMessage();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     virtual QPID_BROKER_EXTERN bool isPersistent() const = 0;
 
     /** track the progress of a message received by the broker - see ingressCompletion above */
+<<<<<<< HEAD
     QPID_BROKER_INLINE_EXTERN bool isIngressComplete() { return ingressCompletion.isDone(); }
     QPID_BROKER_INLINE_EXTERN AsyncCompletion& getIngressCompletion() { return ingressCompletion; }
 
@@ -135,6 +170,27 @@ class PersistableMessage : public Persistable
     bool isStoredOnQueue(PersistableQueue::shared_ptr queue);
     
     void addToSyncList(PersistableQueue::shared_ptr queue, MessageStore* _store);
+=======
+    QPID_BROKER_INLINE_EXTERN bool isIngressComplete() { return ingressCompletion->isDone(); }
+    QPID_BROKER_INLINE_EXTERN IngressCompletion& getIngressCompletion() { return *ingressCompletion; }
+    QPID_BROKER_EXTERN void setIngressCompletion(boost::intrusive_ptr<IngressCompletion> i);
+
+    QPID_BROKER_INLINE_EXTERN void enqueueStart() { ingressCompletion->startCompleter(); }
+    QPID_BROKER_INLINE_EXTERN void enqueueComplete() { ingressCompletion->finishCompleter(); }
+
+    QPID_BROKER_EXTERN void enqueueAsync(boost::shared_ptr<Queue> queue);
+
+    QPID_BROKER_EXTERN void dequeueComplete();
+
+    uint64_t getPersistenceId() const { return persistenceId; }
+    void setPersistenceId(uint64_t _persistenceId) const { persistenceId = _persistenceId; }
+
+
+    virtual void decodeHeader(framing::Buffer& buffer) = 0;
+    virtual void decodeContent(framing::Buffer& buffer) = 0;
+    virtual uint32_t encodedHeaderSize() const = 0;
+    virtual boost::intrusive_ptr<PersistableMessage> merge(const std::map<std::string, qpid::types::Variant>& annotations) const = 0;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }}

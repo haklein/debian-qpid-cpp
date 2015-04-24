@@ -64,6 +64,7 @@ class ProtocolTags {
 
 Url::Invalid::Invalid(const string& s) : Exception(s) {}
 
+<<<<<<< HEAD
 Url Url::getHostNameUrl(uint16_t port) {
     Address address("tcp", std::string(), port);
     if (!sys::SystemInfo::getLocalHostname(address))
@@ -77,6 +78,8 @@ Url Url::getIpAddressesUrl(uint16_t port) {
     return url;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 string Url::str() const {
     if (cache.empty() && !this->empty()) {
         ostringstream os;

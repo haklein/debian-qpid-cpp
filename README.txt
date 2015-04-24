@@ -1,3 +1,25 @@
+<<<<<<< HEAD
+=======
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             Qpid/C++
             ========
 
@@ -13,9 +35,12 @@ Table of Contents
 Qpid/C++ is a C++ implementation of the AMQP protcol described at
 http://amqp.org/
 
+<<<<<<< HEAD
 This release of Qpid/C++ implements the AMQP 0-10. 
 It will not inter-operate with AMQP 0-8/0-9 implementations.
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 For additional software or information on the Qpid project go to:
 
    http://qpid.apache.org
@@ -40,6 +65,7 @@ For documentation, go to:
 
 In C++ distributions:
 
+<<<<<<< HEAD
    ./configure && make - compiles all sources
 
    make check - runs tests
@@ -49,6 +75,13 @@ In C++ distributions:
 In some distributions, no ./configure file is provided. To create the
 ./configure file, you must have autotools installed. Run ./bootstrap
 from the qpid/cpp directory, then follow the above instructions.
+=======
+   mkdir BLD      # The recommended way to use cmake is in a separate build directory
+   cd BLD
+   cmake ..       # Generates code and makefiles
+   make test      # Runs tests
+   make install   # Installs the client and daemon
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 The INSTALL notes contain more detailed information on compiling and
 installing this software.

@@ -52,14 +52,23 @@ private:
     PollableCondition& parent;
     boost::shared_ptr<sys::Poller> poller;
     LONG isSet;
+<<<<<<< HEAD
+=======
+    LONG isDispatching;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 PollableConditionPrivate::PollableConditionPrivate(const sys::PollableCondition::Callback& cb,
                                                    sys::PollableCondition& parent,
                                                    const boost::shared_ptr<sys::Poller>& poller)
+<<<<<<< HEAD
   : IOHandle(new sys::IOHandlePrivate(INVALID_SOCKET,
                                       boost::bind(&PollableConditionPrivate::dispatch, this, _1))),
     cb(cb), parent(parent), poller(poller), isSet(0)
+=======
+  : IOHandle(INVALID_SOCKET, boost::bind(&PollableConditionPrivate::dispatch, this, _1)),
+    cb(cb), parent(parent), poller(poller), isSet(0), isDispatching(0)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
 }
 
@@ -78,7 +87,16 @@ void PollableConditionPrivate::poke()
 void PollableConditionPrivate::dispatch(windows::AsynchIoResult *result)
 {
     delete result;       // Poller::monitorHandle() allocates this
+<<<<<<< HEAD
     cb(parent);
+=======
+    // If isDispatching is already set, just return. Else, enter.
+    if (::InterlockedCompareExchange(&isDispatching, 1, 0) == 1)
+        return;
+    cb(parent);
+    LONG oops = ::InterlockedDecrement(&isDispatching);   // Result must be 0
+    assert(!oops);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (isSet)
         poke();
 }

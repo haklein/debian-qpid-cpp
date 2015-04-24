@@ -17,8 +17,17 @@
 # under the License.
 #
 
+<<<<<<< HEAD
 import cqmf2
 import cqpid
+=======
+import warnings
+warnings.warn("The qmf2 module is deprecated.  It will be removed in the future.",
+              Warning, stacklevel=2)
+
+import cqmf2
+import qpid_messaging
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 from threading import Thread
 import time
 
@@ -124,7 +133,11 @@ class AgentHandler(Thread):
   def run(self):
     event = cqmf2.AgentEvent()
     while self.__running:
+<<<<<<< HEAD
       valid = self.__agent._impl.nextEvent(event, cqpid.Duration.SECOND)
+=======
+      valid = self.__agent._impl.nextEvent(event, qpid_messaging.Duration.SECOND)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       if valid and self.__running:
         if event.getType() == cqmf2.AGENT_METHOD:
           self.method(event, event.getMethodName(), event.getArguments(), event.getArgumentSubtypes(),
@@ -156,7 +169,11 @@ class ConsoleHandler(Thread):
   def run(self):
     event = cqmf2.ConsoleEvent()
     while self.__running:
+<<<<<<< HEAD
       valid = self.__session._impl.nextEvent(event, cqpid.Duration.SECOND)
+=======
+      valid = self.__session._impl.nextEvent(event, qpid_messaging.Duration.SECOND)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       if valid and self.__running:
         if event.getType() == cqmf2.CONSOLE_AGENT_ADD:
           self.agentAdded(Agent(event.getAgent()))
@@ -434,7 +451,11 @@ class Agent(object):
       q_arg = q._impl
     else:
       q_arg = q
+<<<<<<< HEAD
     dur = cqpid.Duration(cqpid.Duration.SECOND.getMilliseconds() * timeout)
+=======
+    dur = qpid_messaging.Duration(qpid_messaging.Duration.SECOND.getMilliseconds() * timeout)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     result = self._impl.query(q_arg, dur)
     if result.getType() == cqmf2.CONSOLE_EXCEPTION:
       raise Exception(Data(result.getData(0)))
@@ -449,7 +470,11 @@ class Agent(object):
   def loadSchemaInfo(self, timeout=30):
     """
     """
+<<<<<<< HEAD
     dur = cqpid.Duration(cqpid.Duration.SECOND.getMilliseconds() * timeout)
+=======
+    dur = qpid_messaging.Duration(qpid_messaging.Duration.SECOND.getMilliseconds() * timeout)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     self._impl.querySchema(dur)
 
   def getPackages(self):
@@ -473,7 +498,11 @@ class Agent(object):
   def getSchema(self, schemaId, timeout=30):
     """
     """
+<<<<<<< HEAD
     dur = cqpid.Duration(cqpid.Duration.SECOND.getMilliseconds() * timeout)
+=======
+    dur = qpid_messaging.Duration(qpid_messaging.Duration.SECOND.getMilliseconds() * timeout)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return Schema(self._impl.getSchema(schemaId._impl, dur))
 
   ## TODO: Async query
@@ -555,7 +584,11 @@ class Data(object):
     return Agent(self._impl.getAgent())
 
   def update(self, timeout=5):
+<<<<<<< HEAD
     dur = cqpid.Duration(cqpid.Duration.SECOND.getMilliseconds() * timeout)
+=======
+    dur = qpid_messaging.Duration(qpid_messaging.Duration.SECOND.getMilliseconds() * timeout)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     agent = self._impl.getAgent()
     query = cqmf2.Query(self._impl.getAddr())
     result = agent.query(query, dur)
@@ -590,7 +623,11 @@ class Data(object):
     timeout = 30
     if '_timeout' in kwargs:
       timeout = kwargs['_timeout']
+<<<<<<< HEAD
     dur = cqpid.Duration(cqpid.Duration.SECOND.getMilliseconds() * timeout)
+=======
+    dur = qpid_messaging.Duration(qpid_messaging.Duration.SECOND.getMilliseconds() * timeout)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     ##
     ## Get the list of arguments from the schema, isolate those that are IN or IN_OUT,

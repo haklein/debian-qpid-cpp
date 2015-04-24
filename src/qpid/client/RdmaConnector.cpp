@@ -70,7 +70,11 @@ class RdmaConnector : public Connector, public sys::Codec
     sys::ShutdownHandler* shutdownHandler;
     framing::InputHandler* input;
     framing::InitiationHandler* initialiser;
+<<<<<<< HEAD
     framing::OutputHandler* output;
+=======
+    framing::FrameHandler* output;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Rdma::AsynchIO* aio;
     Rdma::Connector* acon;
@@ -97,19 +101,30 @@ class RdmaConnector : public Connector, public sys::Codec
 
     void connect(const std::string& host, const std::string& port);
     void close();
+<<<<<<< HEAD
     void send(framing::AMQFrame& frame);
+=======
+    void handle(framing::AMQFrame& frame);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void abort() {} // TODO: need to fix this for heartbeat timeouts to work
 
     void setInputHandler(framing::InputHandler* handler);
     void setShutdownHandler(sys::ShutdownHandler* handler);
+<<<<<<< HEAD
     sys::ShutdownHandler* getShutdownHandler() const;
     framing::OutputHandler* getOutputHandler();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string& getIdentifier() const;
     void activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer>);
     const qpid::sys::SecuritySettings* getSecuritySettings() { return 0; }
 
     size_t decode(const char* buffer, size_t size);
+<<<<<<< HEAD
     size_t encode(const char* buffer, size_t size);
+=======
+    size_t encode(char* buffer, size_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool canEncode();
 
 public:
@@ -310,6 +325,7 @@ void RdmaConnector::setShutdownHandler(ShutdownHandler* handler){
     shutdownHandler = handler;
 }
 
+<<<<<<< HEAD
 OutputHandler* RdmaConnector::getOutputHandler(){ 
     return this; 
 }
@@ -318,11 +334,17 @@ sys::ShutdownHandler* RdmaConnector::getShutdownHandler() const {
     return shutdownHandler;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const std::string& RdmaConnector::getIdentifier() const { 
     return identifier;
 }
 
+<<<<<<< HEAD
 void RdmaConnector::send(AMQFrame& frame) {
+=======
+void RdmaConnector::handle(AMQFrame& frame) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // It is possible that we are called to write after we are already shutting down
     Mutex::ScopedLock l(dataConnectedLock);
     if (!dataConnected) return;
@@ -371,9 +393,15 @@ bool RdmaConnector::canEncode()
     return aio->writable() && (lastEof || currentSize >= maxFrameSize);
 }
 
+<<<<<<< HEAD
 size_t RdmaConnector::encode(const char* buffer, size_t size)
 {
     framing::Buffer out(const_cast<char*>(buffer), size);
+=======
+size_t RdmaConnector::encode(char* buffer, size_t size)
+{
+    framing::Buffer out(buffer, size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     size_t bytesWritten(0);
     {
         Mutex::ScopedLock l(lock);

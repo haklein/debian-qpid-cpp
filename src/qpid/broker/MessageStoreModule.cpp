@@ -33,13 +33,18 @@ using std::string;
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
 MessageStoreModule::MessageStoreModule(boost::shared_ptr<MessageStore>& _store)
+=======
+MessageStoreModule::MessageStoreModule(const boost::shared_ptr<MessageStore>& _store)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   : store(_store) {}
 
 MessageStoreModule::~MessageStoreModule()
 {
 }
 
+<<<<<<< HEAD
 bool MessageStoreModule::init(const Options*) { return true; }
 
 void MessageStoreModule::truncateInit(const bool pushDownStoreFiles)
@@ -47,6 +52,8 @@ void MessageStoreModule::truncateInit(const bool pushDownStoreFiles)
     TRANSFER_EXCEPTION(store->truncateInit(pushDownStoreFiles));
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void MessageStoreModule::create(PersistableQueue& queue, const FieldTable& args)
 {
     TRANSFER_EXCEPTION(store->create(queue, args));

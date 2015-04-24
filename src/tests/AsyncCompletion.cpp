@@ -44,7 +44,12 @@ using broker::PersistableQueue;
 using sys::TIME_SEC;
 using boost::intrusive_ptr;
 
+<<<<<<< HEAD
 /** @file Unit tests for async completion.
+=======
+/** @file
+ * Unit tests for async completion.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Using a dummy store, verify that the broker indicates async completion of
  * message enqueues at the correct time.
  */
@@ -69,6 +74,13 @@ class AsyncCompletionMessageStore : public NullMessageStore {
 
 QPID_AUTO_TEST_SUITE(AsyncCompletionTestSuite)
 
+<<<<<<< HEAD
+=======
+/**
+ *   Send a sync after a bunch of incomplete messages, verify the sync completes
+ *   only when all the messages are complete.
+ */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testWaitTillComplete) {
     SessionFixture fix;
     AsyncCompletionMessageStore* store = new AsyncCompletionMessageStore;
@@ -104,6 +116,37 @@ QPID_AUTO_TEST_CASE(testWaitTillComplete) {
     sync.wait();                // Should complete now, all messages are completed.
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Send a sync after all messages are complete, verify it completes immediately.
+ */
+QPID_AUTO_TEST_CASE(testSyncAfterComplete) {
+    SessionFixture fix;
+    AsyncCompletionMessageStore* store = new AsyncCompletionMessageStore;
+    boost::shared_ptr<qpid::broker::MessageStore> p;
+    p.reset(store);
+    fix.broker->setStore(p);
+    AsyncSession s = fix.session;
+
+    static const int count = 3;
+
+    s.queueDeclare("q", arg::durable=true);
+    // Transfer and complete all the messages
+    for (int i = 0; i < count; ++i) {
+        Message msg(boost::lexical_cast<string>(i), "q");
+        msg.getDeliveryProperties().setDeliveryMode(PERSISTENT);
+        Completion transfer = s.messageTransfer(arg::content=msg, arg::sync=true);
+        intrusive_ptr<PersistableMessage> enqueued = store->enqueued.pop(TIME_SEC);
+        enqueued->enqueueComplete();
+        transfer.wait();
+    }
+    // Send a sync, make sure it completes immediately
+    Completion sync = s.executionSync(arg::sync=true);
+    sync.wait();             // Should complete now, all messages are completed.
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testGetResult) {
     SessionFixture fix;
     AsyncSession s = fix.session;

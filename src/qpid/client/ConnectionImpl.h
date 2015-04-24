@@ -28,7 +28,10 @@
 #include "qpid/framing/FrameHandler.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/sys/ShutdownHandler.h"
+<<<<<<< HEAD
 #include "qpid/sys/TimeoutHandler.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <map>
 #include <iosfwd>
@@ -46,7 +49,10 @@ class SessionImpl;
 
 class ConnectionImpl : public Bounds,
                        public framing::FrameHandler,
+<<<<<<< HEAD
                        public sys::TimeoutHandler, 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                        public sys::ShutdownHandler,
                        public boost::enable_shared_from_this<ConnectionImpl>
 {
@@ -69,8 +75,11 @@ class ConnectionImpl : public Bounds,
 
     void incoming(framing::AMQFrame& frame);
     void closed(uint16_t, const std::string&);
+<<<<<<< HEAD
     void idleOut();
     void idleIn();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void shutdown();
     void failedConnection();
     void release();
@@ -90,6 +99,10 @@ class ConnectionImpl : public Bounds,
     void addSession(const boost::shared_ptr<SessionImpl>&, uint16_t channel=NEXT_CHANNEL);
         
     void close();
+<<<<<<< HEAD
+=======
+    void timeout();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void handle(framing::AMQFrame& frame);
     void erase(uint16_t channel);
     const ConnectionSettings& getNegotiatedSettings();

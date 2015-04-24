@@ -41,7 +41,10 @@ $PYTHON_COMMANDS="$QPID_TOOLS\src\py"
 $env:PYTHONPATH="$srcdir;$PYTHON_DIR;$PYTHON_COMMANDS;$QPID_TESTS_PY;$QPID_TOOLS_LIBS;$QMF_LIB;$env:PYTHONPATH"
 $QPID_CONFIG_EXEC="$PYTHON_COMMANDS\qpid-config"
 $QPID_ROUTE_EXEC="$PYTHON_COMMANDS\qpid-route"
+<<<<<<< HEAD
 $QPID_CLUSTER_EXEC="$PYTHON_COMMANDS\qpid-cluster"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 $QPID_HA_TOOL_EXEC="$PYTHON_COMMANDS\qpid-ha-tool"
 
 # Executables
@@ -62,8 +65,11 @@ $env:TEST_STORE_LIB="$testmoduledir\test_store.so"
 #exportmodule() { test -f $moduledir/$2 && eval "export $1=$moduledir/$2"; }
 #exportmodule ACL_LIB acl.so
 #exportmodule CLUSTER_LIB cluster.so
+<<<<<<< HEAD
 #exportmodule REPLICATING_LISTENER_LIB replicating_listener.so
 #exportmodule REPLICATION_EXCHANGE_LIB replication_exchange.so
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #exportmodule SSLCONNECTOR_LIB sslconnector.so
 #exportmodule SSL_LIB ssl.so
 #exportmodule WATCHDOG_LIB watchdog.so

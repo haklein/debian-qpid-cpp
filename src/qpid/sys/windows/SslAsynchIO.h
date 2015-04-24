@@ -26,6 +26,10 @@
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/sys/Poller.h"
 #include "qpid/CommonImportExport.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/Mutex.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <windows.h>
@@ -38,7 +42,11 @@
 namespace qpid {
 namespace sys {
 namespace windows {
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /*
  * SSL/Schannel shim between the frame-handling and AsynchIO layers.
  * SslAsynchIO creates a regular AsynchIO object to handle I/O and this class
@@ -70,30 +78,47 @@ public:
     virtual void queueForDeletion();
 
     virtual void start(qpid::sys::Poller::shared_ptr poller);
+<<<<<<< HEAD
+=======
+    virtual void createBuffers(uint32_t size);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     virtual void queueReadBuffer(BufferBase* buff);
     virtual void unread(BufferBase* buff);
     virtual void queueWrite(BufferBase* buff);
     virtual void notifyPendingWrite();
     virtual void queueWriteClose();
     virtual bool writeQueueEmpty();
+<<<<<<< HEAD
     virtual void startReading();
     virtual void stopReading();
     virtual void requestCallback(RequestCallback);
     virtual BufferBase* getQueuedBuffer();
 
     QPID_COMMON_EXTERN unsigned int getSslKeySize();
+=======
+    virtual void requestCallback(RequestCallback);
+    virtual BufferBase* getQueuedBuffer();
+    virtual SecuritySettings getSecuritySettings(void);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 protected:
     CredHandle credHandle;
 
     // AsynchIO layer below that's actually doing the I/O
     qpid::sys::AsynchIO *aio;
+<<<<<<< HEAD
+=======
+    Mutex lock;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Track what the state of the SSL session is. Have to know when it's
     // time to notify the upper layer that the session is up, and also to
     // know when it's not legit to pass data through to either side.
     enum { Negotiating, Running, Redo, ShuttingDown } state;
+<<<<<<< HEAD
     bool sessionUp;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     CtxtHandle ctxtHandle;
     TimeStamp credExpiry;
 
@@ -111,13 +136,25 @@ private:
     // These are callbacks from AsynchIO to here.
     void sslDataIn(qpid::sys::AsynchIO& a, BufferBase *buff);
     void idle(qpid::sys::AsynchIO&);
+<<<<<<< HEAD
+=======
+    void reapCheck();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // These callbacks are to the layer above.
     ReadCallback readCallback;
     IdleCallback idleCallback;
     NegotiateDoneCallback negotiateDoneCallback;
+<<<<<<< HEAD
     volatile unsigned int callbacksInProgress;   // >0 if w/in callbacks
     volatile bool queuedDelete;
+=======
+
+    volatile bool queuedDelete;
+    volatile bool queuedClose;
+    volatile bool reapCheckPending;
+    bool started;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Address of peer, in case it's needed for logging.
     std::string peerAddress;
@@ -149,6 +186,10 @@ public:
 
 private:
     std::string serverHost;
+<<<<<<< HEAD
+=======
+    bool clientCertRequested;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Client- and server-side SSL subclasses implement these to do the
     // proper negotiation steps. negotiateStep() is called with a buffer

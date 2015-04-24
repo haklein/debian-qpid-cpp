@@ -135,6 +135,19 @@ QPID_AUTO_TEST_CASE(testConversionsFromString)
     BOOST_CHECK_EQUAL(0, value.asInt16());
     BOOST_CHECK_EQUAL(0u, value.asUint16());
 
+<<<<<<< HEAD
+=======
+    value = "-Blah";
+    BOOST_CHECK_THROW(value.asUint16(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asInt16(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asUint32(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asInt32(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asUint64(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asInt64(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asFloat(), InvalidConversion);
+    BOOST_CHECK_THROW(value.asDouble(), InvalidConversion);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     value = "-000";
     BOOST_CHECK_EQUAL(0, value.asInt16());
     BOOST_CHECK_EQUAL(0u, value.asUint16());
@@ -770,6 +783,36 @@ QPID_AUTO_TEST_CASE(testBufferEncoding)
     BOOST_CHECK_THROW(MapCodec::encode(inMap, buffer), std::exception);
 }
 
+<<<<<<< HEAD
+=======
+QPID_AUTO_TEST_CASE(parse)
+{
+    Variant a;
+    a.parse("What a fine mess");
+    BOOST_CHECK(a.getType()==types::VAR_STRING);
+    a.parse("true");
+    BOOST_CHECK(a.getType()==types::VAR_BOOL);
+    a.parse("FalsE");
+    BOOST_CHECK(a.getType()==types::VAR_BOOL);
+    a.parse("3.1415926");
+    BOOST_CHECK(a.getType()==types::VAR_DOUBLE);
+    a.parse("-7.2e-15");
+    BOOST_CHECK(a.getType()==types::VAR_DOUBLE);
+    a.parse("9223372036854775807");
+    BOOST_CHECK(a.getType()==types::VAR_INT64);
+    a.parse("9223372036854775808");
+    BOOST_CHECK(a.getType()==types::VAR_UINT64);
+    a.parse("-9223372036854775807");
+    BOOST_CHECK(a.getType()==types::VAR_INT64);
+    a.parse("-9223372036854775808");
+    BOOST_CHECK(a.getType()==types::VAR_DOUBLE);
+    a.parse("18446744073709551615");
+    BOOST_CHECK(a.getType()==types::VAR_UINT64);
+    a.parse("18446744073709551616");
+    BOOST_CHECK(a.getType()==types::VAR_DOUBLE);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

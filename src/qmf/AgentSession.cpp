@@ -76,7 +76,11 @@ AgentSessionImpl::AgentSessionImpl(Connection& c, const string& options) :
     externalStorage(false), autoAllowQueries(true), autoAllowMethods(true),
     maxSubscriptions(64), minSubInterval(3000), subLifetime(300), publicEvents(true),
     listenOnDirect(true), strictSecurity(false), maxThreadWaitTime(5),
+<<<<<<< HEAD
     schemaUpdateTime(uint64_t(qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now())))
+=======
+    schemaUpdateTime(uint64_t(qpid::sys::Duration::FromEpoch()))
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     //
     // Set Agent Capability Level
@@ -288,7 +292,11 @@ void AgentSessionImpl::registerSchema(Schema& schema)
     //
     // Get the news out at the next periodic interval that there is new schema information.
     //
+<<<<<<< HEAD
     schemaUpdateTime = uint64_t(qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+=======
+    schemaUpdateTime = uint64_t(qpid::sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     forceHeartbeat = true;
 }
 
@@ -375,7 +383,11 @@ void AgentSessionImpl::authAccept(AgentEvent& authEvent)
     if (query.getSchemaId().isValid()) {
         {
             qpid::sys::Mutex::ScopedLock l(lock);
+<<<<<<< HEAD
             map<SchemaId, DataIndex>::const_iterator iter = schemaIndex.find(query.getSchemaId());
+=======
+            map<SchemaId, DataIndex, SchemaIdCompareNoHash>::const_iterator iter = schemaIndex.find(query.getSchemaId());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (iter != schemaIndex.end())
                 for (DataIndex::const_iterator dIter = iter->second.begin(); dIter != iter->second.end(); dIter++)
                     if (query.matchesPredicate(dIter->second.getProperties()))
@@ -509,7 +521,11 @@ void AgentSessionImpl::raiseEvent(const Data& data, int severity)
     Variant::List list;
     Variant::Map dataAsMap(DataImplAccess::get(data).asMap());
     dataAsMap["_severity"] = severity;
+<<<<<<< HEAD
     dataAsMap["_timestamp"] = uint64_t(qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+=======
+    dataAsMap["_timestamp"] = uint64_t(qpid::sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     list.push_back(dataAsMap);
     encode(list, msg);
     topicSender.send(msg);
@@ -591,7 +607,11 @@ void AgentSessionImpl::handleLocateRequest(const Variant::List& predicate, const
     headers[protocol::HEADER_KEY_APP_ID] = protocol::HEADER_APP_ID_QMF;
 
     map["_values"] = attributes;
+<<<<<<< HEAD
     map["_values"].asMap()[protocol::AGENT_ATTR_TIMESTAMP] = uint64_t(qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+=======
+    map["_values"].asMap()[protocol::AGENT_ATTR_TIMESTAMP] = uint64_t(qpid::sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     map["_values"].asMap()[protocol::AGENT_ATTR_HEARTBEAT_INTERVAL] = interval;
     map["_values"].asMap()[protocol::AGENT_ATTR_EPOCH] = bootSequence;
     map["_values"].asMap()[protocol::AGENT_ATTR_SCHEMA_UPDATED_TIMESTAMP] = schemaUpdateTime;
@@ -751,7 +771,11 @@ void AgentSessionImpl::handleV1SchemaRequest(qpid::management::Buffer& buffer, u
     QPID_LOG(trace, "RCVD QMFv1 SchemaRequest for " << packageName << ":" << className);
 
     qpid::types::Uuid hash(hashBits);
+<<<<<<< HEAD
     map<SchemaId, Schema>::const_iterator iter;
+=======
+    map<SchemaId, Schema, SchemaIdCompare>::const_iterator iter;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     string replyContent;
 
     SchemaId dataId(SCHEMA_TYPE_DATA, packageName, className);
@@ -883,7 +907,11 @@ void AgentSessionImpl::sendHeartbeat()
     msg.setSubject(address.str());
 
     map["_values"] = attributes;
+<<<<<<< HEAD
     map["_values"].asMap()[protocol::AGENT_ATTR_TIMESTAMP] = uint64_t(qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+=======
+    map["_values"].asMap()[protocol::AGENT_ATTR_TIMESTAMP] = uint64_t(qpid::sys::Duration::FromEpoch());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     map["_values"].asMap()[protocol::AGENT_ATTR_HEARTBEAT_INTERVAL] = interval;
     map["_values"].asMap()[protocol::AGENT_ATTR_EPOCH] = bootSequence;
     map["_values"].asMap()[protocol::AGENT_ATTR_SCHEMA_UPDATED_TIMESTAMP] = schemaUpdateTime;
@@ -992,7 +1020,11 @@ void AgentSessionImpl::run()
 
     try {
         while (!threadCanceled) {
+<<<<<<< HEAD
             periodicProcessing((uint64_t) qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()) / qpid::sys::TIME_SEC);
+=======
+            periodicProcessing((uint64_t) qpid::sys::Duration::FromEpoch() / qpid::sys::TIME_SEC);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             Receiver rx;
             bool valid = session.nextReceiver(rx, Duration::SECOND * maxThreadWaitTime);

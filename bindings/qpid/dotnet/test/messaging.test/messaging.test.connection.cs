@@ -54,9 +54,13 @@ namespace Org.Apache.Qpid.Messaging.UnitTest
         public void ConnectionCreate_2()
         {
             Dictionary<string, object> options = new Dictionary<string, object>();
+<<<<<<< HEAD
             options["id"] = 987654321;
             options["name"] = "Widget";
             options["percent"] = 0.99;
+=======
+            options["reconnect"] = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             Connection myConn = new Connection("url", options);
             Assert.IsFalse(myConn.IsOpen);
@@ -73,12 +77,19 @@ namespace Org.Apache.Qpid.Messaging.UnitTest
         public void ConnectionSetOption()
         {
             Dictionary<string, object> options = new Dictionary<string, object>();
+<<<<<<< HEAD
             options["id"] = 987654321;
             options["name"] = "Widget";
             options["percent"] = 0.99;
 
             Connection myConn = new Connection("url", options);
             myConn.SetOption("name", "purple");
+=======
+            options["reconnect"] = true;
+
+            Connection myConn = new Connection("url", options);
+            myConn.SetOption("reconnect", false);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             Assert.IsFalse(myConn.IsOpen);
         }
@@ -87,9 +98,12 @@ namespace Org.Apache.Qpid.Messaging.UnitTest
         public void ConnectionClose()
         {
             Dictionary<string, object> options = new Dictionary<string, object>();
+<<<<<<< HEAD
             options["id"] = 987654321;
             options["name"] = "Widget";
             options["percent"] = 0.99;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             Connection myConn = new Connection("url", options);
             myConn.Close();

@@ -31,6 +31,7 @@ namespace tests {
 
 QPID_AUTO_TEST_SUITE(SystemInfoTestSuite)
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(TestIsLocalHost) {
     // Test that local hostname and addresses are considered local
     Address a;
@@ -47,6 +48,8 @@ QPID_AUTO_TEST_CASE(TestIsLocalHost) {
     BOOST_ASSERT(SystemInfo::isLocalHost("::1"));
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

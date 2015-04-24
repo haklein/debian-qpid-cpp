@@ -7,9 +7,15 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
  * 
  *   http://www.apache.org/licenses/LICENSE-2.0
  * 
+=======
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -19,7 +25,12 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/ProtocolFactory.h"
+=======
+#include "qpid/sys/TransportFactory.h"
+#include "qpid/sys/SocketTransport.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
@@ -74,17 +85,27 @@ struct SslServerOptions : qpid::Options
              "Local store name location for certificates ( CurrentUser | LocalMachine | CurrentService )")
             ("ssl-cert-name", optValue(certName, "NAME"), "Name of the certificate to use")
             ("ssl-port", optValue(port, "PORT"), "Port on which to listen for SSL connections")
+<<<<<<< HEAD
             ("ssl-require-client-authentication", optValue(clientAuth), 
+=======
+            ("ssl-require-client-authentication", optValue(clientAuth),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
              "Forces clients to authenticate in order to establish an SSL connection");
     }
 };
 
+<<<<<<< HEAD
 class SslProtocolFactory : public qpid::sys::ProtocolFactory {
     boost::ptr_vector<Socket> listeners;
     boost::ptr_vector<AsynchAcceptor> acceptors;
     Timer& brokerTimer;
     uint32_t maxNegotiateTime;
     uint16_t listeningPort;
+=======
+class SslProtocolFactory : public qpid::sys::SocketAcceptor, public qpid::sys::TransportConnector {
+    Timer& brokerTimer;
+    uint32_t maxNegotiateTime;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const bool tcpNoDelay;
     std::string brokerHost;
     const bool clientAuthSelected;
@@ -93,6 +114,7 @@ class SslProtocolFactory : public qpid::sys::ProtocolFactory {
     CredHandle credHandle;
 
   public:
+<<<<<<< HEAD
     SslProtocolFactory(const SslServerOptions&, const std::string& host, const std::string& port,
                        int backlog, bool nodelay,
                        Timer& timer, uint32_t maxTime);
@@ -105,14 +127,29 @@ class SslProtocolFactory : public qpid::sys::ProtocolFactory {
     uint16_t getPort() const;
     bool supports(const std::string& capability);
 
+=======
+    SslProtocolFactory(const qpid::broker::Broker& broker, const SslServerOptions&, Timer& timer);
+    ~SslProtocolFactory();
+
+    void connect(sys::Poller::shared_ptr, const std::string& name, const std::string& host, const std::string& port,
+                 sys::ConnectionCodec::Factory*,
+                 ConnectFailedCallback failed);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   private:
     void connectFailed(const qpid::sys::Socket&,
                        int err,
                        const std::string& msg);
+<<<<<<< HEAD
     void established(sys::Poller::shared_ptr,
                      const qpid::sys::Socket&,
                      sys::ConnectionCodec::Factory*,
                      bool isClient);
+=======
+    void establishedIncoming(sys::Poller::shared_ptr, const qpid::sys::Socket&, sys::ConnectionCodec::Factory*);
+    void establishedOutgoing(sys::Poller::shared_ptr, const qpid::sys::Socket&, sys::ConnectionCodec::Factory*, std::string& );
+    void establishedCommon(sys::Poller::shared_ptr, sys::AsynchIOHandler*, sys::AsynchIO*, const qpid::sys::Socket&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 // Static instance to initialise plugin
@@ -123,12 +160,17 @@ static struct SslPlugin : public Plugin {
 
     void earlyInitialize(Target&) {
     }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void initialize(Target& target) {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
         if (broker) {
             try {
+<<<<<<< HEAD
                 const broker::Broker::Options& opts = broker->getOptions();
                 ProtocolFactory::shared_ptr protocol(new SslProtocolFactory(options,
                                                                             "", boost::lexical_cast<std::string>(options.port),
@@ -136,6 +178,15 @@ static struct SslPlugin : public Plugin {
                                                                             broker->getTimer(), opts.maxNegotiateTime));
                 QPID_LOG(notice, "Listening for SSL connections on TCP port " << protocol->getPort());
                 broker->registerProtocolFactory("ssl", protocol);
+=======
+                boost::shared_ptr<SslProtocolFactory> protocol(new SslProtocolFactory(*broker, options, broker->getTimer()));
+                uint16_t port =
+                    protocol->listen(broker->getListenInterfaces(),
+                                     options.port, broker->getConnectionBacklog(),
+                                     &createSocket);
+                QPID_LOG(notice, "Listening for SSL connections on TCP port " << port);
+                broker->registerTransport("ssl", protocol, protocol, port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             } catch (const std::exception& e) {
                 QPID_LOG(error, "Failed to initialise SSL listener: " << e.what());
             }
@@ -143,6 +194,7 @@ static struct SslPlugin : public Plugin {
     }
 } sslPlugin;
 
+<<<<<<< HEAD
 SslProtocolFactory::SslProtocolFactory(const SslServerOptions& options,
                                        const std::string& host, const std::string& port,
                                        int backlog, bool nodelay,
@@ -150,6 +202,14 @@ SslProtocolFactory::SslProtocolFactory(const SslServerOptions& options,
     : brokerTimer(timer),
       maxNegotiateTime(maxTime),
       tcpNoDelay(nodelay),
+=======
+SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker& broker, const SslServerOptions& options, Timer& timer)
+    : SocketAcceptor(broker.getTcpNoDelay(), false, broker.getMaxNegotiateTime(), timer,
+                     boost::bind(&SslProtocolFactory::establishedIncoming, this, _1, _2, _3)),
+      brokerTimer(timer),
+      maxNegotiateTime(broker.getMaxNegotiateTime()),
+      tcpNoDelay(broker.getTcpNoDelay()),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
       clientAuthSelected(options.clientAuth) {
 
     // Make sure that certificate store is good before listening to sockets
@@ -159,7 +219,11 @@ SslProtocolFactory::SslProtocolFactory(const SslServerOptions& options,
     // Get the certificate for this server.
     DWORD flags = 0;
     std::string certStoreLocation = options.certStoreLocation;
+<<<<<<< HEAD
     std::transform(certStoreLocation.begin(), certStoreLocation.end(), certStoreLocation.begin(), ::tolower);
+=======
+    std::transform(certStoreLocation.begin(), certStoreLocation.end(), certStoreLocation.begin(), ::tolower);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (certStoreLocation == "currentuser") {
         flags = CERT_SYSTEM_STORE_CURRENT_USER;
     } else if (certStoreLocation == "localmachine") {
@@ -212,6 +276,7 @@ SslProtocolFactory::SslProtocolFactory(const SslServerOptions& options,
         throw QPID_WINDOWS_ERROR(status);
     ::CertFreeCertificateContext(certContext);
     ::CertCloseStore(certStoreHandle, 0);
+<<<<<<< HEAD
 
     // Listen to socket(s)
     SocketAddress sa(host, port);
@@ -229,6 +294,8 @@ SslProtocolFactory::SslProtocolFactory(const SslServerOptions& options,
         s->listen(sa, backlog);
         listeners.push_back(s);
     }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 SslProtocolFactory::~SslProtocolFactory() {
@@ -242,18 +309,67 @@ void SslProtocolFactory::connectFailed(const qpid::sys::Socket&,
         connectFailedCallback(err, msg);
 }
 
+<<<<<<< HEAD
 void SslProtocolFactory::established(sys::Poller::shared_ptr poller,
                                      const qpid::sys::Socket& s,
                                      sys::ConnectionCodec::Factory* f,
                                      bool isClient) {
     sys::AsynchIOHandler* async = new sys::AsynchIOHandler(s.getFullAddress(), f);
 
+=======
+void SslProtocolFactory::establishedIncoming(sys::Poller::shared_ptr poller,
+                                             const qpid::sys::Socket& s,
+                                             sys::ConnectionCodec::Factory* f) {
+    sys::AsynchIOHandler* async = new sys::AsynchIOHandler(s.getFullAddress(), f, false, false);
+
+    sys::AsynchIO *aio =
+        new qpid::sys::windows::ServerSslAsynchIO(
+            clientAuthSelected,
+            s,
+            credHandle,
+            boost::bind(&AsynchIOHandler::readbuff, async, _1, _2),
+            boost::bind(&AsynchIOHandler::eof, async, _1),
+            boost::bind(&AsynchIOHandler::disconnect, async, _1),
+            boost::bind(&AsynchIOHandler::closedSocket, async, _1, _2),
+            boost::bind(&AsynchIOHandler::nobuffs, async, _1),
+            boost::bind(&AsynchIOHandler::idle, async, _1));
+
+	establishedCommon(poller, async, aio, s);
+}
+
+void SslProtocolFactory::establishedOutgoing(sys::Poller::shared_ptr poller,
+                                             const qpid::sys::Socket& s,
+                                             sys::ConnectionCodec::Factory* f,
+                                             std::string& name) {
+    sys::AsynchIOHandler* async = new sys::AsynchIOHandler(name, f, true, false);
+
+    sys::AsynchIO *aio =
+        new qpid::sys::windows::ClientSslAsynchIO(
+            brokerHost,
+            s,
+            credHandle,
+            boost::bind(&AsynchIOHandler::readbuff, async, _1, _2),
+            boost::bind(&AsynchIOHandler::eof, async, _1),
+            boost::bind(&AsynchIOHandler::disconnect, async, _1),
+            boost::bind(&AsynchIOHandler::closedSocket, async, _1, _2),
+            boost::bind(&AsynchIOHandler::nobuffs, async, _1),
+            boost::bind(&AsynchIOHandler::idle, async, _1));
+
+	establishedCommon(poller, async, aio, s);
+}
+
+void SslProtocolFactory::establishedCommon(sys::Poller::shared_ptr poller,
+                                           sys::AsynchIOHandler* async,
+                                           sys::AsynchIO* aio,
+                                           const qpid::sys::Socket& s) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (tcpNoDelay) {
         s.setTcpNoDelay();
         QPID_LOG(info,
                  "Set TCP_NODELAY on connection to " << s.getPeerAddress());
     }
 
+<<<<<<< HEAD
     SslAsynchIO *aio;
     if (isClient) {
         async->setClient();
@@ -300,6 +416,14 @@ void SslProtocolFactory::accept(sys::Poller::shared_ptr poller,
 }
 
 void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
+=======
+    async->init(aio, brokerTimer, maxNegotiateTime);
+    aio->start(poller);
+}
+
+void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
+                                 const std::string& name,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                  const std::string& host,
                                  const std::string& port,
                                  sys::ConnectionCodec::Factory* fact,
@@ -326,17 +450,27 @@ void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
     // upon connection failure or by the AsynchIO upon connection
     // shutdown.  The allocated AsynchConnector frees itself when it
     // is no longer needed.
+<<<<<<< HEAD
     qpid::sys::Socket* socket = new qpid::sys::Socket();
+=======
+    qpid::sys::Socket* socket = createSocket();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     connectFailedCallback = failed;
     AsynchConnector::create(*socket,
                             host,
                             port,
+<<<<<<< HEAD
                             boost::bind(&SslProtocolFactory::established,
                                         this, poller, _1, fact, true),
+=======
+                            boost::bind(&SslProtocolFactory::establishedOutgoing,
+                                        this, poller, _1, fact, name),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                             boost::bind(&SslProtocolFactory::connectFailed,
                                         this, _1, _2, _3));
 }
 
+<<<<<<< HEAD
 namespace
 {
 const std::string SSL = "ssl";
@@ -350,3 +484,6 @@ bool SslProtocolFactory::supports(const std::string& capability)
 }
 
 }}} // namespace qpid::sys::windows
+=======
+}}}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

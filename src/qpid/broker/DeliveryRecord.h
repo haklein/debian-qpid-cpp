@@ -26,15 +26,26 @@
 #include <deque>
 #include <vector>
 #include <ostream>
+<<<<<<< HEAD
 #include "qpid/framing/SequenceSet.h"
 #include "qpid/broker/BrokerImportExport.h"
 #include "qpid/broker/QueuedMessage.h"
+=======
+#include "qpid/framing/FrameHandler.h"
+#include "qpid/framing/SequenceSet.h"
+#include "qpid/broker/BrokerImportExport.h"
+#include "qpid/broker/QueueCursor.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/DeliveryId.h"
 #include "qpid/broker/Message.h"
 
 namespace qpid {
 namespace broker {
 
+<<<<<<< HEAD
+=======
+class Queue;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class TransactionContext;
 class SemanticState;
 struct AckRange;
@@ -45,7 +56,11 @@ class Consumer;
  */
 class DeliveryRecord
 {
+<<<<<<< HEAD
     QueuedMessage msg;
+=======
+    QueueCursor msg;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     mutable boost::shared_ptr<Queue> queue;
     std::string tag;    // name of consumer
     boost::shared_ptr<Consumer> consumer;
@@ -65,9 +80,19 @@ class DeliveryRecord
      * after that).
      */
     uint32_t credit;
+<<<<<<< HEAD
 
   public:
     QPID_BROKER_EXTERN DeliveryRecord(const QueuedMessage& msg,
+=======
+    framing::SequenceNumber msgId;
+    framing::SequenceNumber replicationId;
+
+  public:
+    QPID_BROKER_EXTERN DeliveryRecord(const QueueCursor& msgCursor,
+                                      framing::SequenceNumber msgId,
+                                      framing::SequenceNumber replicationId,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                       const boost::shared_ptr<Queue>& queue, 
                                       const std::string& tag,
                                       const boost::shared_ptr<Consumer>& consumer,
@@ -80,11 +105,18 @@ class DeliveryRecord
     bool coveredBy(const framing::SequenceSet* const range) const { return range->contains(id); }
 
     void dequeue(TransactionContext* ctxt = 0) const;
+<<<<<<< HEAD
     void requeue() const;
     void release(bool setRedelivered);
     void reject();
     void cancel(const std::string& tag);
     void redeliver(SemanticState* const);
+=======
+    void requeue();
+    void release(bool setRedelivered);
+    void reject();
+    void cancel(const std::string& tag);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void acquire(DeliveryIds& results);
     void complete();
     bool accept(TransactionContext* ctxt); // Returns isRedundant()
@@ -102,13 +134,23 @@ class DeliveryRecord
     uint32_t getCredit() const;
     const std::string& getTag() const { return tag; }
 
+<<<<<<< HEAD
     void deliver(framing::FrameHandler& h, DeliveryId deliveryId, uint16_t framesize);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void setId(DeliveryId _id) { id = _id; }
 
     typedef std::deque<DeliveryRecord> DeliveryRecords;
     static AckRange findRange(DeliveryRecords& records, DeliveryId first, DeliveryId last);
+<<<<<<< HEAD
     const QueuedMessage& getMessage() const { return msg; }
     framing::SequenceNumber getId() const { return id; }
+=======
+    const QueueCursor& getMessage() const { return msg; }
+    framing::SequenceNumber getId() const { return id; }
+    framing::SequenceNumber getMessageId() const { return msgId; }
+    framing::SequenceNumber getReplicationId() const { return replicationId; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     boost::shared_ptr<Queue> getQueue() const { return queue; }
 
     friend std::ostream& operator<<(std::ostream&, const DeliveryRecord&);

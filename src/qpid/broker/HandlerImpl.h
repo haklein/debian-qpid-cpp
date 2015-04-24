@@ -21,7 +21,11 @@
 
 #include "qpid/broker/SemanticState.h"
 #include "qpid/broker/SessionContext.h"
+<<<<<<< HEAD
 #include "qpid/broker/ConnectionState.h"
+=======
+#include "qpid/broker/amqp_0_10/Connection.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace broker {
@@ -40,7 +44,11 @@ class HandlerImpl {
     HandlerImpl(SemanticState& s) : state(s), session(s.getSession()) {}
 
     framing::AMQP_ClientProxy& getProxy() { return session.getProxy(); }
+<<<<<<< HEAD
     ConnectionState& getConnection() { return session.getConnection(); }
+=======
+    amqp_0_10::Connection& getConnection() { return session.getConnection(); }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Broker& getBroker() { return session.getConnection().getBroker(); }
 };
 

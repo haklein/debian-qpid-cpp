@@ -21,7 +21,10 @@
 #ifndef _DtxManager_
 #define _DtxManager_
 
+<<<<<<< HEAD
 #include <boost/ptr_container/ptr_map.hpp>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/broker/DtxBuffer.h"
 #include "qpid/broker/DtxWorkRecord.h"
 #include "qpid/broker/TransactionalStore.h"
@@ -31,11 +34,19 @@
 #include "qpid/ptr_map.h"
 
 namespace qpid {
+<<<<<<< HEAD
+=======
+namespace sys {
+class Timer;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace broker {
 
 class DtxManager{
     typedef boost::ptr_map<std::string, DtxWorkRecord> WorkMap;
 
+<<<<<<< HEAD
     struct DtxCleanup : public sys::TimerTask
     {
         DtxManager& mgr;
@@ -45,20 +56,34 @@ class DtxManager{
         void fire();
     };
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     WorkMap work;
     TransactionalStore* store;
     qpid::sys::Mutex lock;
     qpid::sys::Timer* timer;
+<<<<<<< HEAD
+=======
+    uint32_t dtxDefaultTimeout;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     void remove(const std::string& xid);
     DtxWorkRecord* createWork(const std::string& xid);
 
 public:
+<<<<<<< HEAD
     DtxManager(sys::Timer&);
     ~DtxManager();
     void start(const std::string& xid, DtxBuffer::shared_ptr work);
     void join(const std::string& xid, DtxBuffer::shared_ptr work);
     void recover(const std::string& xid, std::auto_ptr<TPCTransactionContext> txn, DtxBuffer::shared_ptr work);
+=======
+    DtxManager(sys::Timer&, uint32_t _dtxDefaultTimeout=0);
+    ~DtxManager();
+    void start(const std::string& xid, boost::intrusive_ptr<DtxBuffer> work);
+    void join(const std::string& xid, boost::intrusive_ptr<DtxBuffer> work);
+    void recover(const std::string& xid, std::auto_ptr<TPCTransactionContext> txn, boost::intrusive_ptr<DtxBuffer> work);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool prepare(const std::string& xid);
     bool commit(const std::string& xid, bool onePhase);
     void rollback(const std::string& xid);
@@ -68,11 +93,14 @@ public:
     void setStore(TransactionalStore* store);
     void setTimer(sys::Timer& t) { timer = &t; }
 
+<<<<<<< HEAD
     // Used by cluster for replication.
     template<class F> void each(F f) const {
         for (WorkMap::const_iterator i = work.begin(); i != work.end(); ++i)
             f(*ptr_map_ptr(i));
     }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     DtxWorkRecord* getWork(const std::string& xid);
     bool exists(const std::string& xid);
     static std::string convert(const framing::Xid& xid);

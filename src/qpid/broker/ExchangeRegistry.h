@@ -37,6 +37,7 @@
 
 namespace qpid {
 namespace broker {
+<<<<<<< HEAD
 
 struct UnknownExchangeTypeException{};
 
@@ -54,6 +55,47 @@ class ExchangeRegistry{
        bool durable,
        const qpid::framing::FieldTable& args = framing::FieldTable());
     QPID_BROKER_EXTERN void destroy(const std::string& name);
+=======
+namespace {
+const std::string UNKNOWN_EXCHANGE_TYPE("Unknown exchange type: ");
+}
+
+struct UnknownExchangeTypeException : std::exception
+{
+    const std::string message;
+    UnknownExchangeTypeException(const std::string& type) throw() : message(UNKNOWN_EXCHANGE_TYPE + type) {}
+    ~UnknownExchangeTypeException() throw() {}
+    const char* what() const throw()
+    {
+        return message.c_str();
+    }
+};
+
+class ExchangeRegistry{
+  public:
+    typedef boost::function6<Exchange::shared_ptr, const std::string&, 
+                             bool, bool, const qpid::framing::FieldTable&, qpid::management::Manageable*, qpid::broker::Broker*> FactoryFunction;
+
+    ExchangeRegistry (Broker* b = 0) : parent(0), broker(b) {}
+    QPID_BROKER_EXTERN std::pair<Exchange::shared_ptr, bool> declare(
+        const std::string& name, const std::string& type);
+
+    QPID_BROKER_EXTERN std::pair<Exchange::shared_ptr, bool> declare(
+        const std::string& name,
+        const std::string& type,
+        bool durable,
+        bool autodelete,
+        const qpid::framing::FieldTable& args = framing::FieldTable(),
+        Exchange::shared_ptr alternate = Exchange::shared_ptr(),
+        const std::string& connectionId = std::string(),
+        const std::string& userId = std::string());
+
+    QPID_BROKER_EXTERN void destroy(
+        const std::string& name,
+        const std::string& connectionId = std::string(),
+        const std::string& userId = std::string());
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_BROKER_EXTERN Exchange::shared_ptr getDefault();
 
     /**
@@ -79,6 +121,11 @@ class ExchangeRegistry{
 
     QPID_BROKER_EXTERN void registerType(const std::string& type, FactoryFunction);
 
+<<<<<<< HEAD
+=======
+    QPID_BROKER_EXTERN void checkType(const std::string& type);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /** Call f for each exchange in the registry. */
     template <class F> void eachExchange(F f) const {
         qpid::sys::RWlock::ScopedRlock l(lock);

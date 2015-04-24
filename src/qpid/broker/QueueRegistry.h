@@ -22,8 +22,13 @@
 #define _QueueRegistry_
 
 #include "qpid/broker/BrokerImportExport.h"
+<<<<<<< HEAD
 #include "qpid/sys/Mutex.h"
 #include "qpid/management/Manageable.h"
+=======
+#include "qpid/broker/QueueFactory.h"
+#include "qpid/sys/Mutex.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/FieldTable.h"
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
@@ -34,11 +39,16 @@ namespace qpid {
 namespace broker {
 
 class Queue;
+<<<<<<< HEAD
 class QueueEvents;
 class Exchange;
 class OwnershipToken;
 class Broker;
 class MessageStore;
+=======
+class Exchange;
+class OwnershipToken;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  * A registry of queues indexed by queue name.
@@ -47,7 +57,11 @@ class MessageStore;
  * are deleted when and only when they are no longer in use.
  *
  */
+<<<<<<< HEAD
 class QueueRegistry {
+=======
+class QueueRegistry : private QueueFactory {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   public:
     QPID_BROKER_EXTERN QueueRegistry(Broker* b = 0);
     QPID_BROKER_EXTERN ~QueueRegistry();
@@ -60,12 +74,20 @@ class QueueRegistry {
      */
     QPID_BROKER_EXTERN std::pair<boost::shared_ptr<Queue>, bool> declare(
         const std::string& name,
+<<<<<<< HEAD
         bool durable = false,
         bool autodelete = false,
         const OwnershipToken* owner = 0,
         boost::shared_ptr<Exchange> alternateExchange = boost::shared_ptr<Exchange>(),
         const qpid::framing::FieldTable& args = framing::FieldTable(),
         bool recovering = false);
+=======
+        const QueueSettings& settings,
+        boost::shared_ptr<Exchange> alternateExchange = boost::shared_ptr<Exchange>(),
+        bool recovering = false,
+        const OwnershipToken* owner = 0,
+        std::string connectionId=std::string(), std::string userId=std::string());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Destroy the named queue.
@@ -79,7 +101,15 @@ class QueueRegistry {
      * subsequent calls to find or declare with the same name.
      *
      */
+<<<<<<< HEAD
     QPID_BROKER_EXTERN void destroy(const std::string& name);
+=======
+    QPID_BROKER_EXTERN void destroy(
+        const std::string& name,
+        const std::string& connectionId=std::string(),
+        const std::string& userId=std::string());
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     template <class Test> bool destroyIf(const std::string& name, Test test)
     {
         if (test()) {
@@ -101,11 +131,14 @@ class QueueRegistry {
     QPID_BROKER_EXTERN boost::shared_ptr<Queue> get(const std::string& name);
 
     /**
+<<<<<<< HEAD
      * Generate unique queue name.
      */
     std::string generateName();
 
     /**
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
      * Set the store to use.  May only be called once.
      */
     void setStore (MessageStore*);
@@ -118,7 +151,11 @@ class QueueRegistry {
     /**
      * Register the manageable parent for declared queues
      */
+<<<<<<< HEAD
     void setParent (management::Manageable* _parent) { parent = _parent; }
+=======
+    void setParent (management::Manageable*);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Call f for each queue in the registry. */
     template <class F> void eachQueue(F f) const {
@@ -127,22 +164,28 @@ class QueueRegistry {
             f(i->second);
     }
 
+<<<<<<< HEAD
 	/**
 	* Change queue mode when cluster size drops to 1 node, expands again
 	* in practice allows flow queue to disk when last name to be exectuted
 	*/
 	void updateQueueClusterState(bool lastNode);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 private:
     typedef std::map<std::string, boost::shared_ptr<Queue> > QueueMap;
     QueueMap queues;
     mutable qpid::sys::RWlock lock;
+<<<<<<< HEAD
     int counter;
     MessageStore* store;
     QueueEvents* events;
     management::Manageable* parent;
     bool lastNode; //used to set mode on queue declare
     Broker* broker;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 

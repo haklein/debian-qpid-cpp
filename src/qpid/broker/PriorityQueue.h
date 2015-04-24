@@ -22,6 +22,10 @@
  *
  */
 #include "qpid/broker/MessageDeque.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/IndexedDeque.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/IntegerTypes.h"
 #include <deque>
 #include <vector>
@@ -44,6 +48,7 @@ class PriorityQueue : public Messages
     virtual ~PriorityQueue() {}
     size_t size();
 
+<<<<<<< HEAD
     bool deleted(const QueuedMessage&);
     void release(const QueuedMessage&);
     bool acquire(const framing::SequenceNumber&, QueuedMessage&);
@@ -72,14 +77,72 @@ class PriorityQueue : public Messages
     PriorityLevels messages;
     /** FIFO index of all messsagse (including acquired messages)  for fast browsing and indexing */
     MessageDeque fifo;
+=======
+    bool deleted(const QueueCursor&);
+    void publish(const Message& added);
+    Message* next(QueueCursor&);
+    Message* release(const QueueCursor& cursor);
+    Message* find(const QueueCursor&);
+    Message* find(const framing::SequenceNumber&, QueueCursor*);
+
+    void foreach(Functor);
+    static uint getPriority(const Message&);
+  protected:
+    const int levels;
+    struct Priority
+    {
+        const int start;
+        int current;
+        Priority(int s) : start(s), current(start) {}
+    };
+    virtual Priority firstLevel();
+    virtual bool nextLevel(Priority& );
+
+  private:
+    struct MessageHolder
+    {
+        Message message;
+        int priority;
+        framing::SequenceNumber id;
+        framing::SequenceNumber getSequence() const;
+        void setState(MessageState);
+        MessageState getState() const;
+        operator Message&();
+    };
+    struct MessagePointer
+    {
+        MessageHolder* holder;
+        framing::SequenceNumber id;//used only for padding
+        framing::SequenceNumber getSequence() const;
+        void setState(MessageState);
+        MessageState getState() const;
+        operator Message&();
+    };
+    typedef IndexedDeque<MessageHolder> Deque;
+    typedef std::vector<Deque> PriorityLevels;
+    typedef std::vector<framing::SequenceNumber> Counters;
+
+    /** Holds pointers to messages (stored in the fifo index) separated by priority.
+     */
+    PriorityLevels messages;
+    Counters counters;
+    /** FIFO index of messages for fast browsing and indexing */
+    IndexedDeque<MessagePointer> fifo;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     uint frontLevel;
     bool haveFront;
     bool cached;
 
+<<<<<<< HEAD
     void erase(const QueuedMessage&);
     uint getPriorityLevel(const QueuedMessage&) const;
     void clearCache();
     bool checkFront();
+=======
+    uint getPriorityLevel(const Message&) const;
+    MessageHolder priorityPadding(qpid::framing::SequenceNumber);
+    MessagePointer fifoPadding(qpid::framing::SequenceNumber);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::broker

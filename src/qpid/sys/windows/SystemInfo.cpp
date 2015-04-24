@@ -25,7 +25,12 @@
 
 #include "qpid/sys/SystemInfo.h"
 #include "qpid/sys/IntegerTypes.h"
+<<<<<<< HEAD
 #include "qpid/Exception.h"
+=======
+#include "qpid/Exception.h"
+#include "qpid/log/Statement.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <assert.h>
 #include <winsock2.h>
@@ -66,6 +71,7 @@ bool SystemInfo::getLocalHostname (Address &address) {
 static const std::string LOCALHOST("127.0.0.1");
 static const std::string TCP("tcp");
 
+<<<<<<< HEAD
 void SystemInfo::getLocalIpAddresses (uint16_t port,
                                       std::vector<Address> &addrList) {
     enum { MAX_URL_INTERFACES = 100 };
@@ -99,6 +105,12 @@ bool SystemInfo::isLocalHost(const std::string& candidateHost) {
     // FIXME aconway 2012-05-03: not implemented.
     assert(0);
     throw Exception("Not implemented: isLocalHost");
+=======
+// Null function which always fails to find an network interface name
+bool SystemInfo::getInterfaceAddresses(const std::string&, std::vector<std::string>&)
+{
+    return false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void SystemInfo::getSystemId (std::string &osName,
@@ -208,4 +220,32 @@ std::string SystemInfo::getProcessName()
     return name;
 }
 
+<<<<<<< HEAD
+=======
+
+#ifdef _DLL
+namespace windows {
+// set from one or more Qpid DLLs: i.e. in DllMain with DLL_PROCESS_DETACH
+QPID_EXPORT bool processExiting = false;
+QPID_EXPORT bool libraryUnloading = false;
+}
+#endif
+
+bool SystemInfo::threadSafeShutdown()
+{
+#ifdef _DLL
+    if (!windows::processExiting && !windows::libraryUnloading) {
+        // called before exit() or FreeLibrary(), or by a DLL without
+        // a participating DllMain.
+        QPID_LOG(warning, "invalid query for shutdown state");
+        throw qpid::Exception(QPID_MSG("Unable to determine shutdown state."));
+    }
+    return !windows::processExiting;
+#else
+    // Not a DLL: shutdown can only be by exit() or return from main().
+    return false;
+#endif
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::sys

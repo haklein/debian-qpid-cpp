@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 /*
+=======
+ /*
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +24,23 @@
  */
 
 #include "qpid/broker/MessageGroupManager.h"
+<<<<<<< HEAD
 
 #include "qpid/broker/Queue.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/FieldValue.h"
+=======
+#include "qpid/broker/Message.h"
+#include "qpid/broker/Messages.h"
+#include "qpid/broker/MessageDeque.h"
+#include "qpid/broker/QueueSettings.h"
+#include "qpid/framing/Array.h"
+#include "qpid/framing/DeliveryProperties.h"
+#include "qpid/framing/FieldTable.h"
+#include "qpid/framing/FieldValue.h"
+#include "qpid/framing/TypeCode.h"
+#include "qpid/types/Variant.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 #include "qpid/types/Variant.h"
 
@@ -75,14 +92,21 @@ void MessageGroupManager::disown( GroupState& state )
     freeGroups[state.members.front().position] = &state;
 }
 
+<<<<<<< HEAD
 MessageGroupManager::GroupState& MessageGroupManager::findGroup( const QueuedMessage& qm )
 {
     uint32_t thisMsg = qm.position.getValue();
+=======
+MessageGroupManager::GroupState& MessageGroupManager::findGroup( const Message& m )
+{
+    uint32_t thisMsg = m.getSequence().getValue();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (cachedGroup && lastMsg == thisMsg) {
         hits++;
         return *cachedGroup;
     }
 
+<<<<<<< HEAD
     std::string group = defaultGroupId;
     const qpid::framing::FieldTable* headers = qm.payload->getApplicationHeaders();
     if (headers) {
@@ -93,6 +117,10 @@ MessageGroupManager::GroupState& MessageGroupManager::findGroup( const QueuedMes
                 group = tmp;
         }
     }
+=======
+    std::string group = m.getPropertyAsString(groupIdHeader);
+    if (group.empty()) group = defaultGroupId; //empty group is reserved
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if (cachedGroup && group == lastGroup) {
         hits++;
@@ -112,24 +140,39 @@ MessageGroupManager::GroupState& MessageGroupManager::findGroup( const QueuedMes
 }
 
 
+<<<<<<< HEAD
 void MessageGroupManager::enqueued( const QueuedMessage& qm )
 {
     // @todo KAG optimization - store reference to group state in QueuedMessage
     // issue: const-ness??
     GroupState& state = findGroup(qm);
     GroupState::MessageState mState(qm.position);
+=======
+void MessageGroupManager::enqueued( const Message& m )
+{
+    // @todo KAG optimization - store reference to group state in QueuedMessage
+    // issue: const-ness??
+    GroupState& state = findGroup(m);
+    GroupState::MessageState mState(m.getSequence());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     state.members.push_back(mState);
     uint32_t total = state.members.size();
     QPID_LOG( trace, "group queue " << qName <<
               ": added message to group id=" << state.group << " total=" << total );
     if (total == 1) {
         // newly created group, no owner
+<<<<<<< HEAD
         assert(freeGroups.find(qm.position) == freeGroups.end());
         freeGroups[qm.position] = &state;
+=======
+        assert(freeGroups.find(m.getSequence()) == freeGroups.end());
+        freeGroups[m.getSequence()] = &state;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 
+<<<<<<< HEAD
 void MessageGroupManager::acquired( const QueuedMessage& qm )
 {
     // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
@@ -138,12 +181,23 @@ void MessageGroupManager::acquired( const QueuedMessage& qm )
     GroupState::MessageFifo::iterator m = state.findMsg(qm.position);
     assert(m != state.members.end());
     m->acquired = true;
+=======
+void MessageGroupManager::acquired( const Message& m )
+{
+    // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
+    // issue: const-ness??
+    GroupState& state = findGroup(m);
+    GroupState::MessageFifo::iterator gm = state.findMsg(m.getSequence());
+    assert(gm != state.members.end());
+    gm->acquired = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     state.acquired += 1;
     QPID_LOG( trace, "group queue " << qName <<
               ": acquired message in group id=" << state.group << " acquired=" << state.acquired );
 }
 
 
+<<<<<<< HEAD
 void MessageGroupManager::requeued( const QueuedMessage& qm )
 {
     // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
@@ -154,6 +208,18 @@ void MessageGroupManager::requeued( const QueuedMessage& qm )
     GroupState::MessageFifo::iterator m = state.findMsg(qm.position);
     assert(m != state.members.end());
     m->acquired = false;
+=======
+void MessageGroupManager::requeued( const Message& m )
+{
+    // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
+    // issue: const-ness??
+    GroupState& state = findGroup(m);
+    assert( state.acquired != 0 );
+    state.acquired -= 1;
+    GroupState::MessageFifo::iterator i = state.findMsg(m.getSequence());
+    assert(i != state.members.end());
+    i->acquired = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (state.acquired == 0 && state.owned()) {
         QPID_LOG( trace, "group queue " << qName <<
                   ": consumer name=" << state.owner << " released group id=" << state.group);
@@ -164,6 +230,7 @@ void MessageGroupManager::requeued( const QueuedMessage& qm )
 }
 
 
+<<<<<<< HEAD
 void MessageGroupManager::dequeued( const QueuedMessage& qm )
 {
     // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
@@ -172,6 +239,16 @@ void MessageGroupManager::dequeued( const QueuedMessage& qm )
     GroupState::MessageFifo::iterator m = state.findMsg(qm.position);
     assert(m != state.members.end());
     if (m->acquired) {
+=======
+void MessageGroupManager::dequeued( const Message& m )
+{
+    // @todo KAG  avoid lookup: retrieve direct reference to group state from QueuedMessage
+    // issue: const-ness??
+    GroupState& state = findGroup(m);
+    GroupState::MessageFifo::iterator i = state.findMsg(m.getSequence());
+    assert(i != state.members.end());
+    if (i->acquired) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         assert( state.acquired != 0 );
         state.acquired -= 1;
     }
@@ -179,7 +256,11 @@ void MessageGroupManager::dequeued( const QueuedMessage& qm )
     // special case if qm is first (oldest) message in the group:
     // may need to re-insert it back on the freeGroups list, as the index will change
     bool reFreeNeeded = false;
+<<<<<<< HEAD
     if (m == state.members.begin()) {
+=======
+    if (i == state.members.begin()) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (!state.owned()) {
             // will be on the freeGroups list if mgmt is dequeueing rather than a consumer!
             // if on freelist, it is indexed by first member, which is about to be removed!
@@ -188,7 +269,11 @@ void MessageGroupManager::dequeued( const QueuedMessage& qm )
         }
         state.members.pop_front();
     } else {
+<<<<<<< HEAD
         state.members.erase(m);
+=======
+        state.members.erase(i);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     uint32_t total = state.members.size();
@@ -206,6 +291,15 @@ void MessageGroupManager::dequeued( const QueuedMessage& qm )
         QPID_LOG( trace, "group queue " << qName <<
                   ": consumer name=" << state.owner << " released group id=" << state.group);
         disown(state);
+<<<<<<< HEAD
+=======
+        MessageDeque* md = dynamic_cast<MessageDeque*>(&messages);
+        if (md) {
+            md->resetCursors();
+        } else {
+            QPID_LOG(warning, "Could not reset cursors for message group, unexpected container type");
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     } else if (reFreeNeeded) {
         disown(state);
     }
@@ -215,6 +309,7 @@ MessageGroupManager::~MessageGroupManager()
 {
     QPID_LOG( debug, "group queue " << qName << " cache results: hits=" << hits << " misses=" << misses );
 }
+<<<<<<< HEAD
 bool MessageGroupManager::nextConsumableMessage( Consumer::shared_ptr& c, QueuedMessage& next )
 {
     if (!messages.size())
@@ -264,6 +359,29 @@ bool MessageGroupManager::nextBrowsableMessage( Consumer::shared_ptr& c, QueuedM
 {
     // browse: allow access to any available msg, regardless of group ownership (?ok?)
     return messages.browse(c->getPosition(), next, false);
+=======
+
+bool MessageGroupManager::acquire(const std::string& consumer, Message& m)
+{
+    if (m.getState() == AVAILABLE) {
+        // @todo KAG avoid lookup: retrieve direct reference to group state from QueuedMessage
+        GroupState& state = findGroup(m);
+
+        if (!state.owned()) {
+            own( state, consumer );
+            QPID_LOG( trace, "group queue " << qName <<
+                      ": consumer name=" << consumer << " has acquired group id=" << state.group);
+        }
+        if (state.owner == consumer) {
+            m.setState(ACQUIRED);
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void MessageGroupManager::query(qpid::types::Variant::Map& status) const
@@ -296,11 +414,17 @@ void MessageGroupManager::query(qpid::types::Variant::Map& status) const
         // set the timestamp to the arrival timestamp of the oldest (HEAD) message, if present
         info[GROUP_TIMESTAMP] = 0;
         if (g->second.members.size() != 0) {
+<<<<<<< HEAD
             QueuedMessage qm;
             if (messages.find(g->second.members.front().position, qm) &&
                 qm.payload &&
                 qm.payload->hasProperties<framing::DeliveryProperties>()) {
                 info[GROUP_TIMESTAMP] = qm.payload->getProperties<framing::DeliveryProperties>()->getTimestamp();
+=======
+            Message* m = messages.find(g->second.members.front().position, 0);
+            if (m && m->getTimestamp()) {
+                info[GROUP_TIMESTAMP] = m->getTimestamp();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         }
         info[GROUP_CONSUMER] = g->second.owner;
@@ -313,6 +437,7 @@ void MessageGroupManager::query(qpid::types::Variant::Map& status) const
 
 boost::shared_ptr<MessageGroupManager> MessageGroupManager::create( const std::string& qName,
                                                                     Messages& messages,
+<<<<<<< HEAD
                                                                     const qpid::framing::FieldTable& settings )
 {
     boost::shared_ptr<MessageGroupManager> empty;
@@ -340,6 +465,15 @@ boost::shared_ptr<MessageGroupManager> MessageGroupManager::create( const std::s
         return manager;
     }
     return empty;
+=======
+                                                                    const QueueSettings& settings )
+{
+    boost::shared_ptr<MessageGroupManager> manager( new MessageGroupManager( settings.groupKey, qName, messages, settings.addTimestamp ) );
+    QPID_LOG( debug, "Configured Queue '" << qName <<
+              "' for message grouping using header key '" << settings.groupKey << "'" <<
+              " (timestamp=" << settings.addTimestamp << ")");
+    return manager;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 std::string MessageGroupManager::defaultGroupId;
@@ -348,6 +482,7 @@ void MessageGroupManager::setDefaults(const std::string& groupId)   // static
     defaultGroupId = groupId;
 }
 
+<<<<<<< HEAD
 /** Cluster replication:
 
    state map format:
@@ -361,6 +496,8 @@ void MessageGroupManager::setDefaults(const std::string& groupId)   // static
    }
 */
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 namespace {
     const std::string GROUP_NAME("name");
     const std::string GROUP_OWNER("owner");
@@ -370,6 +507,7 @@ namespace {
     const std::string GROUP_STATE("group-state");
 }
 
+<<<<<<< HEAD
 
 /** Runs on UPDATER to snapshot current state */
 void MessageGroupManager::getState(qpid::framing::FieldTable& state ) const
@@ -467,3 +605,5 @@ void MessageGroupManager::setState(const qpid::framing::FieldTable& state)
 
     QPID_LOG(debug, "Queue \"" << qName << "\": message group state replicated, key =" << groupIdHeader)
 }
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

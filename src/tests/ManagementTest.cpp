@@ -21,7 +21,10 @@
 
 #include "qpid/management/ManagementObject.h"
 #include "qpid/framing/Buffer.h"
+<<<<<<< HEAD
 #include "qpid/console/ObjectId.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "unit_test.h"
 
 namespace qpid {
@@ -93,6 +96,7 @@ QPID_AUTO_TEST_CASE(testObjectIdCreate) {
     BOOST_CHECK_EQUAL(oid.getV2Key(), "an-object-name");
 }
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testConsoleObjectId) {
     qpid::console::ObjectId oid1, oid2;
 
@@ -119,6 +123,8 @@ QPID_AUTO_TEST_CASE(testConsoleObjectId) {
     BOOST_CHECK(oid1 == oid2);
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

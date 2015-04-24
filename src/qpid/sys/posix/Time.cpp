@@ -23,11 +23,20 @@
 
 #include "qpid/sys/Time.h"
 #include <ostream>
+<<<<<<< HEAD
+=======
+#include <istream>
+#include <sstream>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <time.h>
 #include <stdio.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <iomanip>
+<<<<<<< HEAD
+=======
+#include <cctype>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace {
 int64_t max_abstime() { return std::numeric_limits<int64_t>::max(); }
@@ -40,7 +49,11 @@ AbsTime::AbsTime(const AbsTime& t, const Duration& d) :
     timepoint(d == Duration::max() ? max_abstime() : t.timepoint+d.nanosecs)
 {}
 
+<<<<<<< HEAD
 AbsTime AbsTime::Epoch() {
+=======
+AbsTime AbsTime::Zero() {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AbsTime epoch; epoch.timepoint = 0;
     return epoch;
 }
@@ -51,12 +64,29 @@ AbsTime AbsTime::FarFuture() {
 
 AbsTime AbsTime::now() {
     struct timespec ts;
+<<<<<<< HEAD
     ::clock_gettime(CLOCK_REALTIME, &ts);
+=======
+    ::clock_gettime(CLOCK_MONOTONIC, &ts);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     AbsTime time_now;
     time_now.timepoint = toTime(ts).nanosecs;
     return time_now;
 }
 
+<<<<<<< HEAD
+=======
+AbsTime AbsTime::epoch() {
+    return AbsTime(now(), -Duration::FromEpoch());
+}
+
+Duration Duration::FromEpoch() {
+    struct timespec ts;
+    ::clock_gettime(CLOCK_REALTIME, &ts);
+    return toTime(ts).nanosecs;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Duration::Duration(const AbsTime& start, const AbsTime& finish) :
     nanosecs(finish.timepoint - start.timepoint)
 {}
@@ -66,13 +96,19 @@ namespace {
 const time_t TIME_T_MAX = std::numeric_limits<time_t>::max();
 }
 
+<<<<<<< HEAD
 struct timespec& toTimespec(struct timespec& ts, const Duration& t) {
+=======
+struct timespec& toTimespec(struct timespec& ts, const AbsTime& a) {
+    Duration t(ZERO, a);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Duration secs = t / TIME_SEC;
     ts.tv_sec = (secs > TIME_T_MAX) ? TIME_T_MAX : static_cast<time_t>(secs);
     ts.tv_nsec = static_cast<long>(t % TIME_SEC);
     return ts; 
 }
 
+<<<<<<< HEAD
 struct timeval& toTimeval(struct timeval& tv, const Duration& t) {
     Duration secs = t / TIME_SEC;
     tv.tv_sec = (secs > TIME_T_MAX) ? TIME_T_MAX : static_cast<time_t>(secs);
@@ -80,12 +116,43 @@ struct timeval& toTimeval(struct timeval& tv, const Duration& t) {
     return tv;
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 Duration toTime(const struct timespec& ts) {
     return ts.tv_sec*TIME_SEC + ts.tv_nsec;
 }
 
 std::ostream& operator<<(std::ostream& o, const Duration& d) {
+<<<<<<< HEAD
     return o << int64_t(d) << "ns";   
+=======
+    if (d >= TIME_SEC) return o << (double(d)/TIME_SEC) << "s";
+    if (d >= TIME_MSEC) return o << (double(d)/TIME_MSEC) << "ms";
+    if (d >= TIME_USEC) return o << (double(d)/TIME_USEC) << "us";
+    return o << int64_t(d) << "ns";
+}
+
+std::istream& operator>>(std::istream& i, Duration& d) {
+    // Don't throw, let the istream throw if it's configured to do so.
+    double number;
+    i >> number;
+    if (i.fail()) return i;
+
+    if (i.eof() || std::isspace(i.peek())) // No suffix
+        d = int64_t(number*TIME_SEC);
+    else {
+        std::stringbuf suffix;
+        i >> &suffix;
+        if (i.fail()) return i;
+	std::string suffix_str = suffix.str();
+        if (suffix_str.compare("s") == 0) d = int64_t(number*TIME_SEC);
+        else if (suffix_str.compare("ms") == 0) d = int64_t(number*TIME_MSEC);
+        else if (suffix_str.compare("us") == 0) d = int64_t(number*TIME_USEC);
+        else if (suffix_str.compare("ns") == 0) d = int64_t(number*TIME_NSEC);
+        else i.setstate(std::ios::failbit);
+    }
+    return i;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace {

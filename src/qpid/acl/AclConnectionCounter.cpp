@@ -24,6 +24,10 @@
 #include "qpid/broker/Connection.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/Mutex.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/SocketAddress.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <assert.h>
 #include <sstream>
 
@@ -85,13 +89,20 @@ bool ConnectionCounter::limitApproveLH(
 //
 // countConnectionLH
 //
+<<<<<<< HEAD
 // Increment the name's count in map and return a comparison against the limit.
 // called with dataLock already taken
+=======
+// Increment the name's count in map and return an optional comparison
+//  against a connection limit.
+// Called with dataLock already taken.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 //
 bool ConnectionCounter::countConnectionLH(
     connectCountsMap_t& theMap,
     const std::string& theName,
     uint16_t theLimit,
+<<<<<<< HEAD
     bool emitLog) {
 
     bool result(true);
@@ -111,6 +122,28 @@ bool ConnectionCounter::countConnectionLH(
                 << " curValue=" << count
                 << " result=" << (result ? "allow" : "deny"));
         }
+=======
+    bool emitLog,
+    bool enforceLimit) {
+
+    bool result(true);
+    uint16_t count(0);
+    connectCountsMap_t::iterator eRef = theMap.find(theName);
+    if (eRef != theMap.end()) {
+        count = (uint16_t)(*eRef).second + 1;
+        (*eRef).second = count;
+    } else {
+        theMap[theName] = count = 1;
+    }
+    if (enforceLimit) {
+        result = count <= theLimit;
+    }
+    if (emitLog) {
+        QPID_LOG(trace, "ACL ConnectionApprover user=" << theName
+            << " limit=" << theLimit
+            << " curValue=" << count
+            << " result=" << (result ? "allow" : "deny"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     return result;
 }
@@ -123,6 +156,7 @@ bool ConnectionCounter::countConnectionLH(
 // called with dataLock already taken
 //
 void ConnectionCounter::releaseLH(
+<<<<<<< HEAD
     connectCountsMap_t& theMap, const std::string& theName, uint16_t theLimit) {
 
     if (theLimit > 0) {
@@ -140,6 +174,24 @@ void ConnectionCounter::releaseLH(
             QPID_LOG(notice, "ACL ConnectionCounter Connection for '" << theName
                 << "' not found in connection count pool");
         }
+=======
+    connectCountsMap_t& theMap, const std::string& theName) {
+
+    connectCountsMap_t::iterator eRef = theMap.find(theName);
+    if (eRef != theMap.end()) {
+        uint16_t count = (uint16_t) (*eRef).second;
+        assert (count > 0);
+        if (1 == count) {
+            theMap.erase (eRef);
+        } else {
+            (*eRef).second = count - 1;
+        }
+    } else {
+        // User had no connections.
+        // Connections denied by ACL never get users added
+        //QPID_LOG(notice, "ACL ConnectionCounter Connection for '" << theName
+        //    << "' not found in connection count pool");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -161,7 +213,11 @@ void ConnectionCounter::connection(broker::Connection& connection) {
     connectProgressMap[connection.getMgmtId()] = C_CREATED;
 
     // Count the connection from this host.
+<<<<<<< HEAD
     (void) countConnectionLH(connectByHostMap, hostName, hostLimit, false);
+=======
+    (void) countConnectionLH(connectByHostMap, hostName, hostLimit, false, false);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 
@@ -180,8 +236,12 @@ void ConnectionCounter::closed(broker::Connection& connection) {
             // Normal case: connection was created and opened.
             // Decrement user in-use counts
             releaseLH(connectByNameMap,
+<<<<<<< HEAD
                       connection.getUserId(),
                       nameLimit);
+=======
+                      connection.getUserId());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             // Connection was created but not opened.
             // Don't decrement user count.
@@ -189,8 +249,12 @@ void ConnectionCounter::closed(broker::Connection& connection) {
 
         // Decrement host in-use count.
         releaseLH(connectByHostMap,
+<<<<<<< HEAD
                   getClientHost(connection.getMgmtId()),
                   hostLimit);
+=======
+                  getClientHost(connection.getMgmtId()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
         // destroy connection progress indicator
         connectProgressMap.erase(eRef);
@@ -211,21 +275,49 @@ void ConnectionCounter::closed(broker::Connection& connection) {
 //  check total connections, connections from IP, connections by user and
 //  disallow if over any limit
 //
+<<<<<<< HEAD
 bool ConnectionCounter::approveConnection(const broker::Connection& connection)
 {
     const std::string& hostName(getClientHost(connection.getMgmtId()));
     const std::string& userName(              connection.getUserId());
+=======
+bool ConnectionCounter::approveConnection(
+        const broker::Connection& connection,
+        const std::string& userName,
+        bool enforcingConnectionQuotas,
+        uint16_t connectionUserQuota,
+        boost::shared_ptr<AclData> localdata)
+{
+    const std::string& hostName(getClientHost(connection.getMgmtId()));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     Mutex::ScopedLock locker(dataLock);
 
     // Bump state from CREATED to OPENED
     (void) countConnectionLH(connectProgressMap, connection.getMgmtId(),
+<<<<<<< HEAD
                              C_OPENED, false);
+=======
+                             C_OPENED, false, false);
+
+    // Run global black/white list check
+    sys::SocketAddress sa(hostName, "");
+    bool okByHostList(true);
+    std::string hostLimitText;
+    if (sa.isIp()) {
+        AclResult result = localdata->isAllowedConnection(userName, hostName, hostLimitText);
+        okByHostList = AclHelper::resultAllows(result);
+        if (okByHostList) {
+            QPID_LOG(trace, "ACL: ConnectionApprover host list " << hostLimitText);
+        }
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Approve total connections
     bool okTotal  = true;
     if (totalLimit > 0) {
         okTotal = totalCurrentConnections <= totalLimit;
+<<<<<<< HEAD
         if (!connection.isShadow()) {
             QPID_LOG(trace, "ACL ConnectionApprover totalLimit=" << totalLimit
                 << " curValue=" << totalCurrentConnections
@@ -336,6 +428,53 @@ void ConnectionCounter::setUserId(const broker::Connection& connection,
     }
 }
 
+=======
+        QPID_LOG(trace, "ACL ConnectionApprover totalLimit=" << totalLimit
+                 << " curValue=" << totalCurrentConnections
+                 << " result=" << (okTotal ? "allow" : "deny"));
+    }
+
+    // Approve by IP host connections
+    bool okByIP   = limitApproveLH(connectByHostMap, hostName, hostLimit, true);
+
+    // Count and Approve the connection by the user
+    bool okByUser = countConnectionLH(connectByNameMap, userName,
+                                      connectionUserQuota, true,
+                                      enforcingConnectionQuotas);
+
+    // Emit separate log for each disapproval
+    if (!okByHostList) {
+        QPID_LOG(error, "ACL: ConnectionApprover host list " << hostLimitText
+                 << " Connection refused.");
+    }
+    if (!okTotal) {
+        QPID_LOG(error, "Client max total connection count limit of " << totalLimit
+                 << " exceeded by '"
+                 << connection.getMgmtId() << "', user: '"
+                 << userName << "'. Connection refused");
+    }
+    if (!okByIP) {
+        QPID_LOG(error, "Client max per-host connection count limit of "
+                 << hostLimit << " exceeded by '"
+                 << connection.getMgmtId() << "', user: '"
+                 << userName << "'. Connection refused.");
+    }
+    if (!okByUser) {
+        QPID_LOG(error, "Client max per-user connection count limit of "
+                 << connectionUserQuota << " exceeded by '"
+                 << connection.getMgmtId() << "', user: '"
+                 << userName << "'. Connection refused.");
+    }
+
+    // Count/Event once for each disapproval
+    bool result = okByHostList && okTotal && okByIP && okByUser;
+    if (!result) {
+        acl.reportConnectLimit(userName, hostName);
+    }
+
+    return result;
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 //
 // getClientIp - given a connection's mgmtId return the client host part.
@@ -350,7 +489,16 @@ std::string ConnectionCounter::getClientHost(const std::string mgmtId)
         size_t colon = mgmtId.find_last_of(':');
         if (std::string::npos != colon) {
             // trailing colon found
+<<<<<<< HEAD
             return mgmtId.substr(hyphen+1, colon - hyphen - 1);
+=======
+            std::string tmp = mgmtId.substr(hyphen+1, colon - hyphen - 1);
+            // undecorate ipv6
+            if (tmp.length() >= 3 && tmp.find("[") == 0 && tmp.rfind("]") == tmp.length()-1)
+                tmp = tmp.substr(1, tmp.length()-2);
+            return tmp;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         } else {
             // colon not found - use everything after hyphen
             return mgmtId.substr(hyphen+1);
@@ -358,7 +506,10 @@ std::string ConnectionCounter::getClientHost(const std::string mgmtId)
     }
 
     // no hyphen found - use whole string
+<<<<<<< HEAD
     assert(false);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return mgmtId;
 }
 

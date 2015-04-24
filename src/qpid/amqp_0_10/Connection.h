@@ -61,6 +61,7 @@ class Connection  : public sys::ConnectionCodec,
     QPID_BROKER_EXTERN Connection(sys::OutputControl&, const std::string& id, bool isClient);
     QPID_BROKER_EXTERN void setInputHandler(std::auto_ptr<sys::ConnectionInputHandler> c);
     size_t decode(const char* buffer, size_t size);
+<<<<<<< HEAD
     size_t encode(const char* buffer, size_t size);
     bool isClosed() const;
     bool canEncode();
@@ -76,6 +77,18 @@ class Connection  : public sys::ConnectionCodec,
     /** Used by cluster code to set a special version on "update" connections. */
     // FIXME aconway 2009-07-30: find a cleaner mechanism for this.
     void setVersion(const framing::ProtocolVersion&);
+=======
+    size_t encode(char* buffer, size_t size);
+    bool isClosed() const;
+    bool canEncode();
+    void abort();
+    void connectionEstablished();
+    void activateOutput();
+    void closed();              // connection closed by peer.
+    void close();               // closing from this end.
+    void handle(framing::AMQFrame&);
+    framing::ProtocolVersion getVersion() const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::amqp_0_10

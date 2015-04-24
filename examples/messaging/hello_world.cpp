@@ -33,9 +33,15 @@ int main(int argc, char** argv) {
     std::string broker = argc > 1 ? argv[1] : "localhost:5672";
     std::string address = argc > 2 ? argv[2] : "amq.topic";
     std::string connectionOptions = argc > 3 ? argv[3] : "";
+<<<<<<< HEAD
     
     Connection connection(broker, connectionOptions);
     try {
+=======
+
+    try {
+        Connection connection(broker, connectionOptions);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         connection.open();
         Session session = connection.createSession();
 
@@ -47,12 +53,20 @@ int main(int argc, char** argv) {
         Message message = receiver.fetch(Duration::SECOND * 1);
         std::cout << message.getContent() << std::endl;
         session.acknowledge();
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         connection.close();
         return 0;
     } catch(const std::exception& error) {
         std::cerr << error.what() << std::endl;
+<<<<<<< HEAD
         connection.close();
         return 1;   
+=======
+        return 1;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }

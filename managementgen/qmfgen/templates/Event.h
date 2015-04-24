@@ -24,11 +24,18 @@
 /*MGEN:Root.Disclaimer*/
 
 #include "qpid/management/ManagementEvent.h"
+<<<<<<< HEAD
 #include "qmf/BrokerImportExport.h"
+=======
+/*MGEN:IF(Root.InBroker)*/
+#include "qmf/BrokerImportExport.h"
+/*MGEN:ENDIF*/
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qmf {
 /*MGEN:Event.OpenNamespaces*/
 
+<<<<<<< HEAD
 QPID_BROKER_CLASS_EXTERN class Event/*MGEN:Event.NameCap*/ : public ::qpid::management::ManagementEvent
 {
   private:
@@ -36,24 +43,48 @@ QPID_BROKER_CLASS_EXTERN class Event/*MGEN:Event.NameCap*/ : public ::qpid::mana
     static std::string packageName;
     static std::string eventName;
     static uint8_t md5Sum[MD5_LEN];
+=======
+/*MGEN:Root.ExternClass*/ class Event/*MGEN:Event.NameCap*/ : public ::qpid::management::ManagementEvent
+{
+  private:
+    static void writeSchema (std::string& schema);
+    static uint8_t md5Sum[MD5_LEN];
+    /*MGEN:Root.ExternMethod*/ static std::string packageName;
+    /*MGEN:Root.ExternMethod*/ static std::string eventName;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /*MGEN:Event.ArgDeclarations*/
 
   public:
     writeSchemaCall_t getWriteSchemaCall(void) { return writeSchema; }
 
+<<<<<<< HEAD
     QPID_BROKER_EXTERN Event/*MGEN:Event.NameCap*/(/*MGEN:Event.ConstructorArgs*/);
     QPID_BROKER_EXTERN ~Event/*MGEN:Event.NameCap*/() {};
+=======
+    /*MGEN:Root.ExternMethod*/ Event/*MGEN:Event.NameCap*/(/*MGEN:Event.ConstructorArgs*/);
+    /*MGEN:Root.ExternMethod*/ ~Event/*MGEN:Event.NameCap*/() {};
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     static void registerSelf(::qpid::management::ManagementAgent* agent);
     std::string& getPackageName() const { return packageName; }
     std::string& getEventName() const { return eventName; }
     uint8_t* getMd5Sum() const { return md5Sum; }
     uint8_t getSeverity() const { return /*MGEN:Event.Severity*/; }
+<<<<<<< HEAD
     QPID_BROKER_EXTERN void encode(std::string& buffer) const;
     QPID_BROKER_EXTERN void mapEncode(::qpid::types::Variant::Map& map) const;
 
     QPID_BROKER_EXTERN static bool match(const std::string& evt, const std::string& pkg);
+=======
+    /*MGEN:Root.ExternMethod*/ void encode(std::string& buffer) const;
+    /*MGEN:Root.ExternMethod*/ void mapEncode(::qpid::types::Variant::Map& map) const;
+
+    /*MGEN:Root.ExternMethod*/ static bool match(const std::string& evt, const std::string& pkg);
+    static std::pair<std::string,std::string> getFullName() {
+        return std::make_pair(packageName, eventName);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }/*MGEN:Event.CloseNamespaces*/

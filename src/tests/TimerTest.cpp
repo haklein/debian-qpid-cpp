@@ -21,6 +21,10 @@
  */
 #include "qpid/sys/Timer.h"
 #include "qpid/sys/Monitor.h"
+<<<<<<< HEAD
+=======
+#include "qpid/Options.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "unit_test.h"
 #include <math.h>
 #include <iostream>
@@ -81,7 +85,11 @@ class TestTask : public TimerTask
         uint64_t difference = _abs64(expected - actual);
 #elif defined(_WIN32)
         uint64_t difference = labs(expected - actual);
+<<<<<<< HEAD
 #elif defined(__SUNPRO_CC)
+=======
+#elif defined(__SUNPRO_CC) || defined (__IBMCPP__)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         uint64_t difference = llabs(expected - actual);
 #else
         uint64_t difference = abs(expected - actual);
@@ -127,6 +135,52 @@ QPID_AUTO_TEST_CASE(testGeneral)
     dynamic_pointer_cast<TestTask>(task4)->check(2);
 }
 
+<<<<<<< HEAD
+=======
+std::string toString(Duration d) { return boost::lexical_cast<std::string>(d); }
+Duration fromString(const std::string& str) { return boost::lexical_cast<Duration>(str); }
+
+QPID_AUTO_TEST_CASE(testOstreamInOut) {
+    std::string empty;
+    BOOST_CHECK_EQUAL(toString(Duration(int64_t(TIME_SEC))), "1s");
+    BOOST_CHECK_EQUAL(toString(Duration(int64_t(TIME_SEC*123.4))), "123.4s");
+    BOOST_CHECK_EQUAL(toString(Duration(int64_t(TIME_MSEC*123.4))), "123.4ms");
+    BOOST_CHECK_EQUAL(toString(Duration(int64_t(TIME_USEC*123.4))), "123.4us");
+    BOOST_CHECK_EQUAL(toString(Duration(int64_t(TIME_NSEC*123))), "123ns");
+
+    BOOST_CHECK_EQUAL(fromString("123.4"), Duration(int64_t(TIME_SEC*123.4)));
+    BOOST_CHECK_EQUAL(fromString("123.4s"), Duration(int64_t(TIME_SEC*123.4)));
+    BOOST_CHECK_EQUAL(fromString("123ms"), Duration(int64_t(TIME_MSEC*123)));
+    BOOST_CHECK_EQUAL(fromString("123us"), Duration(int64_t(TIME_USEC*123)));
+    BOOST_CHECK_EQUAL(fromString("123ns"), Duration(int64_t(TIME_NSEC*123)));
+
+    Duration d = 0;
+    std::istringstream i;
+    std::string s;
+
+    i.str("123x");
+    i >> d;
+    BOOST_CHECK(i.fail());
+    BOOST_CHECK_EQUAL(d, 0);
+    BOOST_CHECK_EQUAL(i.str(), "123x");
+
+    i.str("xxx");
+    i >> d;
+    BOOST_CHECK(i.fail());
+    BOOST_CHECK_EQUAL(d, 0);
+    BOOST_CHECK_EQUAL(i.str(), "xxx");
+}
+
+QPID_AUTO_TEST_CASE(testOptionParse) {
+    Options opts;
+    Duration interval;
+    opts.addOptions()("interval", optValue(interval, "I"), "blah");
+    const char *args[] = { "fakeexe", "--interval", "123.4" };
+    opts.parse(sizeof(args)/sizeof(args[0]), args);
+    BOOST_CHECK_EQUAL(interval, Duration(int64_t(TIME_SEC*123.4)));
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_SUITE_END()
 
 }} // namespace qpid::tests

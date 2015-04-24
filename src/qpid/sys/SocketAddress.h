@@ -42,6 +42,7 @@ public:
     QPID_COMMON_EXTERN SocketAddress& operator=(const SocketAddress&);
     QPID_COMMON_EXTERN ~SocketAddress();
 
+<<<<<<< HEAD
     QPID_COMMON_EXTERN bool nextAddress();
     QPID_COMMON_EXTERN std::string asString(bool numeric=true) const;
     QPID_COMMON_EXTERN void setAddrInfoPort(uint16_t port);
@@ -49,6 +50,36 @@ public:
     QPID_COMMON_EXTERN static std::string asString(::sockaddr const * const addr, size_t addrlen);
     QPID_COMMON_EXTERN static uint16_t getPort(::sockaddr const * const addr);
     
+=======
+    QPID_COMMON_EXTERN void firstAddress() const;
+    QPID_COMMON_EXTERN bool nextAddress() const;
+    QPID_COMMON_EXTERN std::string asString(bool numeric=true,
+                                            bool dispNameOnly=false,
+                                            bool hideDecoration=false) const;
+    QPID_COMMON_EXTERN std::string getHost() const;
+
+    QPID_COMMON_EXTERN static std::string asString(::sockaddr const * const addr,
+                                                   size_t addrlen,
+                                                   bool dispNameOnly=false,
+                                                   bool hideDecoration=false);
+    QPID_COMMON_EXTERN static uint16_t getPort(::sockaddr const * const addr);
+
+    QPID_COMMON_EXTERN bool isIp() const;
+
+    QPID_COMMON_EXTERN std::string comparisonDetails(const SocketAddress& ) const;
+
+    QPID_COMMON_EXTERN bool isComparable(const SocketAddress& saHi) const;
+
+    QPID_COMMON_EXTERN bool inRange(const SocketAddress& ,
+                                    const SocketAddress& ) const;
+    QPID_COMMON_EXTERN bool inRange(const struct addrinfo&,
+                                    const struct addrinfo&,
+                                    const struct addrinfo&) const;
+
+    QPID_COMMON_EXTERN bool compareAddresses(const struct addrinfo&,
+                                             const struct addrinfo&,
+                                             int&) const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 private:
     std::string host;

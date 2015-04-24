@@ -143,7 +143,11 @@ template <class T> void PollableQueue<T>::dispatch(PollableCondition& cond) {
 
 template <class T> void PollableQueue<T>::process() {
     // Called with lock held
+<<<<<<< HEAD
     while (!stopped && !queue.empty()) {
+=======
+    if (!stopped && !queue.empty()) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         assert(batch.empty());
         batch.swap(queue);
         typename Batch::const_iterator putBack;

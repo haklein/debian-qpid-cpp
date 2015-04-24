@@ -24,7 +24,11 @@
 
 #include "qpid/broker/ConnectionObserver.h"
 #include "qpid/sys/Mutex.h"
+<<<<<<< HEAD
 #include <boost/iterator/iterator_concepts.hpp>
+=======
+#include "qpid/acl/AclData.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <map>
 
@@ -77,12 +81,21 @@ private:
     bool countConnectionLH(connectCountsMap_t& theMap,
                            const std::string& theName,
                            uint16_t theLimit,
+<<<<<<< HEAD
                            bool emitLog);
 
     /** Release a connection */
     void releaseLH(connectCountsMap_t& theMap,
                    const std::string& theName,
                    uint16_t theLimit);
+=======
+                           bool emitLog,
+                           bool enforceLimit);
+
+    /** Release a connection */
+    void releaseLH(connectCountsMap_t& theMap,
+                   const std::string& theName);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 public:
     ConnectionCounter(Acl& acl, uint16_t nl, uint16_t hl, uint16_t tl);
@@ -93,8 +106,17 @@ public:
     void     closed(broker::Connection& connection);
 
     // Connection counting
+<<<<<<< HEAD
     bool approveConnection(const broker::Connection& conn);
     void setUserId(const broker::Connection& connection, const std::string& username);
+=======
+    bool approveConnection(const broker::Connection& conn,
+                           const std::string& userName,
+                           bool enforcingConnectionQuotas,
+                           uint16_t connectionLimit,
+                           boost::shared_ptr<AclData> localdata
+                          );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::ha

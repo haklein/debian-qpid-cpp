@@ -29,6 +29,7 @@ namespace framing {
 
 using namespace std;
 
+<<<<<<< HEAD
 static const size_t UNPARSED_SIZE=36; 
 
 Uuid::Uuid(bool unique) {
@@ -70,6 +71,15 @@ bool Uuid::isNull() const {
     // uuid_is_null that takes a non const argument
     return !!uuid_is_null(const_cast<uint8_t*>(data()));
 }
+=======
+Uuid::Uuid(bool unique):
+  qpid::types::Uuid(unique)
+{}
+
+Uuid::Uuid(const uint8_t* data):
+  qpid::types::Uuid(data)
+{}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void Uuid::encode(Buffer& buf) const {
     buf.putRawData(data(), size());
@@ -78,6 +88,7 @@ void Uuid::encode(Buffer& buf) const {
 void Uuid::decode(Buffer& buf) {
     if (buf.available() < size())
         throw IllegalArgumentException(QPID_MSG("Not enough data for UUID."));
+<<<<<<< HEAD
     buf.getRawData(c_array(), size());
 }
 
@@ -101,6 +112,11 @@ std::string Uuid::str() const {
     std::ostringstream os;
     os << *this;
     return os.str();
+=======
+
+    // Break qpid::types::Uuid encapsulation - Nasty, but efficient
+    buf.getRawData(const_cast<uint8_t*>(data()), size());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 }} // namespace qpid::framing

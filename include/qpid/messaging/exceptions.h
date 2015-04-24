@@ -40,9 +40,12 @@ struct QPID_MESSAGING_CLASS_EXTERN MessagingException : public qpid::types::Exce
 {
     QPID_MESSAGING_EXTERN MessagingException(const std::string& msg);
     QPID_MESSAGING_EXTERN virtual ~MessagingException() throw();
+<<<<<<< HEAD
 
     qpid::types::Variant::Map detail;
     //TODO: override what() to include detail if present
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 /**
@@ -140,6 +143,18 @@ struct QPID_MESSAGING_CLASS_EXTERN SendError : public SenderError
 };
 
 /**
+<<<<<<< HEAD
+=======
+ * Thrown on a synchronous send to indicate that the message being
+ * sent was rejected.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN MessageRejected : public SendError
+{
+    QPID_MESSAGING_EXTERN MessageRejected(const std::string&);
+};
+
+/**
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Thrown to indicate that the sender attempted to send a message that
  * would result in the target node on the peer exceeding a
  * preconfigured capacity.
@@ -149,19 +164,52 @@ struct QPID_MESSAGING_CLASS_EXTERN TargetCapacityExceeded : public SendError
     QPID_MESSAGING_EXTERN TargetCapacityExceeded(const std::string&);
 };
 
+<<<<<<< HEAD
+=======
+/**
+ * Thrown to indicate that the locally configured sender capacity has
+ * been reached, and thus no further messages can be put on the replay
+ * buffer.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN OutOfCapacity : public SendError
+{
+    QPID_MESSAGING_EXTERN OutOfCapacity(const std::string&);
+};
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 struct QPID_MESSAGING_CLASS_EXTERN SessionError : public MessagingException
 {
     QPID_MESSAGING_EXTERN SessionError(const std::string&);
 };
 
+<<<<<<< HEAD
+=======
+/**
+ * Thrown to indicate that the sesion was closed by this client (probably in
+ * a different thread) whilst we were waiting on it. This is not really an
+ * error condition but there is no other way to return this.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN SessionClosed : public SessionError
+{
+  QPID_MESSAGING_EXTERN SessionClosed();
+};
+
+/** Base class for transactional errors */
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 struct QPID_MESSAGING_CLASS_EXTERN TransactionError : public SessionError
 {
     QPID_MESSAGING_EXTERN TransactionError(const std::string&);
 };
 
 /**
+<<<<<<< HEAD
  * Thrown on Session::commit() if reconnection results in the
  * transaction being automatically aborted.
+=======
+ * The transaction was automatically rolled back.  This could be due to an error
+ * on the broker, such as a store failure, or a connection failure during the
+ * transaction
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  */
 struct QPID_MESSAGING_CLASS_EXTERN TransactionAborted : public TransactionError
 {
@@ -169,6 +217,19 @@ struct QPID_MESSAGING_CLASS_EXTERN TransactionAborted : public TransactionError
 };
 
 /**
+<<<<<<< HEAD
+=======
+ * The outcome of the transaction on the broker, commit or roll-back, is not
+ * known. This occurs when the connection fails after we sent the commit but
+ * before we received a result.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN TransactionUnknown : public TransactionError
+{
+    QPID_MESSAGING_EXTERN TransactionUnknown(const std::string&);
+};
+
+/**
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Thrown to indicate that the application attempted to do something
  * for which it was not authorised by its peer.
  */
@@ -182,6 +243,14 @@ struct QPID_MESSAGING_CLASS_EXTERN ConnectionError : public MessagingException
     QPID_MESSAGING_EXTERN ConnectionError(const std::string&);
 };
 
+<<<<<<< HEAD
+=======
+struct QPID_MESSAGING_CLASS_EXTERN AuthenticationFailure : public ConnectionError
+{
+    QPID_MESSAGING_EXTERN AuthenticationFailure(const std::string&);
+};
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /**
  * Thrown to indicate loss of underlying connection. When
  * auto-reconnect is used this will be caught by the library and used

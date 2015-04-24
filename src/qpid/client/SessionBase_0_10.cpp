@@ -73,7 +73,11 @@ uint32_t SessionBase_0_10::timeout(uint32_t seconds) { return impl->setTimeout(s
 
 SessionId SessionBase_0_10::getId() const { return impl->getId(); }
 
+<<<<<<< HEAD
 bool SessionBase_0_10::isValid() const { return impl; }
+=======
+bool SessionBase_0_10::isValid() const { return !!impl; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 Connection SessionBase_0_10::getConnection()
 {

@@ -18,7 +18,18 @@
 # under the License.
 #
 
+<<<<<<< HEAD
 import optparse, time, qpid.messaging, re
+=======
+import optparse, time, re, os
+
+try:
+    import qpid_messaging as qm
+except ImportError:
+    qpid_messaging = None
+    import qpid.messaging as qm
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 from threading import Thread
 from subprocess import Popen, PIPE, STDOUT
 
@@ -46,6 +57,11 @@ op.add_option("--content-size", default=1024, type="int", metavar="BYTES",
               help="message size in bytes (default %default)")
 op.add_option("--ack-frequency", default=100, metavar="N", type="int",
               help="receiver ack's every N messages, 0 means unconfirmed (default %default)")
+<<<<<<< HEAD
+=======
+op.add_option("--tx", default=0, metavar="N", type="int",
+              help="Transaction batch size, 0 means no transactions")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 op.add_option("--no-report-header", dest="report_header", default=True,
               action="store_false", help="don't print header on report")
 op.add_option("--summarize", default=False, action="store_true",
@@ -69,14 +85,28 @@ op.add_option("--connection-options", type="str",
               help="Connection options for senders & receivers")
 op.add_option("--durable", default=False, action="store_true",
               help="Use durable queues and messages")
+<<<<<<< HEAD
+=======
+op.add_option("-t", "--timeout", default=1.0, type="float", metavar="SECONDS",
+              help="Timeout for fetch operations (default %default)")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 op.add_option("--save-received", default=False, action="store_true",
               help="Save received message content to files <queuename>-receiver-<n>.msg")
 op.add_option("--verbose", default=False, action="store_true",
               help="Show commands executed")
+<<<<<<< HEAD
 op.add_option("--no-delete", default=False, action="store_true",
               help="Don't delete the test queues.")
 op.add_option("--fill-drain", default=False, action="store_true",
               help="First fill the queues, then drain them")
+=======
+op.add_option("--fill-drain", default=False, action="store_true",
+              help="First fill the queues, then drain them")
+op.add_option("--qpid-send-path", default="", type="str", metavar="PATH",
+              help="path to qpid-send binary")
+op.add_option("--qpid-receive-path", default="", type="str", metavar="PATH",
+              help="path to qpid-receive binary")
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 single_quote_re = re.compile("'")
 def posix_quote(string):
@@ -115,7 +145,11 @@ def start_receive(queue, index, opts, ready_queue, broker, host):
     messages = msg_total/opts.receivers;
     if (index < msg_total%opts.receivers): messages += 1
     if (messages == 0): return None
+<<<<<<< HEAD
     command = ["qpid-receive",
+=======
+    command = [os.path.join(opts.qpid_receive_path, "qpid-receive"),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                "-b", broker,
                "-a", address,
                "-m", str(messages),
@@ -125,7 +159,12 @@ def start_receive(queue, index, opts, ready_queue, broker, host):
                "--report-total",
                "--ack-frequency", str(opts.ack_frequency),
                "--ready-address", "%s;{create:always}"%ready_queue,
+<<<<<<< HEAD
                "--report-header=no"
+=======
+               "--report-header=no",
+               "--tx=%s" % opts.tx
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                ]
     if opts.save_received:
         command += ["--save-content=%s-receiver-%s.msg"%(queue,index)]
@@ -138,7 +177,11 @@ def start_receive(queue, index, opts, ready_queue, broker, host):
 
 def start_send(queue, opts, broker, host):
     address="%s;{%s}"%(queue,",".join(opts.send_option + ["create:always"]))
+<<<<<<< HEAD
     command = ["qpid-send",
+=======
+    command = [os.path.join(opts.qpid_send_path, "qpid-send"),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                "-b", broker,
                "-a", address,
                "--messages", str(opts.messages),
@@ -148,7 +191,12 @@ def start_send(queue, opts, broker, host):
                "--report-header=no",
                "--timestamp=%s"%(opts.timestamp and "yes" or "no"),
                "--sequence=%s"%(opts.sequence and "yes" or "no"),
+<<<<<<< HEAD
                "--durable", str(opts.durable)
+=======
+               "--durable=%d" % opts.durable,
+               "--tx=%s" % opts.tx
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                ]
     command += opts.send_arg
     if opts.connection_options:
@@ -166,6 +214,7 @@ def first_line(p):
         raise Exception("Process exit %d: %s"%(p.returncode, error_msg(out,err)))
     return out.split("\n")[0]
 
+<<<<<<< HEAD
 def recreate_queues(queues, brokers, no_delete, opts):
     c = qpid.messaging.Connection(brokers[0])
     c.open()
@@ -177,6 +226,56 @@ def recreate_queues(queues, brokers, no_delete, opts):
         address = "%s;{%s}"%(q, ",".join(opts.create_option + ["create:always"]))
         if opts.verbose: print "Creating", address
         s.sender(address)
+=======
+def connect(broker, opts):
+    if opts.connection_options:
+        copts = dict([kv.strip().split(":") for kv in opts.connection_options.strip("{}").split(",")])
+    else:
+        copts = {}
+    return qm.Connection.establish(broker, **copts)
+
+def drain(queue, session, opts):
+    """
+    Drain a queue to make sure it is empty. Throw away the messages.
+    """
+    if opts.verbose: print "Draining", queue
+    r = session.receiver(queue, capacity=1000)
+    n = 0
+    try:
+        while True:
+            # FIXME aconway 2014-11-21: activemq broker does not respect the drain flag
+            # so fetch on an empty queue will hang forever, use get with timeout instead.
+            # r.fetch(timeout=0)
+            m = qm.Message()
+            r.get(timeout=opts.timeout)
+            n += 1
+            if n % 500 == 0: r.session.acknowledge()
+        r.session.acknowledge()
+    except qm.Empty:
+        pass
+    r.close()
+    if opts.verbose: print "Drained", queue, n
+
+def clear_queues(queues, brokers, opts):
+    c = connect(brokers[0], opts)
+    for q in queues:
+        s = c.session()
+        need_drain = False
+        try:
+            s.sender("%s;{delete:always}"%(q)).close()
+            if opts.verbose: print "Deleted", q
+        except qm.NotFound:
+            s = c.session()
+        except qm.AddressError:
+            need_drain = True # AMQP 1.0 does not support delete, drain instead.
+            s = c.session()
+        address_opts = ["create:always"]
+        if opts.durable: address_opts += ["node:{durable:true}"]
+        address = "%s;{%s}"%(q, ",".join(opts.create_option + address_opts))
+        if opts.verbose: print "Declaring", address
+        s.sender(address)
+        if need_drain: drain(q, s, opts)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     c.close()
 
 def print_header(timestamp):
@@ -221,6 +320,7 @@ def print_summary(send_stats, recv_stats, total_tp):
 
 class ReadyReceiver:
     """A receiver for ready messages"""
+<<<<<<< HEAD
     def __init__(self, queue, broker):
         self.connection = qpid.messaging.Connection(broker)
         self.connection.open()
@@ -228,12 +328,25 @@ class ReadyReceiver:
             "%s;{create:receiver,delete:receiver,node:{durable:false}}"%(queue))
         self.receiver.session.sync()
         self.timeout=10
+=======
+    def __init__(self, queue, broker, opts):
+        self.connection = connect(broker, opts)
+        self.receiver = self.connection.session().receiver(queue)
+        self.receiver.session.sync()
+        self.timeout=opts.timeout
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     def wait(self, receivers):
         try:
             for i in receivers: self.receiver.fetch(self.timeout)
+<<<<<<< HEAD
             self.connection.close()
         except qpid.messaging.Empty:
+=======
+            self.receiver.session.acknowledge()
+            self.connection.close()
+        except qm.Empty:
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             for r in receivers:
                 if (r.poll() is not None):
                     out,err=r.communicate()
@@ -271,8 +384,13 @@ def main():
     queues = ["%s-%s"%(opts.queue_name, i) for i in xrange(opts.queues)]
     try:
         for i in xrange(opts.repeat):
+<<<<<<< HEAD
             recreate_queues(queues, opts.broker, opts.no_delete, opts)
             ready_receiver = ReadyReceiver(ready_queue, opts.broker[0])
+=======
+            clear_queues(queues+[ready_queue], opts.broker, opts)
+            ready_receiver = ReadyReceiver(ready_queue, opts.broker[0], opts)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
             def start_receivers():
                 return [ start_receive(q, j, opts, ready_queue, brokers.next(), client_hosts.next())

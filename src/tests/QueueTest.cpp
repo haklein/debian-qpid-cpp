@@ -30,7 +30,10 @@
 #include "qpid/broker/ExchangeRegistry.h"
 #include "qpid/broker/QueueRegistry.h"
 #include "qpid/broker/NullMessageStore.h"
+<<<<<<< HEAD
 #include "qpid/broker/ExpiryPolicy.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/DeliveryProperties.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/MessageTransferBody.h"
@@ -38,8 +41,15 @@
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/reply_exceptions.h"
+<<<<<<< HEAD
 #include "qpid/broker/QueuePolicy.h"
 #include "qpid/broker/QueueFlowLimit.h"
+=======
+#include "qpid/broker/QueueFlowLimit.h"
+#include "qpid/broker/QueueSettings.h"
+#include "qpid/sys/Thread.h"
+#include "qpid/sys/Timer.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #include <iostream>
 #include <vector>
@@ -56,35 +66,58 @@ using namespace qpid::sys;
 
 namespace qpid {
 namespace tests {
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class TestConsumer : public virtual Consumer{
 public:
     typedef boost::shared_ptr<TestConsumer> shared_ptr;
 
+<<<<<<< HEAD
     QueuedMessage last;
     bool received;
     TestConsumer(std::string name="test", bool acquire = true):Consumer(name, acquire), received(false) {};
 
     virtual bool deliver(QueuedMessage& msg){
         last = msg;
+=======
+    QueueCursor lastCursor;
+    Message lastMessage;
+    bool received;
+    TestConsumer(std::string name="test", bool acquire = true) : Consumer(name, acquire ? CONSUMER : BROWSER, ""), received(false) {};
+
+    virtual bool deliver(const QueueCursor& cursor, const Message& message){
+        lastCursor = cursor;
+        lastMessage = message;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         received = true;
         return true;
     };
     void notify() {}
     void cancel() {}
+<<<<<<< HEAD
     void acknowledged(const QueuedMessage&) {}
+=======
+    void acknowledged(const DeliveryRecord&) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     OwnershipToken* getSession() { return 0; }
 };
 
 class FailOnDeliver : public Deliverable
 {
+<<<<<<< HEAD
     boost::intrusive_ptr<Message> msg;
+=======
+    Message msg;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 public:
     FailOnDeliver() : msg(MessageUtils::createMessage()) {}
     void deliverTo(const boost::shared_ptr<Queue>& queue)
     {
         throw Exception(QPID_MSG("Invalid delivery to " << queue->getName()));
     }
+<<<<<<< HEAD
     Message& getMessage() { return *(msg.get()); }
 };
 
@@ -240,12 +273,23 @@ QPID_AUTO_TEST_CASE(testDequeue){
 
 }
 
+=======
+    Message& getMessage() { return msg; }
+};
+
+QPID_AUTO_TEST_SUITE(QueueTestSuite)
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testBound){
     //test the recording of bindings, and use of those to allow a queue to be unbound
     string key("my-key");
     FieldTable args;
 
+<<<<<<< HEAD
     Queue::shared_ptr queue(new Queue("my-queue", true));
+=======
+    Queue::shared_ptr queue(new Queue("my-queue"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ExchangeRegistry exchanges;
     //establish bindings from exchange->queue and notify the queue as it is bound:
     Exchange::shared_ptr exchange1 = exchanges.declare("my-exchange-1", "direct").first;
@@ -273,6 +317,7 @@ QPID_AUTO_TEST_CASE(testBound){
     exchange3->route(deliverable);
 }
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testPersistLastNodeStanding){
     client::QueueOptions args;
     args.setPersistLastNode();
@@ -502,10 +547,52 @@ QPID_AUTO_TEST_CASE(testLVQOrdering){
     received = queue->get().payload;
     BOOST_CHECK_EQUAL(msg7.get(), received.get());
 
+=======
+QPID_AUTO_TEST_CASE(testLVQ){
+
+    QueueSettings settings;
+    string key="key";
+    settings.lvqKey = key;
+    QueueFactory factory;
+    Queue::shared_ptr q(factory.create("my-queue", settings));
+
+    const char* values[] = { "a", "b", "c", "a"};
+    for (size_t i = 0; i < sizeof(values)/sizeof(values[0]); ++i) {
+        qpid::types::Variant::Map properties;
+        properties[key] = values[i];
+        q->deliver(MessageUtils::createMessage(properties, boost::lexical_cast<string>(i+1)));
+    }
+    BOOST_CHECK_EQUAL(q->getMessageCount(), 3u);
+
+    TestConsumer::shared_ptr c(new TestConsumer("test", true));
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("2"), c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("3"), c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("4"), c->lastMessage.getContent());
+
+
+    const char* values2[] = { "a", "b", "c"};
+    for (size_t i = 0; i < sizeof(values2)/sizeof(values2[0]); ++i) {
+        qpid::types::Variant::Map properties;
+        properties[key] = values[i];
+        q->deliver(MessageUtils::createMessage(properties, boost::lexical_cast<string>(i+5)));
+    }
+    BOOST_CHECK_EQUAL(q->getMessageCount(), 3u);
+
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("5"), c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("6"), c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(std::string("7"), c->lastMessage.getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_CASE(testLVQEmptyKey){
 
+<<<<<<< HEAD
     client::QueueOptions args;
     // set queue mode
     args.setOrdering(client::LVQ);
@@ -683,13 +770,32 @@ QPID_AUTO_TEST_CASE(testLVQRecover){
     queue1->setLastNodeFailure();
     BOOST_CHECK_EQUAL(testStore.enqCnt, 2u);
     BOOST_CHECK_EQUAL(testStore.deqCnt, 1u);
+=======
+    QueueSettings settings;
+    string key="key";
+    settings.lvqKey = key;
+    QueueFactory factory;
+    Queue::shared_ptr q(factory.create("my-queue", settings));
+
+
+    qpid::types::Variant::Map properties;
+    properties["key"] = "a";
+    q->deliver(MessageUtils::createMessage(properties, "one"));
+    properties.clear();
+    q->deliver(MessageUtils::createMessage(properties, "two"));
+    BOOST_CHECK_EQUAL(q->getMessageCount(), 2u);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void addMessagesToQueue(uint count, Queue& queue, uint oddTtl = 200, uint evenTtl = 0)
 {
     for (uint i = 0; i < count; i++) {
+<<<<<<< HEAD
         intrusive_ptr<Message> m = createMessage("exchange", "key", i % 2 ? oddTtl : evenTtl);
         m->computeExpiration(new broker::ExpiryPolicy);
+=======
+        Message m = MessageUtils::createMessage("exchange", "key", i % 2 ? oddTtl : evenTtl);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         queue.deliver(m);
     }
 }
@@ -704,6 +810,7 @@ QPID_AUTO_TEST_CASE(testPurgeExpired) {
 }
 
 QPID_AUTO_TEST_CASE(testQueueCleaner) {
+<<<<<<< HEAD
     Timer timer;
     QueueRegistry queues;
     Queue::shared_ptr queue = queues.declare("my-queue").first;
@@ -711,11 +818,23 @@ QPID_AUTO_TEST_CASE(testQueueCleaner) {
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 10u);
 
     QueueCleaner cleaner(queues, &timer);
+=======
+    boost::shared_ptr<Poller> poller(new Poller);
+    Thread runner(poller.get());
+    Timer timer;
+    QueueRegistry queues;
+    Queue::shared_ptr queue = queues.declare("my-queue", QueueSettings()).first;
+    addMessagesToQueue(10, *queue, 200, 400);
+    BOOST_CHECK_EQUAL(queue->getMessageCount(), 10u);
+
+    QueueCleaner cleaner(queues, poller, &timer);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     cleaner.start(100 * qpid::sys::TIME_MSEC);
     ::usleep(300*1000);
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 5u);
     ::usleep(300*1000);
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 0u);
+<<<<<<< HEAD
 }
 
 
@@ -731,30 +850,80 @@ namespace {
         results.push_back(c->last);
         std::string group = c->last.payload->getProperties<MessageProperties>()->getApplicationHeaders().getAsString("GROUP-ID");
         int id = c->last.payload->getProperties<MessageProperties>()->getApplicationHeaders().getAsInt("MY-ID");
+=======
+    poller->shutdown();
+    runner.join();
+}
+namespace {
+int getIntProperty(const Message& message, const std::string& key)
+{
+    qpid::types::Variant v = message.getProperty(key);
+    int i(0);
+    if (!v.isVoid()) i = v;
+    return i;
+}
+// helper for group tests
+void verifyAcquire( Queue::shared_ptr queue,
+                    TestConsumer::shared_ptr c,
+                    std::deque<QueueCursor>& results,
+                    const std::string& expectedGroup,
+                    const int expectedId )
+{
+    bool success = queue->dispatch(c);
+    BOOST_CHECK(success);
+    if (success) {
+        results.push_back(c->lastCursor);
+        std::string group = c->lastMessage.getPropertyAsString("GROUP-ID");
+        int id = getIntProperty(c->lastMessage, "MY-ID");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         BOOST_CHECK_EQUAL( group, expectedGroup );
         BOOST_CHECK_EQUAL( id, expectedId );
     }
 }
 
+<<<<<<< HEAD
+=======
+Message createGroupMessage(int id, const std::string& group)
+{
+    qpid::types::Variant::Map properties;
+    properties["GROUP-ID"] = group;
+    properties["MY-ID"] = id;
+    return MessageUtils::createMessage(properties);
+}
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     //
     // Verify that consumers of grouped messages own the groups once a message is acquired,
     // and release the groups once all acquired messages have been dequeued or requeued
     //
+<<<<<<< HEAD
     FieldTable args;
     Queue::shared_ptr queue(new Queue("my_queue", true));
     args.setString("qpid.group_header_key", "GROUP-ID");
     args.setInt("qpid.shared_msg_group", 1);
     queue->configure(args);
+=======
+    QueueSettings settings;
+    settings.shareGroups = 1;
+    settings.groupKey = "GROUP-ID";
+    QueueFactory factory;
+    Queue::shared_ptr queue(factory.create("my_queue", settings));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     std::string groups[] = { std::string("a"), std::string("a"), std::string("a"),
                              std::string("b"), std::string("b"), std::string("b"),
                              std::string("c"), std::string("c"), std::string("c") };
     for (int i = 0; i < 9; ++i) {
+<<<<<<< HEAD
         intrusive_ptr<Message> msg = createMessage("e", "A");
         msg->insertCustomProperty("GROUP-ID", groups[i]);
         msg->insertCustomProperty("MY-ID", i);
         queue->deliver(msg);
+=======
+        queue->deliver(createGroupMessage(i, groups[i]));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     // Queue = a-0, a-1, a-2, b-3, b-4, b-5, c-6, c-7, c-8...
@@ -768,8 +937,13 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     queue->consume(c1);
     queue->consume(c2);
 
+<<<<<<< HEAD
     std::deque<QueuedMessage> dequeMeC1;
     std::deque<QueuedMessage> dequeMeC2;
+=======
+    std::deque<QueueCursor> dequeMeC1;
+    std::deque<QueueCursor> dequeMeC2;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 
     verifyAcquire(queue, c1, dequeMeC1, "a", 0 );  // c1 now owns group "a" (acquire a-0)
@@ -828,9 +1002,15 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     // Owners= ^C2, ^C2, ^C1, ^C1, ^C2, ^C2
 
     // what happens if C-2 "requeues" a-1 and a-2?
+<<<<<<< HEAD
     queue->requeue( dequeMeC2.front() );
     dequeMeC2.pop_front();
     queue->requeue( dequeMeC2.front() );
+=======
+    queue->release( dequeMeC2.front() );
+    dequeMeC2.pop_front();
+    queue->release( dequeMeC2.front() );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     dequeMeC2.pop_front();  // now just has c-7 acquired
 
     // Queue = a-1, a-2, b-4, b-5, c-7, c-8...
@@ -855,9 +1035,15 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     gotOne = queue->dispatch(c2);
     BOOST_CHECK( !gotOne );
 
+<<<<<<< HEAD
     // requeue all of C1's acquired messages, then cancel C1
     while (!dequeMeC1.empty()) {
         queue->requeue(dequeMeC1.front());
+=======
+    // release all of C1's acquired messages, then cancel C1
+    while (!dequeMeC1.empty()) {
+        queue->release(dequeMeC1.front());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         dequeMeC1.pop_front();
     }
     queue->cancel(c1);
@@ -877,7 +1063,12 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     // Owners= ---, ---, ---
 
     TestConsumer::shared_ptr c3(new TestConsumer("C3"));
+<<<<<<< HEAD
     std::deque<QueuedMessage> dequeMeC3;
+=======
+    queue->consume(c3);
+    std::deque<QueueCursor> dequeMeC3;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     verifyAcquire(queue, c3, dequeMeC3, "a", 2 );
     verifyAcquire(queue, c2, dequeMeC2, "b", 4 );
@@ -897,11 +1088,15 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
 
     // Queue = a-2,
     // Owners= ^C3,
+<<<<<<< HEAD
 
     intrusive_ptr<Message> msg = createMessage("e", "A");
     msg->insertCustomProperty("GROUP-ID", "a");
     msg->insertCustomProperty("MY-ID", 9);
     queue->deliver(msg);
+=======
+    queue->deliver(createGroupMessage(9, "a"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Queue = a-2, a-9
     // Owners= ^C3, ^C3
@@ -909,10 +1104,14 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumer) {
     gotOne = queue->dispatch(c2);
     BOOST_CHECK( !gotOne );
 
+<<<<<<< HEAD
     msg = createMessage("e", "A");
     msg->insertCustomProperty("GROUP-ID", "b");
     msg->insertCustomProperty("MY-ID", 10);
     queue->deliver(msg);
+=======
+    queue->deliver(createGroupMessage(10, "b"));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Queue = a-2, a-9, b-10
     // Owners= ^C3, ^C3, ----
@@ -933,6 +1132,7 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumerDefaults) {
     // Verify that the same default group name is automatically applied to messages that
     // do not specify a group name.
     //
+<<<<<<< HEAD
     FieldTable args;
     Queue::shared_ptr queue(new Queue("my_queue", true));
     args.setString("qpid.group_header_key", "GROUP-ID");
@@ -944,6 +1144,19 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumerDefaults) {
         // no "GROUP-ID" header
         msg->insertCustomProperty("MY-ID", i);
         queue->deliver(msg);
+=======
+    QueueSettings settings;
+    settings.shareGroups = 1;
+    settings.groupKey = "GROUP-ID";
+    QueueFactory factory;
+    Queue::shared_ptr queue(factory.create("my_queue", settings));
+
+    for (int i = 0; i < 3; ++i) {
+        qpid::types::Variant::Map properties;
+        // no "GROUP-ID" header
+        properties["MY-ID"] = i;
+        queue->deliver(MessageUtils::createMessage(properties));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     // Queue = 0, 1, 2
@@ -956,20 +1169,34 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumerDefaults) {
     queue->consume(c1);
     queue->consume(c2);
 
+<<<<<<< HEAD
     std::deque<QueuedMessage> dequeMeC1;
     std::deque<QueuedMessage> dequeMeC2;
 
     queue->dispatch(c1);    // c1 now owns default group (acquired 0)
     dequeMeC1.push_back(c1->last);
     int id = c1->last.payload->getProperties<MessageProperties>()->getApplicationHeaders().getAsInt("MY-ID");
+=======
+    std::deque<QueueCursor> dequeMeC1;
+    std::deque<QueueCursor> dequeMeC2;
+
+    queue->dispatch(c1);    // c1 now owns default group (acquired 0)
+    dequeMeC1.push_back(c1->lastCursor);
+    int id = getIntProperty(c1->lastMessage, "MY-ID");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK_EQUAL( id, 0 );
 
     bool gotOne = queue->dispatch(c2);  // c2 should get nothing
     BOOST_CHECK( !gotOne );
 
     queue->dispatch(c1);    // c1 now acquires 1
+<<<<<<< HEAD
     dequeMeC1.push_back(c1->last);
     id = c1->last.payload->getProperties<MessageProperties>()->getApplicationHeaders().getAsInt("MY-ID");
+=======
+    dequeMeC1.push_back(c1->lastCursor);
+    id = getIntProperty(c1->lastMessage, "MY-ID");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK_EQUAL( id, 1 );
 
     gotOne = queue->dispatch(c2);  // c2 should still get nothing
@@ -982,7 +1209,11 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumerDefaults) {
 
     // now default group should be available...
     queue->dispatch(c2);    // c2 now owns default group (acquired 2)
+<<<<<<< HEAD
     id = c2->last.payload->getProperties<MessageProperties>()->getApplicationHeaders().getAsInt("MY-ID");
+=======
+    id = c2->lastMessage.getProperty("MY-ID");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK_EQUAL( id, 2 );
 
     gotOne = queue->dispatch(c1);  // c1 should get nothing
@@ -992,6 +1223,7 @@ QPID_AUTO_TEST_CASE(testGroupsMultiConsumerDefaults) {
     queue->cancel(c2);
 }
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testMultiQueueLastNode){
 
     TestMessageStoreOC  testStore;
@@ -1416,15 +1648,22 @@ QPID_AUTO_TEST_CASE(testFlowToDiskBlocking){
     BOOST_CHECK_EQUAL(5u, tq9->getMessageCount());
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 QPID_AUTO_TEST_CASE(testSetPositionFifo) {
     Queue::shared_ptr q(new Queue("my-queue", true));
     BOOST_CHECK_EQUAL(q->getPosition(), SequenceNumber(0));
     for (int i = 0; i < 10; ++i)
+<<<<<<< HEAD
         q->deliver(contentMessage(boost::lexical_cast<string>(i+1)));
+=======
+        q->deliver(MessageUtils::createMessage(qpid::types::Variant::Map(), boost::lexical_cast<string>(i+1)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Verify the front of the queue
     TestConsumer::shared_ptr c(new TestConsumer("test", false)); // Don't acquire
     BOOST_CHECK(q->dispatch(c));
+<<<<<<< HEAD
     BOOST_CHECK_EQUAL(1u, c->last.position); // Numbered from 1
     BOOST_CHECK_EQUAL("1", getContent(c->last.payload));
     // Verify the back of the queue
@@ -1432,12 +1671,20 @@ QPID_AUTO_TEST_CASE(testSetPositionFifo) {
     BOOST_CHECK_EQUAL(10u, q->getPosition());
     BOOST_CHECK(q->find(q->getPosition(), qm)); // Back of the queue
     BOOST_CHECK_EQUAL("10", getContent(qm.payload));
+=======
+    BOOST_CHECK_EQUAL(1u, c->lastMessage.getSequence()); // Numbered from 1
+    BOOST_CHECK_EQUAL("1", c->lastMessage.getContent());
+
+    // Verify the back of the queue
+    BOOST_CHECK_EQUAL(10u, q->getPosition());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK_EQUAL(10u, q->getMessageCount());
 
     // Using setPosition to introduce a gap in sequence numbers.
     q->setPosition(15);
     BOOST_CHECK_EQUAL(10u, q->getMessageCount());
     BOOST_CHECK_EQUAL(15u, q->getPosition());
+<<<<<<< HEAD
     BOOST_CHECK(q->find(10, qm)); // Back of the queue
     BOOST_CHECK_EQUAL("10", getContent(qm.payload));
     q->deliver(contentMessage("16"));
@@ -1448,10 +1695,22 @@ QPID_AUTO_TEST_CASE(testSetPositionFifo) {
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(16u, c->last.position);
     BOOST_CHECK_EQUAL("16", getContent(c->last.payload));
+=======
+    q->deliver(MessageUtils::createMessage(qpid::types::Variant::Map(), "16"));
+
+    q->seek(*c, Queue::MessagePredicate(), 9);
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(10u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("10", c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(16u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("16", c->lastMessage.getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Using setPosition to trunkcate the queue
     q->setPosition(5);
     BOOST_CHECK_EQUAL(5u, q->getMessageCount());
+<<<<<<< HEAD
     q->deliver(contentMessage("6a"));
     c->setPosition(4);
     BOOST_CHECK(q->dispatch(c));
@@ -1460,10 +1719,22 @@ QPID_AUTO_TEST_CASE(testSetPositionFifo) {
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(6u, c->last.position);
     BOOST_CHECK_EQUAL("6a", getContent(c->last.payload));
+=======
+    q->deliver(MessageUtils::createMessage(qpid::types::Variant::Map(), "6a"));
+    c = boost::shared_ptr<TestConsumer>(new TestConsumer("test", false)); // Don't acquire
+    q->seek(*c, Queue::MessagePredicate(), 4);
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(5u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("5", c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(6u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("6a", c->lastMessage.getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK(!q->dispatch(c)); // No more messages.
 }
 
 QPID_AUTO_TEST_CASE(testSetPositionLvq) {
+<<<<<<< HEAD
     Queue::shared_ptr q(new Queue("my-queue", true));
     string key="key";
     framing::FieldTable args;
@@ -1475,11 +1746,25 @@ QPID_AUTO_TEST_CASE(testSetPositionLvq) {
         intrusive_ptr<Message> m = contentMessage(boost::lexical_cast<string>(i+1));
         m->insertCustomProperty(key, values[i]);
         q->deliver(m);
+=======
+    QueueSettings settings;
+    string key="key";
+    settings.lvqKey = key;
+    QueueFactory factory;
+    Queue::shared_ptr q(factory.create("my-queue", settings));
+
+    const char* values[] = { "a", "b", "c", "a", "b", "c" };
+    for (size_t i = 0; i < sizeof(values)/sizeof(values[0]); ++i) {
+        qpid::types::Variant::Map properties;
+        properties[key] = values[i];
+        q->deliver(MessageUtils::createMessage(properties, boost::lexical_cast<string>(i+1)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     BOOST_CHECK_EQUAL(3u, q->getMessageCount());
     // Verify the front of the queue
     TestConsumer::shared_ptr c(new TestConsumer("test", false)); // Don't acquire
     BOOST_CHECK(q->dispatch(c));
+<<<<<<< HEAD
     BOOST_CHECK_EQUAL(4u, c->last.position); // Numbered from 1
     BOOST_CHECK_EQUAL("4", getContent(c->last.payload));
     // Verify the back of the queue
@@ -1492,10 +1777,24 @@ QPID_AUTO_TEST_CASE(testSetPositionLvq) {
     c->setPosition(4);
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(5u, c->last.position); // Numbered from 1
+=======
+    BOOST_CHECK_EQUAL(4u, c->lastMessage.getSequence()); // Numbered from 1
+    BOOST_CHECK_EQUAL("4", c->lastMessage.getContent());
+    // Verify the back of the queue
+    BOOST_CHECK_EQUAL(6u, q->getPosition());
+
+    q->setPosition(5);
+
+    c = boost::shared_ptr<TestConsumer>(new TestConsumer("test", false)); // Don't acquire
+    q->seek(*c, Queue::MessagePredicate(), 4);
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(5u, c->lastMessage.getSequence()); // Numbered from 1
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     BOOST_CHECK(!q->dispatch(c));
 }
 
 QPID_AUTO_TEST_CASE(testSetPositionPriority) {
+<<<<<<< HEAD
     Queue::shared_ptr q(new Queue("my-queue", true));
     framing::FieldTable args;
     args.setInt("qpid.priorities", 10);
@@ -1507,10 +1806,23 @@ QPID_AUTO_TEST_CASE(testSetPositionPriority) {
         m->getFrames().getHeaders()->get<DeliveryProperties>(true)
             ->setPriority(priorities[i]);
         q->deliver(m);
+=======
+    QueueSettings settings;
+    settings.priorities = 10;
+    QueueFactory factory;
+    Queue::shared_ptr q(factory.create("my-queue", settings));
+
+    const int priorities[] = { 1, 2, 3, 2, 1, 3 };
+    for (size_t i = 0; i < sizeof(priorities)/sizeof(priorities[0]); ++i) {
+        qpid::types::Variant::Map properties;
+        properties["priority"] = priorities[i];
+        q->deliver(MessageUtils::createMessage(properties, boost::lexical_cast<string>(i+1)));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     // Truncation removes messages in fifo order, not priority order.
     q->setPosition(3);
+<<<<<<< HEAD
     TestConsumer::shared_ptr c(new TestConsumer("test", false)); // Browse in FIFO order
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(1u, c->last.position);
@@ -1527,10 +1839,29 @@ QPID_AUTO_TEST_CASE(testSetPositionPriority) {
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(4u, c->last.position);
     BOOST_CHECK_EQUAL("4a", getContent(c->last.payload));
+=======
+    TestConsumer::shared_ptr c(new TestConsumer("test", false)); // Browse in priority order
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(3u, c->lastMessage.getSequence());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(2u, c->lastMessage.getSequence());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(1u, c->lastMessage.getSequence());
+    BOOST_CHECK(!q->dispatch(c));
+
+    qpid::types::Variant::Map properties;
+    properties["priority"] = 4;
+    q->deliver(MessageUtils::createMessage(properties, "4a"));
+
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(4u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("4a", c->lastMessage.getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // But consumers see priority order
     c.reset(new TestConsumer("test", true));
     BOOST_CHECK(q->dispatch(c));
+<<<<<<< HEAD
     BOOST_CHECK_EQUAL(4u, c->last.position);
     BOOST_CHECK_EQUAL("4a", getContent(c->last.payload));
     BOOST_CHECK(q->dispatch(c));
@@ -1542,6 +1873,19 @@ QPID_AUTO_TEST_CASE(testSetPositionPriority) {
     BOOST_CHECK(q->dispatch(c));
     BOOST_CHECK_EQUAL(1u, c->last.position);
     BOOST_CHECK_EQUAL("1", getContent(c->last.payload));
+=======
+    BOOST_CHECK_EQUAL(4u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("4a", c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(3u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("3", c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(2u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("2", c->lastMessage.getContent());
+    BOOST_CHECK(q->dispatch(c));
+    BOOST_CHECK_EQUAL(1u, c->lastMessage.getSequence());
+    BOOST_CHECK_EQUAL("1", c->lastMessage.getContent());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 QPID_AUTO_TEST_SUITE_END()

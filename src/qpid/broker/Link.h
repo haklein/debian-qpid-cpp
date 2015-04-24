@@ -45,8 +45,15 @@ namespace broker {
 
 class LinkRegistry;
 class Broker;
+<<<<<<< HEAD
 class Connection;
 class LinkExchange;
+=======
+class LinkExchange;
+namespace amqp_0_10 {
+class Connection;
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 class Link : public PersistableConfig, public management::Manageable {
   private:
@@ -69,12 +76,19 @@ class Link : public PersistableConfig, public management::Manageable {
     std::string        username;
     std::string        password;
     mutable uint64_t    persistenceId;
+<<<<<<< HEAD
     qmf::org::apache::qpid::broker::Link* mgmtObject;
+=======
+    qmf::org::apache::qpid::broker::Link::shared_ptr mgmtObject;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Broker* broker;
     int     state;
     uint32_t visitCount;
     uint32_t currentInterval;
+<<<<<<< HEAD
     bool     closing;
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Url      url;       // URL can contain many addresses.
     size_t   reconnectNext; // Index for next re-connect attempt
 
@@ -82,8 +96,14 @@ class Link : public PersistableConfig, public management::Manageable {
     Bridges created;   // Bridges pending creation
     Bridges active;    // Bridges active
     Bridges cancellations;    // Bridges pending cancellation
+<<<<<<< HEAD
     uint channelCounter;
     Connection* connection;
+=======
+    framing::ChannelId nextFreeChannel;
+    RangeSet<framing::ChannelId> freeChannels;
+    amqp_0_10::Connection* connection;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     management::ManagementAgent* agent;
     boost::function<void(Link*)> listener;
     boost::intrusive_ptr<sys::TimerTask> timerTask;
@@ -97,7 +117,11 @@ class Link : public PersistableConfig, public management::Manageable {
     static const int STATE_OPERATIONAL = 3;
     static const int STATE_FAILED      = 4;
     static const int STATE_CLOSED      = 5;
+<<<<<<< HEAD
     static const int STATE_PASSIVE     = 6;
+=======
+    static const int STATE_CLOSING     = 6;  // Waiting for outstanding connect to complete first
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     static const uint32_t MAX_INTERVAL = 32;
 
@@ -106,16 +130,26 @@ class Link : public PersistableConfig, public management::Manageable {
     void destroy();                  // Cleanup connection before link goes away
     void ioThreadProcessing();       // Called on connection's IO thread by request
     bool tryFailoverLH();            // Called during maintenance visit
+<<<<<<< HEAD
     bool hideManagement() const;
     void reconnectLH(const Address&); //called by LinkRegistry
 
     // connection management (called by LinkRegistry)
     void established(Connection*); // Called when connection is created
+=======
+    void reconnectLH(const Address&); //called by LinkRegistry
+
+    // connection management (called by LinkRegistry)
+    void established(amqp_0_10::Connection*); // Called when connection is created
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void opened();      // Called when connection is open (after create)
     void closed(int, std::string);   // Called when connection goes away
     void notifyConnectionForced(const std::string text);
     void closeConnection(const std::string& reason);
+<<<<<<< HEAD
     bool pendingConnection(const std::string& host, uint16_t port) const;  // is Link trying to connect to this remote?
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     friend class LinkRegistry; // to call established, opened, closed
 
@@ -151,7 +185,12 @@ class Link : public PersistableConfig, public management::Manageable {
 
     bool isDurable() { return durable; }
     void maintenanceVisit ();
+<<<<<<< HEAD
     uint nextChannel();
+=======
+    QPID_BROKER_EXTERN framing::ChannelId nextChannel();        // allocate channel from link free pool
+    QPID_BROKER_EXTERN void returnChannel(framing::ChannelId);  // return channel to link free pool
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void add(Bridge::shared_ptr);
     void cancel(Bridge::shared_ptr);
 
@@ -165,7 +204,10 @@ class Link : public PersistableConfig, public management::Manageable {
     std::string getPassword()      { return password; }
     Broker* getBroker()       { return broker; }
 
+<<<<<<< HEAD
     void setPassive(bool p);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bool isConnecting() const { return state == STATE_CONNECTING; }
 
     // PersistableConfig:
@@ -181,17 +223,24 @@ class Link : public PersistableConfig, public management::Manageable {
     static bool isEncodedLink(const std::string& key);
 
     // Manageable entry points
+<<<<<<< HEAD
     management::ManagementObject*    GetManagementObject(void) const;
+=======
+    management::ManagementObject::shared_ptr GetManagementObject(void) const;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     management::Manageable::status_t ManagementMethod(uint32_t, management::Args&, std::string&);
 
     // manage the exchange owned by this link
     static const std::string exchangeTypeName;
     static boost::shared_ptr<Exchange> linkExchangeFactory(const std::string& name);
 
+<<<<<<< HEAD
     // replicate internal state of this Link for clustering
     void getState(framing::FieldTable& state) const;
     void setState(const framing::FieldTable& state);
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /** create a name for a link (if none supplied by user config) */
     static std::string createName(const std::string& transport,
                                   const std::string& host,
@@ -200,7 +249,11 @@ class Link : public PersistableConfig, public management::Manageable {
     /** The current connction for this link. Note returns 0 if the link is not
      * presently connected.
      */
+<<<<<<< HEAD
     Connection* getConnection() { return connection; }
+=======
+    amqp_0_10::Connection* getConnection() { return connection; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }
 }

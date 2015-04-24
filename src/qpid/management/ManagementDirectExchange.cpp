@@ -36,18 +36,29 @@ ManagementDirectExchange::ManagementDirectExchange(const std::string& _name,
                                                    bool               _durable,
                                                    const FieldTable&  _args,
                                                    Manageable*        _parent, Broker* b) :
+<<<<<<< HEAD
     Exchange (_name, _durable, _args, _parent, b), 
     DirectExchange(_name, _durable, _args, _parent, b),
+=======
+    Exchange (_name, _durable, false, _args, _parent, b),
+    DirectExchange(_name, _durable, false, _args, _parent, b),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     managementAgent(0) {}
 
 void ManagementDirectExchange::route(Deliverable&      msg)
 {
     bool routeIt = true;
+<<<<<<< HEAD
     const std::string& routingKey = msg.getMessage().getRoutingKey();
     const FieldTable* args = msg.getMessage().getApplicationHeaders();
 
     if (managementAgent)
         routeIt = managementAgent->dispatchCommand(msg, routingKey, args, false, qmfVersion);
+=======
+
+    if (managementAgent)
+        routeIt = managementAgent->dispatchCommand(msg, msg.getMessage().getRoutingKey(), 0/*args - TODO*/, false, qmfVersion);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     if (routeIt)
         DirectExchange::route(msg);

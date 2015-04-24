@@ -19,6 +19,10 @@
  *
  */
 #include "AddressParser.h"
+<<<<<<< HEAD
+=======
+#include "AddressImpl.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/Uuid.h"
 #include <boost/format.hpp>
 
@@ -38,7 +42,14 @@ bool AddressParser::parse(Address& address)
 {
     std::string name;
     if (readName(name)) {
+<<<<<<< HEAD
         if (name.find('#') == 0) name = qpid::framing::Uuid(true).str() + name;
+=======
+        if (name.find('#') == 0) {
+            name = qpid::framing::Uuid(true).str() + name;
+            AddressImpl::setTemporary(address, true);
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         address.setName(name);
         if (readChar('/')) {
             std::string subject;

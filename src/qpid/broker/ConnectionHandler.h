@@ -47,7 +47,13 @@ struct SecuritySettings;
 
 namespace broker {
 
+<<<<<<< HEAD
 class Connection;
+=======
+namespace amqp_0_10 {
+class Connection;
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class SecureConnection;
 
 class ConnectionHandler : public framing::FrameHandler
@@ -55,13 +61,21 @@ class ConnectionHandler : public framing::FrameHandler
     struct Handler : public framing::AMQP_AllOperations::ConnectionHandler
     {
         framing::AMQP_AllProxy::Connection proxy;
+<<<<<<< HEAD
         Connection& connection;
+=======
+        amqp_0_10::Connection& connection;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         bool serverMode;
         std::auto_ptr<SaslAuthenticator> authenticator;
         SecureConnection* secured;
         bool isOpen;
 
+<<<<<<< HEAD
         Handler(Connection& connection, bool isClient);
+=======
+        Handler(amqp_0_10::Connection& connection, bool isClient);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         ~Handler();
         void startOk(const qpid::framing::ConnectionStartOkBody& body);
         void startOk(const qpid::framing::FieldTable& clientProperties,
@@ -98,13 +112,23 @@ class ConnectionHandler : public framing::FrameHandler
     std::auto_ptr<Handler> handler;
 
     bool handle(const qpid::framing::AMQMethodBody& method);
+<<<<<<< HEAD
   public:
     ConnectionHandler(Connection& connection, bool isClient );
     void close(framing::connection::CloseCode code, const std::string& text);
+=======
+    void close(framing::connection::CloseCode code, const std::string& text);
+  public:
+    ConnectionHandler(amqp_0_10::Connection& connection, bool isClient );
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void heartbeat();
     void handle(framing::AMQFrame& frame);
     void setSecureConnection(SecureConnection* secured);
     bool isOpen() { return handler->isOpen; }
+<<<<<<< HEAD
+=======
+  friend class amqp_0_10::Connection;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 

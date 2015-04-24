@@ -7,9 +7,15 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+<<<<<<< HEAD
  * 
  *   http://www.apache.org/licenses/LICENSE-2.0
  * 
+=======
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -39,7 +45,11 @@ using std::string;
 int main(int argc, char** argv) {
     const char* url = argc>1 ? argv[1] : "amqp:tcp:127.0.0.1:5672";
     std::string connectionOptions = argc > 2 ? argv[2] : "";
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     Connection connection(url, connectionOptions);
      try {
         connection.open();
@@ -48,8 +58,13 @@ int main(int argc, char** argv) {
         Sender sender = session.createSender("service_queue");
 
         //create temp queue & receiver...
+<<<<<<< HEAD
         Address responseQueue("#response-queue; {create:always, delete:always}");
         Receiver receiver = session.createReceiver(responseQueue);
+=======
+        Receiver receiver = session.createReceiver("#");
+        Address responseQueue = receiver.getAddress();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 	// Now send some messages ...
 	string s[] = {
@@ -62,10 +77,18 @@ int main(int argc, char** argv) {
     	Message request;
         request.setReplyTo(responseQueue);
 	for (int i=0; i<4; i++) {
+<<<<<<< HEAD
             request.setContent(s[i]);
             sender.send(request);
             Message response = receiver.fetch();
             std::cout << request.getContent() << " -> " << response.getContent() << std::endl;
+=======
+            request.setContentObject(s[i]);
+            sender.send(request);
+            Message response = receiver.fetch();
+            std::cout << request.getContentObject() << " -> " << response.getContentObject() << std::endl;
+            session.acknowledge(response);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 	}
         connection.close();
         return 0;

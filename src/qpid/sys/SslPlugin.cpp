@@ -19,6 +19,7 @@
  *
  */
 
+<<<<<<< HEAD
 #include "qpid/sys/ProtocolFactory.h"
 
 #include "qpid/Plugin.h"
@@ -35,6 +36,19 @@
 #include <boost/bind.hpp>
 #include <memory>
 
+=======
+#include "qpid/sys/TransportFactory.h"
+
+#include "qpid/Plugin.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/log/Statement.h"
+#include "qpid/sys/AsynchIO.h"
+#include "qpid/sys/SocketTransport.h"
+#include "qpid/sys/ssl/util.h"
+#include "qpid/sys/ssl/SslSocket.h"
+
+#include <boost/bind.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
 namespace sys {
@@ -48,12 +62,19 @@ struct SslServerOptions : ssl::SslOptions
     uint16_t port;
     bool clientAuth;
     bool nodict;
+<<<<<<< HEAD
     bool multiplex;
 
     SslServerOptions() : port(5671),
                          clientAuth(false),
                          nodict(false),
                          multiplex(false)
+=======
+
+    SslServerOptions() : port(5671),
+                         clientAuth(false),
+                         nodict(false)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {
         addOptions()
             ("ssl-port", optValue(port, "PORT"), "Port on which to listen for SSL connections")
@@ -64,6 +85,7 @@ struct SslServerOptions : ssl::SslOptions
     }
 };
 
+<<<<<<< HEAD
 template <class T>
 class SslProtocolFactoryTmpl : public ProtocolFactory {
   private:
@@ -96,19 +118,44 @@ class SslProtocolFactoryTmpl : public ProtocolFactory {
 typedef SslProtocolFactoryTmpl<SslSocket> SslProtocolFactory;
 typedef SslProtocolFactoryTmpl<SslMuxSocket> SslMuxProtocolFactory;
 
+=======
+namespace {
+    Socket* createServerSSLSocket(const SslServerOptions& options) {
+        return new SslSocket(options.certName, options.clientAuth);
+    }
+
+    Socket* createServerSSLMuxSocket(const SslServerOptions& options) {
+        return new SslMuxSocket(options.certName, options.clientAuth);
+    }
+
+    Socket* createClientSSLSocket() {
+        return new SslSocket();
+    }
+
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 // Static instance to initialise plugin
 static struct SslPlugin : public Plugin {
     SslServerOptions options;
     bool nssInitialized;
+<<<<<<< HEAD
 
     Options* getOptions() { return &options; }
 
     SslPlugin() : nssInitialized(false) {}
+=======
+    bool multiplex;
+
+    Options* getOptions() { return &options; }
+
+    SslPlugin() : nssInitialized(false), multiplex(false) {}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ~SslPlugin() { if (nssInitialized) ssl::shutdownNSS(); }
 
     void earlyInitialize(Target& target) {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
+<<<<<<< HEAD
         if (broker && !options.certDbPath.empty()) {
             const broker::Broker::Options& opts = broker->getOptions();
 
@@ -125,11 +172,39 @@ static struct SslPlugin : public Plugin {
         }
     }
     
+=======
+        if (broker && broker->shouldListen("ssl")) {
+            if (options.certDbPath.empty()) {
+                QPID_LOG(notice, "SSL plugin not enabled, you must set --ssl-cert-db to enable it.");
+                broker->disableListening("ssl");
+                return;
+            }
+
+            try {
+                ssl::initNSS(options, true);
+                nssInitialized = true;
+            } catch (const std::exception& e) {
+                QPID_LOG(error, "Failed to initialise SSL plugin: " << e.what());
+                broker->disableListening("ssl");
+                return;
+            }
+
+            if (broker->getPortOption() == options.port && // AMQP & AMQPS ports are the same
+                broker->getPortOption() != 0 &&
+                broker->shouldListen("tcp")) {
+                multiplex = true;
+                broker->disableListening("tcp");
+            }
+        }
+    }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     void initialize(Target& target) {
         QPID_LOG(trace, "Initialising SSL plugin");
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
         if (broker) {
+<<<<<<< HEAD
             if (options.certDbPath.empty()) {
                 QPID_LOG(notice, "SSL plugin not enabled, you must set --ssl-cert-db to enable it.");
             } else {
@@ -157,10 +232,34 @@ static struct SslPlugin : public Plugin {
                     QPID_LOG(error, "Failed to initialise SSL plugin: " << e.what());
                 }
             }
+=======
+            uint16_t port = options.port;
+            TransportAcceptor::shared_ptr ta;
+            if (broker->shouldListen("ssl")) {
+                SocketAcceptor* sa =
+                    new SocketAcceptor(broker->getTcpNoDelay(), options.nodict, broker->getMaxNegotiateTime(), broker->getTimer());
+                    port = sa->listen(broker->getListenInterfaces(), options.port, broker->getConnectionBacklog(),
+                                        multiplex ?
+                                            boost::bind(&createServerSSLMuxSocket, options) :
+                                            boost::bind(&createServerSSLSocket, options));
+                if ( port!=0 ) {
+                    ta.reset(sa);
+                    QPID_LOG(notice, "Listening for " <<
+                                    (multiplex ? "SSL or TCP" : "SSL") <<
+                                    " connections on TCP/TCP6 port " <<
+                                    port);
+                }
+            }
+            TransportConnector::shared_ptr tc(
+                new SocketConnector(broker->getTcpNoDelay(), options.nodict, broker->getMaxNegotiateTime(), broker->getTimer(),
+                                    &createClientSSLSocket));
+            broker->registerTransport("ssl", ta, tc, port);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 } sslPlugin;
 
+<<<<<<< HEAD
 template <class T>
 SslProtocolFactoryTmpl<T>::SslProtocolFactoryTmpl(const SslServerOptions& options, int backlog, bool nodelay, Timer& timer, uint32_t maxTime) :
     brokerTimer(timer),
@@ -291,4 +390,6 @@ bool SslMuxProtocolFactory::supports(const std::string& capability)
     return s == SSL || s == "tcp";
 }
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::sys

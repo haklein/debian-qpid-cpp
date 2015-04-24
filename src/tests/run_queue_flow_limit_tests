@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -19,6 +23,7 @@
 # under the License.
 #
 
+<<<<<<< HEAD
 # Run tests against Queue producer flow control.
 
 source ./test_env.sh
@@ -55,3 +60,11 @@ if test x$RETCODE != x0; then
 fi
 rm -rf $LOG_FILE
 
+=======
+source $QPID_TEST_COMMON
+
+ensure_python_tests
+
+# Run tests against Queue producer flow control.
+$QPID_PYTHON_TEST -m queue_flow_limit_tests $SKIPTESTS -b localhost:$QPID_PORT
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

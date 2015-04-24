@@ -24,6 +24,10 @@
 #include "qpid/broker/Consumer.h"
 #include "qpid/broker/Exchange.h"
 #include "qpid/broker/Queue.h"
+<<<<<<< HEAD
+=======
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 #include "qpid/framing/FrameHandler.h"
 #include "qpid/framing/MessageTransferBody.h"
@@ -32,13 +36,20 @@ using namespace qpid;
 using namespace qpid::broker;
 using std::string;
 
+<<<<<<< HEAD
 DeliveryRecord::DeliveryRecord(const QueuedMessage& _msg,
+=======
+DeliveryRecord::DeliveryRecord(const QueueCursor& _msg,
+                               framing::SequenceNumber _msgId,
+                               framing::SequenceNumber _replicationId,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                const Queue::shared_ptr& _queue,
                                const std::string& _tag,
                                const boost::shared_ptr<Consumer>& _consumer,
                                bool _acquired,
                                bool accepted,
                                bool _windowing,
+<<<<<<< HEAD
                                uint32_t _credit):
     msg(_msg),
     queue(_queue),
@@ -51,17 +62,36 @@ DeliveryRecord::DeliveryRecord(const QueuedMessage& _msg,
     ended(accepted && acquired),
     windowing(_windowing),
     credit(msg.payload ? msg.payload->getRequiredCredit() : _credit)
+=======
+                               uint32_t _credit) : msg(_msg),
+                                                   queue(_queue),
+                                                   tag(_tag),
+                                                   consumer(_consumer),
+                                                   acquired(_acquired),
+                                                   acceptExpected(!accepted),
+                                                   cancelled(false),
+                                                   completed(false),
+                                                   ended(accepted && acquired),
+                                                   windowing(_windowing),
+                                                   credit(_credit),
+                                                   msgId(_msgId),
+                                                   replicationId(_replicationId)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {}
 
 bool DeliveryRecord::setEnded()
 {
     ended = true;
+<<<<<<< HEAD
     //reset msg pointer, don't need to hold on to it anymore
     msg.payload = boost::intrusive_ptr<Message>();
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     QPID_LOG(debug, "DeliveryRecord::setEnded() id=" << id);
     return isRedundant();
 }
 
+<<<<<<< HEAD
 void DeliveryRecord::redeliver(SemanticState* const session) {
     if (!ended) {
         if(cancelled){
@@ -95,14 +125,24 @@ void DeliveryRecord::requeue() const
     if (acquired && !ended) {
         msg.payload->redeliver();
         queue->requeue(msg);
+=======
+void DeliveryRecord::requeue()
+{
+    if (acquired && !ended) {
+        queue->release(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void DeliveryRecord::release(bool setRedelivered)
 {
     if (acquired && !ended) {
+<<<<<<< HEAD
         if (setRedelivered) msg.payload->redeliver();
         queue->requeue(msg);
+=======
+        queue->release(msg, setRedelivered);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         acquired = false;
         setEnded();
     } else {
@@ -110,13 +150,22 @@ void DeliveryRecord::release(bool setRedelivered)
     }
 }
 
+<<<<<<< HEAD
 void DeliveryRecord::complete()  {
+=======
+void DeliveryRecord::complete()
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     completed = true;
 }
 
 bool DeliveryRecord::accept(TransactionContext* ctxt) {
     if (!ended) {
+<<<<<<< HEAD
         if (consumer) consumer->acknowledged(getMessage());
+=======
+        if (consumer) consumer->acknowledged(*this);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         if (acquired) queue->dequeue(ctxt, msg);
         setEnded();
         QPID_LOG(debug, "Accepted " << id);
@@ -124,19 +173,33 @@ bool DeliveryRecord::accept(TransactionContext* ctxt) {
     return isRedundant();
 }
 
+<<<<<<< HEAD
 void DeliveryRecord::dequeue(TransactionContext* ctxt) const{
+=======
+void DeliveryRecord::dequeue(TransactionContext* ctxt) const
+{
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     if (acquired && !ended) {
         queue->dequeue(ctxt, msg);
     }
 }
 
+<<<<<<< HEAD
 void DeliveryRecord::committed() const{
     queue->dequeueCommitted(msg);
+=======
+void DeliveryRecord::committed() const
+{
+    if (acquired && !ended) {
+        queue->dequeueCommitted(msg);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void DeliveryRecord::reject()
 {
     if (acquired && !ended) {
+<<<<<<< HEAD
         Exchange::shared_ptr alternate = queue->getAlternateExchange();
         if (alternate) {
             DeliverableMessage delivery(msg.payload);
@@ -149,6 +212,9 @@ void DeliveryRecord::reject()
         }
         queue->countRejected();
         dequeue();
+=======
+        queue->reject(msg);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         setEnded();
     }
 }

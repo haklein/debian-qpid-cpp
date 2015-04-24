@@ -30,6 +30,10 @@ namespace qpid {
 
 namespace broker {
 class Queue;
+<<<<<<< HEAD
+=======
+class Exchange;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace framing {
@@ -40,6 +44,16 @@ namespace ha {
 /**
  * Test whether something is replicated, taking into account the
  * default replication level.
+<<<<<<< HEAD
+=======
+ *
+ * The primary uses a ReplicationTest with default based on configuration
+ * settings, and marks objects to be replicated with an explict replication
+ * argument.
+ *
+ * The backup uses a default of NONE, so it always accepts what the primary has
+ * marked on the object.
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
  */
 class ReplicationTest
 {
@@ -47,6 +61,7 @@ class ReplicationTest
     ReplicationTest(ReplicateLevel replicateDefault_) :
         replicateDefault(replicateDefault_) {}
 
+<<<<<<< HEAD
     // Return the simple replication level, accounting for defaults.
     ReplicateLevel replicateLevel(const std::string& str);
     ReplicateLevel replicateLevel(const framing::FieldTable& f);
@@ -62,6 +77,24 @@ class ReplicationTest
   private:
     ReplicateLevel replicateDefault;
 };
+=======
+    // Get the replication level set on an object, or default if not set.
+    ReplicateLevel getLevel(const std::string& str) const;
+    ReplicateLevel getLevel(const framing::FieldTable& f) const;
+    ReplicateLevel getLevel(const types::Variant::Map& m) const;
+    ReplicateLevel getLevel(const broker::Queue&) const;
+    ReplicateLevel getLevel(const broker::Exchange&) const;
+
+    // Calculate level for objects that may not have replication set,
+    // including auto-delete/exclusive settings.
+    ReplicateLevel useLevel(const broker::Queue&) const;
+    ReplicateLevel useLevel(const broker::Exchange&) const;
+
+  private:
+    ReplicateLevel replicateDefault;
+};
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace qpid::ha
 
 #endif  /*!QPID_HA_REPLICATIONTEST_H*/

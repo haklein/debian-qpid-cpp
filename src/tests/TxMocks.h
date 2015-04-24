@@ -103,6 +103,12 @@ public:
         if(!debugName.empty()) std::cout << std::endl << "MockTxOp[" << debugName << "]::rollback()" << std::endl;
         actual.push_back(ROLLBACK);
     }
+<<<<<<< HEAD
+=======
+
+    void callObserver(const boost::shared_ptr<TransactionObserver>&) {}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     MockTxOp& expectPrepare(){
         expected.push_back(PREPARE);
         return *this;
@@ -119,8 +125,11 @@ public:
         assertEqualVector(expected, actual);
     }
 
+<<<<<<< HEAD
     void accept(TxOpConstVisitor&) const {}
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ~MockTxOp(){}
 };
 

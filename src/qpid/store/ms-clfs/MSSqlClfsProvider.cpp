@@ -26,6 +26,10 @@
 #include <string>
 #include <windows.h>
 #include <clfsw32.h>
+<<<<<<< HEAD
+=======
+#include <qpid/broker/Broker.h>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <qpid/broker/RecoverableQueue.h>
 #include <qpid/log/Statement.h>
 #include <qpid/store/MessageStorePlugin.h>
@@ -33,7 +37,10 @@
 #include <qpid/store/StorageProvider.h>
 #include <qpid/sys/Mutex.h>
 #include <boost/foreach.hpp>
+<<<<<<< HEAD
 #include <boost/make_shared.hpp>
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 // From ms-sql...
 #include "BlobAdapter.h"
@@ -108,6 +115,7 @@ public:
     /**
      * @name Methods inherited from qpid::broker::MessageStore
      */
+<<<<<<< HEAD
     //@{
     /**
      * If called after init() but before recovery, will discard the database
@@ -122,6 +130,8 @@ public:
      *                           otherwise empty.
      */
     virtual void truncateInit(const bool pushDownStoreFiles = false);
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /**
      * Record the existence of a durable queue
@@ -369,7 +379,11 @@ MSSqlClfsProvider::finalizeMe()
 MSSqlClfsProvider::MSSqlClfsProvider()
     : options("MS SQL/CLFS Provider options")
 {
+<<<<<<< HEAD
     transactions = boost::make_shared<TransactionLog>();
+=======
+    transactions.reset(new TransactionLog());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 MSSqlClfsProvider::~MSSqlClfsProvider()
@@ -384,7 +398,11 @@ MSSqlClfsProvider::earlyInitialize(Plugin::Target &target)
         // Check the store dir option; if not specified, need to
         // grab the broker's data dir.
         if (options.storeDir.empty()) {
+<<<<<<< HEAD
             DataDir& dir = store->getBroker()->getDataDir();
+=======
+            const DataDir& dir = store->getBroker()->getDataDir();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             if (dir.isEnabled()) {
                 options.storeDir = dir.getPath();
             }
@@ -467,11 +485,14 @@ MSSqlClfsProvider::activate(MessageStorePlugin &store)
 }
 
 void
+<<<<<<< HEAD
 MSSqlClfsProvider::truncateInit(const bool pushDownStoreFiles)
 {
 }
 
 void
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 MSSqlClfsProvider::create(PersistableQueue& queue,
                           const qpid::framing::FieldTable& /*args needed for jrnl*/)
 {

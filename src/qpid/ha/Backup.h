@@ -22,6 +22,11 @@
  *
  */
 
+<<<<<<< HEAD
+=======
+#include "LogPrefix.h"
+#include "Role.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "Settings.h"
 #include "qpid/Url.h"
 #include "qpid/sys/Mutex.h"
@@ -38,6 +43,7 @@ namespace ha {
 class Settings;
 class BrokerReplicator;
 class HaBroker;
+<<<<<<< HEAD
 
 /**
  * State associated with a backup broker. Manages connections to primary.
@@ -45,10 +51,22 @@ class HaBroker;
  * THREAD SAFE
  */
 class Backup
+=======
+class StatusCheck;
+class Membership;
+
+/**
+ * Backup role: Manages connections to primary, replicates  management events and queue contents.
+ *
+ * THREAD SAFE
+ */
+class Backup : public Role
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
   public:
     Backup(HaBroker&, const Settings&);
     ~Backup();
+<<<<<<< HEAD
     void setBrokerUrl(const Url&);
     void setStatus(BrokerStatus);
 
@@ -57,11 +75,33 @@ class Backup
     std::string logPrefix;
 
     sys::Mutex lock;
+=======
+
+    void setBrokerUrl(const Url&);
+
+    Role* promote();
+
+    boost::shared_ptr<BrokerReplicator> getBrokerReplicator() { return replicator; }
+
+  private:
+    void stop(sys::Mutex::ScopedLock&);
+    Role* recover(sys::Mutex::ScopedLock&);
+
+    const LogPrefix& logPrefix;
+    Membership& membership;
+
+    sys::Mutex lock;
+    bool stopped;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     HaBroker& haBroker;
     broker::Broker& broker;
     Settings settings;
     boost::shared_ptr<broker::Link> link;
     boost::shared_ptr<BrokerReplicator> replicator;
+<<<<<<< HEAD
+=======
+    std::auto_ptr<StatusCheck> statusCheck;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 
 }} // namespace qpid::ha

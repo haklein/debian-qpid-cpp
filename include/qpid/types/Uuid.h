@@ -32,7 +32,11 @@ namespace types {
 class QPID_TYPES_CLASS_EXTERN Uuid
 {
   public:
+<<<<<<< HEAD
     static const size_t SIZE;
+=======
+    QPID_TYPES_EXTERN static const size_t SIZE;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     /** 
      * If unique is true, this will generate a new unique uuid, if not
      * it will construct a null uuid.
@@ -42,6 +46,10 @@ class QPID_TYPES_CLASS_EXTERN Uuid
     QPID_TYPES_EXTERN Uuid& operator=(const Uuid&);
     /** Copy the UUID from data16, which must point to a 16-byte UUID */
     QPID_TYPES_EXTERN Uuid(const unsigned char* data16);
+<<<<<<< HEAD
+=======
+    QPID_TYPES_EXTERN Uuid(const char* data16);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Set to a new unique identifier. */
     QPID_TYPES_EXTERN void generate();
@@ -69,10 +77,27 @@ class QPID_TYPES_CLASS_EXTERN Uuid
     friend QPID_TYPES_EXTERN std::ostream& operator<<(std::ostream&, Uuid);
     friend QPID_TYPES_EXTERN std::istream& operator>>(std::istream&, Uuid&);
 
+<<<<<<< HEAD
+=======
+    /** Hash value suitable for use with unordered_map */
+    QPID_TYPES_EXTERN size_t hash() const;
+
+    /** Hasher for use with unordered_map */
+    struct Hasher {
+        size_t operator()(const Uuid& u) const { return u.hash(); }
+    };
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   private:
     unsigned char bytes[16];
 };
 
+<<<<<<< HEAD
+=======
+/** Hash value function for use with boots::hash or std::hash */
+inline size_t hash_value(const Uuid& uuid) { return uuid.hash(); }
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 /** Returns true if the uuids are equal, false otherwise. **/
 QPID_TYPES_EXTERN bool operator==(const Uuid&, const Uuid&);
 /** Returns true if the uuids are NOT equal, false if they are. **/
@@ -91,4 +116,8 @@ QPID_TYPES_EXTERN std::istream& operator>>(std::istream&, Uuid&);
 
 }} // namespace qpid::types
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #endif  /*!QPID_TYPES_UUID_H*/

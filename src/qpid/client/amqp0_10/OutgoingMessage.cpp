@@ -21,11 +21,22 @@
 #include "qpid/client/amqp0_10/OutgoingMessage.h"
 #include "qpid/client/amqp0_10/AddressResolution.h"
 #include "qpid/amqp_0_10/Codecs.h"
+<<<<<<< HEAD
 #include "qpid/types/Variant.h"
 #include "qpid/messaging/Address.h"
 #include "qpid/messaging/Message.h"
 #include "qpid/messaging/MessageImpl.h"
 #include "qpid/framing/enum.h"
+=======
+#include "qpid/types/encodings.h"
+#include "qpid/types/Variant.h"
+#include "qpid/messaging/Address.h"
+#include "qpid/messaging/Duration.h"
+#include "qpid/messaging/Message.h"
+#include "qpid/messaging/MessageImpl.h"
+#include "qpid/framing/enum.h"
+#include "qpid/log/Statement.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <sstream>
 
 namespace qpid {
@@ -45,14 +56,41 @@ const std::string SUBJECT("qpid.subject");
 const std::string X_APP_ID("x-amqp-0-10.app-id");
 const std::string X_ROUTING_KEY("x-amqp-0-10.routing-key");
 const std::string X_CONTENT_ENCODING("x-amqp-0-10.content-encoding");
+<<<<<<< HEAD
+=======
+const std::string TEXT_PLAIN("text/plain");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void OutgoingMessage::convert(const qpid::messaging::Message& from)
 {
     //TODO: need to avoid copying as much as possible
+<<<<<<< HEAD
     message.setData(from.getContent());
     message.getMessageProperties().setContentType(from.getContentType());
     message.getMessageProperties().setCorrelationId(from.getCorrelationId());
+=======
+    if (from.getContentObject().getType() == qpid::types::VAR_MAP) {
+        std::string content;
+        qpid::amqp_0_10::MapCodec::encode(from.getContentObject().asMap(), content);
+        message.getMessageProperties().setContentType(qpid::amqp_0_10::MapCodec::contentType);
+        message.setData(content);
+    } else if (from.getContentObject().getType() == qpid::types::VAR_LIST) {
+        std::string content;
+        qpid::amqp_0_10::ListCodec::encode(from.getContentObject().asList(), content);
+        message.getMessageProperties().setContentType(qpid::amqp_0_10::ListCodec::contentType);
+        message.setData(content);
+    } else if (from.getContentObject().getType() == qpid::types::VAR_STRING &&
+               (from.getContentObject().getEncoding() == qpid::types::encodings::UTF8 || from.getContentObject().getEncoding() == qpid::types::encodings::ASCII)) {
+        message.getMessageProperties().setContentType(TEXT_PLAIN);
+        message.setData(from.getContent());
+    } else {
+        message.setData(from.getContent());
+        message.getMessageProperties().setContentType(from.getContentType());
+    }
+    if ( !from.getCorrelationId().empty() )
+        message.getMessageProperties().setCorrelationId(from.getCorrelationId());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     message.getMessageProperties().setUserId(from.getUserId());
     const Address& address = from.getReplyTo();
     if (address) {
@@ -92,6 +130,10 @@ void OutgoingMessage::convert(const qpid::messaging::Message& from)
     if (i != from.getProperties().end()) {
         message.getMessageProperties().setContentEncoding(i->second.asString());
     }
+<<<<<<< HEAD
+=======
+    base = qpid::sys::now();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void OutgoingMessage::setSubject(const std::string& s)
@@ -104,4 +146,48 @@ std::string OutgoingMessage::getSubject() const
     return subject;
 }
 
+<<<<<<< HEAD
+=======
+void OutgoingMessage::send(qpid::client::AsyncSession& session, const std::string& destination, const std::string& routingKey)
+{
+    if (!expired) {
+        message.getDeliveryProperties().setRoutingKey(routingKey);
+        status = session.messageTransfer(arg::destination=destination, arg::content=message);
+        if (destination.empty()) {
+            QPID_LOG(debug, "Sending to queue " << routingKey << " " << message.getMessageProperties() << " " << message.getDeliveryProperties());
+        } else {
+            QPID_LOG(debug, "Sending to exchange " << destination << " " << message.getMessageProperties() << " " << message.getDeliveryProperties());
+        }
+    }
+}
+void OutgoingMessage::send(qpid::client::AsyncSession& session, const std::string& routingKey)
+{
+    send(session, std::string(), routingKey);
+}
+
+bool OutgoingMessage::isComplete()
+{
+    return expired || (status.isValid() && status.isComplete());
+}
+void OutgoingMessage::markRedelivered()
+{
+    message.setRedelivered(true);
+    if (message.getDeliveryProperties().hasTtl()) {
+        uint64_t delta = qpid::sys::Duration(base, qpid::sys::now())/qpid::sys::TIME_MSEC;
+        uint64_t ttl = message.getDeliveryProperties().getTtl();
+        if (ttl <= delta) {
+            QPID_LOG(debug, "Expiring outgoing message (" << ttl << " < " << delta << ")");
+            expired = true;
+            message.getDeliveryProperties().setTtl(1);
+        } else {
+            QPID_LOG(debug, "Adjusting ttl on outgoing message from " << ttl << " by " << delta);
+            ttl = ttl - delta;
+            message.getDeliveryProperties().setTtl(ttl);
+        }
+    }
+}
+OutgoingMessage::OutgoingMessage() : expired (false) {}
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }}} // namespace qpid::client::amqp0_10

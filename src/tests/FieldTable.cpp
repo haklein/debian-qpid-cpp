@@ -20,7 +20,10 @@
  */
 #include <iostream>
 #include <algorithm>
+<<<<<<< HEAD
 #include "qpid/sys/alloca.h"
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/framing/Array.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/FieldValue.h"

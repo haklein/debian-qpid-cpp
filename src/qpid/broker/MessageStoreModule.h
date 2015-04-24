@@ -38,10 +38,15 @@ class MessageStoreModule : public MessageStore
 {
     boost::shared_ptr<MessageStore> store;
   public:
+<<<<<<< HEAD
     MessageStoreModule(boost::shared_ptr<MessageStore>& store);
 
     bool init(const Options* options);
     void truncateInit(const bool pushDownStoreFiles = false);
+=======
+    MessageStoreModule(const boost::shared_ptr<MessageStore>& store);
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     std::auto_ptr<TransactionContext> begin();
     std::auto_ptr<TPCTransactionContext> begin(const std::string& xid);
     void prepare(TPCTransactionContext& txn);

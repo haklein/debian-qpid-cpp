@@ -21,16 +21,32 @@
 #include "BrokerReplicator.h"
 #include "HaBroker.h"
 #include "QueueReplicator.h"
+<<<<<<< HEAD
 #include "qpid/broker/Broker.h"
 #include "qpid/broker/Connection.h"
 #include "qpid/broker/Queue.h"
 #include "qpid/broker/Link.h"
 #include "qpid/framing/FieldTable.h"
+=======
+#include "TxReplicator.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/broker/amqp_0_10/Connection.h"
+#include "qpid/broker/Queue.h"
+#include "qpid/broker/QueueSettings.h"
+#include "qpid/broker/Link.h"
+#include "qpid/broker/amqp_0_10/MessageTransfer.h"
+#include "qpid/framing/FieldTable.h"
+#include "qpid/framing/FieldValue.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/log/Statement.h"
 #include "qpid/amqp_0_10/Codecs.h"
 #include "qpid/broker/SessionHandler.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/framing/MessageTransferBody.h"
+<<<<<<< HEAD
+=======
+#include "qpid/framing/reply_exceptions.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qmf/org/apache/qpid/broker/EventBind.h"
 #include "qmf/org/apache/qpid/broker/EventUnbind.h"
 #include "qmf/org/apache/qpid/broker/EventExchangeDeclare.h"
@@ -39,6 +55,10 @@
 #include "qmf/org/apache/qpid/broker/EventQueueDelete.h"
 #include "qmf/org/apache/qpid/broker/EventSubscribe.h"
 #include "qmf/org/apache/qpid/ha/EventMembersUpdate.h"
+<<<<<<< HEAD
+=======
+#include <boost/bind.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <algorithm>
 #include <sstream>
 #include <iostream>
@@ -55,23 +75,39 @@ using qmf::org::apache::qpid::broker::EventQueueDeclare;
 using qmf::org::apache::qpid::broker::EventQueueDelete;
 using qmf::org::apache::qpid::broker::EventSubscribe;
 using qmf::org::apache::qpid::ha::EventMembersUpdate;
+<<<<<<< HEAD
 using namespace framing;
 using std::string;
+=======
+using qpid::broker::amqp_0_10::MessageTransfer;
+using namespace framing;
+using namespace std;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using std::ostream;
 using types::Variant;
 using namespace broker;
 
 namespace {
 
+<<<<<<< HEAD
 const string QPID_CONFIGURATION_REPLICATOR("qpid.configuration-replicator");
 
+=======
+const string QPID_CONFIGURATION_REPLICATOR("qpid.broker-replicator");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const string CLASS_NAME("_class_name");
 const string EVENT("_event");
 const string OBJECT_NAME("_object_name");
 const string PACKAGE_NAME("_package_name");
 const string QUERY_RESPONSE("_query_response");
+<<<<<<< HEAD
 const string SCHEMA_ID("_schema_id");
 const string VALUES("_values");
+=======
+const string VALUES("_values");
+const string SCHEMA_ID("_schema_id");
+const string WHAT("_what");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 const string ALTEX("altEx");
 const string ALTEXCHANGE("altExchange");
@@ -79,6 +115,7 @@ const string ARGS("args");
 const string ARGUMENTS("arguments");
 const string AUTODEL("autoDel");
 const string AUTODELETE("autoDelete");
+<<<<<<< HEAD
 const string EXCL("excl");
 const string EXCLUSIVE("exclusive");
 const string BIND("bind");
@@ -97,6 +134,29 @@ const string QUEUE("queue");
 const string TYPE("type");
 const string HA_BROKER("habroker");
 const string PARTIAL("partial");
+=======
+const string BIND("bind");
+const string BINDING("binding");
+const string BINDING_KEY("bindingKey");
+const string CREATED("created");
+const string DISP("disp");
+const string DEST("dest");
+const string DURABLE("durable");
+const string EXCHANGE("exchange");
+const string EXCL("excl");
+const string EXCLUSIVE("exclusive");
+const string EXNAME("exName");
+const string EXTYPE("exType");
+const string HA_BROKER("habroker");
+const string KEY("key");
+const string NAME("name");
+const string PARTIAL("partial");
+const string QNAME("qName");
+const string QUEUE("queue");
+const string TYPE("type");
+const string UNBIND("unbind");
+const string CONSUMER_COUNT("consumerCount");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 const string AGENT_EVENT_BROKER("agent.ind.event.org_apache_qpid_broker.#");
 const string AGENT_EVENT_HA("agent.ind.event.org_apache_qpid_ha.#");
@@ -105,10 +165,13 @@ const string QMF_CONTENT("qmf.content");
 const string QMF_DEFAULT_TOPIC("qmf.default.topic");
 const string QMF_OPCODE("qmf.opcode");
 
+<<<<<<< HEAD
 const string _WHAT("_what");
 const string _CLASS_NAME("_class_name");
 const string _PACKAGE_NAME("_package_name");
 const string _SCHEMA_ID("_schema_id");
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 const string OBJECT("OBJECT");
 const string ORG_APACHE_QPID_BROKER("org.apache.qpid.broker");
 const string ORG_APACHE_QPID_HA("org.apache.qpid.ha");
@@ -116,6 +179,7 @@ const string QMF_DEFAULT_DIRECT("qmf.default.direct");
 const string _QUERY_REQUEST("_query_request");
 const string BROKER("broker");
 const string MEMBERS("members");
+<<<<<<< HEAD
 
 bool isQMFv2(const Message& message) {
     const framing::MessageProperties* props = message.getProperties<framing::MessageProperties>();
@@ -125,10 +189,16 @@ bool isQMFv2(const Message& message) {
 template <class T> bool match(Variant::Map& schema) {
     return T::match(schema[CLASS_NAME], schema[PACKAGE_NAME]);
 }
+=======
+const string AUTO_DELETE_TIMEOUT("qpid.auto_delete_timeout");
+
+const string COLON(":");
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void sendQuery(const string& packageName, const string& className, const string& queueName,
                SessionHandler& sessionHandler)
 {
+<<<<<<< HEAD
     framing::AMQP_ServerProxy peer(sessionHandler.out);
     Variant::Map request;
     request[_WHAT] = OBJECT;
@@ -136,6 +206,14 @@ void sendQuery(const string& packageName, const string& className, const string&
     schema[_CLASS_NAME] = className;
     schema[_PACKAGE_NAME] = packageName;
     request[_SCHEMA_ID] = schema;
+=======
+    Variant::Map request;
+    request[WHAT] = OBJECT;
+    Variant::Map schema;
+    schema[CLASS_NAME] = className;
+    schema[PACKAGE_NAME] = packageName;
+    request[SCHEMA_ID] = schema;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     AMQFrame method((MessageTransferBody(ProtocolVersion(), QMF_DEFAULT_DIRECT, 0, 0)));
     method.setBof(true);
@@ -173,6 +251,7 @@ Variant::Map asMapVoid(const Variant& value) {
 }
 } // namespace
 
+<<<<<<< HEAD
 BrokerReplicator::BrokerReplicator(HaBroker& hb, const boost::shared_ptr<Link>& l)
     : Exchange(QPID_CONFIGURATION_REPLICATOR),
       logPrefix("Backup: "), replicationTest(hb.getReplicationTest()),
@@ -180,12 +259,146 @@ BrokerReplicator::BrokerReplicator(HaBroker& hb, const boost::shared_ptr<Link>& 
       initialized(false),
       alternates(hb.getBroker().getExchanges())
 {}
+=======
+// Report errors on the broker replication session.
+class BrokerReplicator::ErrorListener : public broker::SessionHandler::ErrorListener {
+  public:
+    ErrorListener(const LogPrefix& lp) : logPrefix(lp) {}
+
+    void connectionException(framing::connection::CloseCode code, const std::string& msg) {
+        QPID_LOG(error, logPrefix << framing::createConnectionException(code, msg).what());
+    }
+    void channelException(framing::session::DetachCode code, const std::string& msg) {
+        QPID_LOG(error, logPrefix << framing::createChannelException(code, msg).what());
+    }
+    void executionException(framing::execution::ErrorCode code, const std::string& msg) {
+        QPID_LOG(error, logPrefix << framing::createSessionException(code, msg).what());
+    }
+    void incomingExecutionException(framing::execution::ErrorCode code, const std::string& msg) {
+        QPID_LOG(error, logPrefix << "Incoming " << framing::createSessionException(code, msg).what());
+    }
+    void detach() {}
+
+  private:
+    const LogPrefix& logPrefix;
+};
+
+/** Keep track of queues or exchanges during the update process to solve 2
+ * problems.
+ *
+ * 1. Once all responses are processed, remove any queues/exchanges
+ * that were not mentioned as they no longer exist on the primary.
+ *
+ * 2. During the update if we see an event for an object we should
+ * ignore any subsequent responses for that object as they are out
+ * of date.
+ */
+class BrokerReplicator::UpdateTracker {
+  public:
+    typedef std::set<std::string> Names;
+    typedef boost::function<void (const std::string&)> CleanFn;
+
+    UpdateTracker(const std::string& type_, // "queue" or "exchange"
+                  CleanFn f,
+                  const LogPrefix& lp)
+        : type(type_), cleanFn(f), logPrefix(lp) {}
+
+    /** Destructor cleans up remaining initial queues. */
+    ~UpdateTracker() {
+        // Don't throw in a destructor.
+        try {
+            for_each(initial.begin(), initial.end(),
+                     boost::bind(&UpdateTracker::clean, this, _1));
+        }
+        catch (const std::exception& e) {
+            QPID_LOG(error, logPrefix << "Error in cleanup of lost objects: " << e.what());
+        }
+    }
+
+    /** Add an exchange name */
+    void addExchange(Exchange::shared_ptr ex)  { initial.insert(ex->getName()); }
+
+    /** Add a queue name. */
+    void addQueue(Queue::shared_ptr q) { initial.insert(q->getName()); }
+
+    /** Received an event for name */
+    void event(const std::string& name) {
+        initial.erase(name); // no longer a candidate for deleting
+        events.insert(name); // we have seen an event for this name
+    }
+
+    /** Received a response for name.
+     *@return true if this response should be processed, false if we have
+     *already seen an event for this object.
+     */
+    bool response(const std::string& name) {
+        initial.erase(name); // no longer a candidate for deleting
+        return events.find(name) == events.end(); // true if no event seen yet.
+    }
+
+  private:
+    void clean(const std::string& name) {
+        QPID_LOG(debug, logPrefix << "Deleted " << type << " " << name <<
+                 ": no longer exists on primary");
+        try { cleanFn(name); }
+        catch (const framing::NotFoundException&) {}
+    }
+
+    std::string type;
+    Names initial, events;
+    CleanFn cleanFn;
+    const LogPrefix& logPrefix;
+};
+
+namespace {
+template <class EventType> std::string key() {
+    pair<string,string> name = EventType::getFullName();
+    return name.first + COLON + name.second;
+}
+}
+
+boost::shared_ptr<BrokerReplicator> BrokerReplicator::create(
+    HaBroker& hb, const boost::shared_ptr<broker::Link>& l)
+{
+    boost::shared_ptr<BrokerReplicator> br(new BrokerReplicator(hb, l));
+    br->initialize();
+    return br;
+}
+
+BrokerReplicator::BrokerReplicator(HaBroker& hb, const boost::shared_ptr<Link>& l)
+    : Exchange(QPID_CONFIGURATION_REPLICATOR),
+      logPrefix(hb.logPrefix), replicationTest(NONE),
+      haBroker(hb), broker(hb.getBroker()),
+      exchanges(broker.getExchanges()), queues(broker.getQueues()),
+      link(l),
+      initialized(false),
+      alternates(hb.getBroker().getExchanges()),
+      connect(0)
+{
+    framing::FieldTable args = getArgs();
+    args.setString(QPID_REPLICATE, printable(NONE).str());
+    setArgs(args);
+
+    dispatch[key<EventQueueDeclare>()] = &BrokerReplicator::doEventQueueDeclare;
+    dispatch[key<EventQueueDelete>()] = &BrokerReplicator::doEventQueueDelete;
+    dispatch[key<EventExchangeDeclare>()] = &BrokerReplicator::doEventExchangeDeclare;
+    dispatch[key<EventExchangeDelete>()] = &BrokerReplicator::doEventExchangeDelete;
+    dispatch[key<EventBind>()] = &BrokerReplicator::doEventBind;
+    dispatch[key<EventUnbind>()] = &BrokerReplicator::doEventUnbind;
+    dispatch[key<EventMembersUpdate>()] = &BrokerReplicator::doEventMembersUpdate;
+    dispatch[key<EventSubscribe>()] = &BrokerReplicator::doEventSubscribe;
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 void BrokerReplicator::initialize() {
     // Can't do this in the constructor because we need a shared_ptr to this.
     types::Uuid uuid(true);
     const std::string name(QPID_CONFIGURATION_REPLICATOR + ".bridge." + uuid.str());
+<<<<<<< HEAD
     broker.getLinks().declare(
+=======
+    std::pair<Bridge::shared_ptr, bool> result = broker.getLinks().declare(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         name,               // name for bridge
         *link,              // parent
         false,              // durable
@@ -198,6 +411,7 @@ void BrokerReplicator::initialize() {
         "",                 // excludes
         false,              // dynamic
         0,                  // sync?
+<<<<<<< HEAD
         // shared_ptr keeps this in memory until outstanding initializeBridge
         // calls are run.
         boost::bind(&BrokerReplicator::initializeBridge, shared_from_this(), _1, _2)
@@ -208,22 +422,91 @@ BrokerReplicator::~BrokerReplicator() { }
 
 // This is called in the connection IO thread when the bridge is started.
 void BrokerReplicator::initializeBridge(Bridge& bridge, SessionHandler& sessionHandler) {
+=======
+        LinkRegistry::INFINITE_CREDIT,
+        // shared_ptr keeps this in memory until outstanding connected
+        // calls are run.
+        boost::bind(&BrokerReplicator::connected, shared_from_this(), _1, _2)
+    );
+    assert(result.second);
+    result.first->setErrorListener(boost::shared_ptr<ErrorListener>(new ErrorListener(logPrefix)));
+    broker.getConnectionObservers().add(shared_from_this());
+}
+
+BrokerReplicator::~BrokerReplicator() {}
+
+namespace {
+struct QueueReplicators : public  std::deque<boost::shared_ptr<QueueReplicator> > {
+    QueueReplicators(const ExchangeRegistry& er) { addAll(er); }
+
+    /** Add the exchange if it is a QueueReplicator. */
+    void add(const boost::shared_ptr<Exchange>& ex) {
+        boost::shared_ptr<QueueReplicator> qr =
+            boost::dynamic_pointer_cast<QueueReplicator>(ex);
+        if (qr) push_back(qr);
+    }
+    /** Add all QueueReplicator in the ExchangeRegistry. */
+    void addAll(const ExchangeRegistry& er) {
+        // Make copy of exchanges so we can work outside the registry lock.
+        er.eachExchange(boost::bind(&QueueReplicators::add, this, _1));
+    }
+};
+} // namespace
+
+void BrokerReplicator::shutdown() {
+    // NOTE: this is called in a QMF dispatch thread, not the Link's connection
+    // thread.  It's OK to be unlocked because it doesn't use any mutable state,
+    // it only calls thread safe functions objects belonging to the Broker.
+
+    // Unregister with broker objects:
+    broker.getConnectionObservers().remove(shared_from_this());
+    broker.getExchanges().destroy(getName());
+}
+
+// This is called in the connection IO thread when the bridge is started.
+void BrokerReplicator::connected(Bridge& bridge, SessionHandler& sessionHandler) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     // Use the credentials of the outgoing Link connection for creating queues,
     // exchanges etc. We know link->getConnection() is non-zero because we are
     // being called in the connections thread context.
     //
+<<<<<<< HEAD
     assert(link->getConnection());
     userId = link->getConnection()->getUserId();
     remoteHost = link->getConnection()->getUrl();
+=======
+    connect = link->getConnection();
+    assert(connect);
+    userId = link->getConnection()->getUserId();
+    remoteHost = link->getConnection()->getMgmtId();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     link->getRemoteAddress(primary);
     string queueName = bridge.getQueueName();
 
     QPID_LOG(info, logPrefix << (initialized ? "Failing over" : "Connecting")
+<<<<<<< HEAD
              << " to primary " << primary
              << " status:" << printable(haBroker.getStatus()));
     initialized = true;
 
+=======
+             << " to primary " << primary);
+    initialized = true;
+
+    exchangeTracker.reset(
+        new UpdateTracker("exchange",
+                          boost::bind(&BrokerReplicator::deleteExchange, this, _1),
+                          logPrefix));
+    exchanges.eachExchange(boost::bind(&BrokerReplicator::existingExchange, this, _1));
+
+    queueTracker.reset(
+        new UpdateTracker("queue",
+                          boost::bind(&BrokerReplicator::deleteQueue, this, _1, true),
+                          logPrefix));
+    queues.eachQueue(boost::bind(&BrokerReplicator::existingQueue, this, _1));
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     framing::AMQP_ServerProxy peer(sessionHandler.out);
     const qmf::org::apache::qpid::broker::ArgsLinkBridge& args(bridge.getArgs());
 
@@ -234,9 +517,20 @@ void BrokerReplicator::initializeBridge(Bridge& bridge, SessionHandler& sessionH
     peer.getExchange().bind(queueName, QMF_DEFAULT_TOPIC, AGENT_EVENT_BROKER, FieldTable());
     peer.getExchange().bind(queueName, QMF_DEFAULT_TOPIC, AGENT_EVENT_HA, FieldTable());
     //subscribe to the queue
+<<<<<<< HEAD
     peer.getMessage().subscribe(queueName, args.i_dest, 1, 0, false, "", 0, FieldTable());
     peer.getMessage().flow(args.i_dest, 0, 0xFFFFFFFF);
     peer.getMessage().flow(args.i_dest, 1, 0xFFFFFFFF);
+=======
+    FieldTable arguments;
+    arguments.setInt(QueueReplicator::QPID_SYNC_FREQUENCY, 1); // TODO aconway 2012-05-22: optimize?
+    peer.getMessage().subscribe(
+        queueName, args.i_dest, 1/*accept-none*/, 0/*pre-acquired*/,
+        false/*exclusive*/, "", 0, arguments);
+    peer.getMessage().setFlowMode(args.i_dest, 1); // Window
+    peer.getMessage().flow(args.i_dest, 0, haBroker.getSettings().getFlowMessages());
+    peer.getMessage().flow(args.i_dest, 1, haBroker.getSettings().getFlowBytes());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     // Issue a query request for queues, exchanges, bindings and the habroker
     // using event queue as the reply-to address
@@ -246,10 +540,29 @@ void BrokerReplicator::initializeBridge(Bridge& bridge, SessionHandler& sessionH
     sendQuery(ORG_APACHE_QPID_BROKER, BINDING, queueName, sessionHandler);
 }
 
+<<<<<<< HEAD
+=======
+// Called for each queue in existence when the backup connects to a primary.
+void BrokerReplicator::existingQueue(const boost::shared_ptr<Queue>& q) {
+    if (replicationTest.getLevel(*q)) {
+        QPID_LOG(debug, logPrefix << "Existing queue: " << q->getName());
+        queueTracker->addQueue(q);
+    }
+}
+
+void BrokerReplicator::existingExchange(const boost::shared_ptr<Exchange>& ex) {
+    if (replicationTest.getLevel(*ex)) {
+        QPID_LOG(debug, logPrefix << "Existing exchange: " << ex->getName());
+        exchangeTracker->addExchange(ex);
+    }
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void BrokerReplicator::route(Deliverable& msg) {
     // We transition from JOINING->CATCHUP on the first message received from the primary.
     // Until now we couldn't be sure if we had a good connection to the primary.
     if (haBroker.getStatus() == JOINING) {
+<<<<<<< HEAD
         haBroker.setStatus(CATCHUP);
         QPID_LOG(notice, logPrefix << "Connected to primary " << primary);
     }
@@ -286,11 +599,45 @@ void BrokerReplicator::route(Deliverable& msg) {
                 Variant::Map& values = map[VALUES].asMap();
                 framing::FieldTable args;
                 amqp_0_10::translate(asMapVoid(values[ARGUMENTS]), args);
+=======
+        haBroker.getMembership().setStatus(CATCHUP);
+        QPID_LOG(notice, logPrefix << "Connected to primary " << primary);
+    }
+    Variant::List list;
+    try {
+        if (!MessageTransfer::isQMFv2(msg.getMessage()))
+            throw Exception("Unexpected message, not QMF2 event or query response.");
+        // decode as list
+        string content = msg.getMessage().getContent();
+        qpid::amqp_0_10::ListCodec::decode(content, list);
+
+        if (msg.getMessage().getPropertyAsString(QMF_CONTENT) == EVENT) {
+            for (Variant::List::iterator i = list.begin(); i != list.end(); ++i) {
+                Variant::Map& map = i->asMap();
+                QPID_LOG(trace, logPrefix << "Broker replicator event: " << map);
+                Variant::Map& schema = map[SCHEMA_ID].asMap();
+                Variant::Map& values = map[VALUES].asMap();
+                std::string key = (schema[PACKAGE_NAME].asString() +
+                                   COLON +
+                                   schema[CLASS_NAME].asString());
+                EventDispatchMap::iterator j = dispatch.find(key);
+                if (j != dispatch.end()) (this->*(j->second))(values);
+            }
+        } else if (msg.getMessage().getPropertyAsString(QMF_OPCODE) == QUERY_RESPONSE) {
+            for (Variant::List::iterator i = list.begin(); i != list.end(); ++i) {
+                Variant::Map& map = i->asMap();
+                QPID_LOG(trace, logPrefix << "Broker replicator response: " << map);
+                string type = map[SCHEMA_ID].asMap()[CLASS_NAME].asString();
+                Variant::Map& values = map[VALUES].asMap();
+                framing::FieldTable args;
+                qpid::amqp_0_10::translate(asMapVoid(values[ARGUMENTS]), args);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                 if      (type == QUEUE) doResponseQueue(values);
                 else if (type == EXCHANGE) doResponseExchange(values);
                 else if (type == BINDING) doResponseBind(values);
                 else if (type == HA_BROKER) doResponseHaBroker(values);
             }
+<<<<<<< HEAD
             if (messageProperties->getCorrelationId() == EXCHANGE && !headers->isSet(PARTIAL)) {
                 // We have received all of the exchange response.
                 alternates.clear();
@@ -299,10 +646,28 @@ void BrokerReplicator::route(Deliverable& msg) {
     } catch (const std::exception& e) {
         QPID_LOG(critical, logPrefix << "Configuration failed: " << e.what()
                  << ": while handling: " << list);
+=======
+            if (MessageTransfer::isLastQMFResponse(msg.getMessage(), EXCHANGE)) {
+                QPID_LOG(debug, logPrefix << "All exchange responses received.")
+                exchangeTracker.reset(); // Clean up exchanges that no longer exist in the primary
+                alternates.clear();
+            }
+            if (MessageTransfer::isLastQMFResponse(msg.getMessage(), QUEUE)) {
+                QPID_LOG(debug, logPrefix << "All queue responses received.");
+                queueTracker.reset(); // Clean up queues that no longer exist in the primary
+            }
+        }
+    } catch (const std::exception& e) {
+;
+        haBroker.shutdown(
+            QPID_MSG(logPrefix << "Configuration replication failed: "
+                     << e.what() << ": while handling: " << list));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         throw;
     }
 }
 
+<<<<<<< HEAD
 void BrokerReplicator::doEventQueueDeclare(Variant::Map& values) {
     Variant::Map argsMap = asMapVoid(values[ARGS]);
     bool autoDel = values[AUTODEL].asBool();
@@ -325,6 +690,27 @@ void BrokerReplicator::doEventQueueDeclare(Variant::Map& values) {
             name, values[DURABLE].asBool(), autoDel, args, values[ALTEX].asString());
         assert(queue);  // Should be created since we destroed the previous queue above.
         if (queue) startQueueReplicator(queue);
+=======
+
+void BrokerReplicator::doEventQueueDeclare(Variant::Map& values) {
+    Variant::Map argsMap = asMapVoid(values[ARGS]);
+    if (values[DISP] == CREATED && replicationTest.getLevel(argsMap)) {
+        string name = values[QNAME].asString();
+        QueueSettings settings(values[DURABLE].asBool(), values[AUTODEL].asBool());
+        QPID_LOG(debug, logPrefix << "Queue declare event: " << name);
+        if (queueTracker.get()) queueTracker->event(name);
+        framing::FieldTable args;
+        qpid::amqp_0_10::translate(argsMap, args);
+        // If we already have a queue with this name, replace it.
+        // The queue was definitely created on the primary.
+        if (queues.find(name)) {
+            QPID_LOG(warning, logPrefix << "Declare event, replacing exsiting queue: "
+                     << name);
+            deleteQueue(name);
+        }
+        replicateQueue(name, values[DURABLE].asBool(), values[AUTODEL].asBool(), args,
+                       values[ALTEX].asString());
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -332,7 +718,11 @@ boost::shared_ptr<QueueReplicator> BrokerReplicator::findQueueReplicator(
     const std::string& qname)
 {
     string rname = QueueReplicator::replicatorName(qname);
+<<<<<<< HEAD
     boost::shared_ptr<broker::Exchange> ex = broker.getExchanges().find(rname);
+=======
+    boost::shared_ptr<broker::Exchange> ex = exchanges.find(rname);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return boost::dynamic_pointer_cast<QueueReplicator>(ex);
 }
 
@@ -340,16 +730,25 @@ void BrokerReplicator::doEventQueueDelete(Variant::Map& values) {
     // The remote queue has already been deleted so replicator
     // sessions may be closed by a "queue deleted" exception.
     string name = values[QNAME].asString();
+<<<<<<< HEAD
     boost::shared_ptr<Queue> queue = broker.getQueues().find(name);
     if (queue && replicationTest.replicateLevel(queue->getSettings())) {
         QPID_LOG(debug, logPrefix << "Queue delete event: " << name);
         stopQueueReplicator(name);
         broker.deleteQueue(name, userId, remoteHost);
+=======
+    boost::shared_ptr<Queue> queue = queues.find(name);
+    if (queue && replicationTest.getLevel(*queue)) {
+        QPID_LOG(debug, logPrefix << "Queue delete event: " << name);
+        if (queueTracker.get()) queueTracker->event(name);
+        deleteQueue(name);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void BrokerReplicator::doEventExchangeDeclare(Variant::Map& values) {
     Variant::Map argsMap(asMapVoid(values[ARGS]));
+<<<<<<< HEAD
     if (!replicationTest.replicateLevel(argsMap)) return; // Not a replicated exchange.
     if (values[DISP] == CREATED && replicationTest.replicateLevel(argsMap)) {
         string name = values[EXNAME].asString();
@@ -365,11 +764,33 @@ void BrokerReplicator::doEventExchangeDeclare(Variant::Map& values) {
         boost::shared_ptr<Exchange> exchange =
             createExchange(name, values[EXTYPE].asString(), values[DURABLE].asBool(), args, values[ALTEX].asString());
         assert(exchange);
+=======
+    if (values[DISP] == CREATED && replicationTest.getLevel(argsMap)) {
+        string name = values[EXNAME].asString();
+        QPID_LOG(debug, logPrefix << "Exchange declare event: " << name);
+        if (exchangeTracker.get()) exchangeTracker->event(name);
+        framing::FieldTable args;
+        qpid::amqp_0_10::translate(argsMap, args);
+        // If we already have a exchange with this name, replace it.
+        // The exchange was definitely created on the primary.
+        if (exchanges.find(name)) {
+            deleteExchange(name);
+            QPID_LOG(warning, logPrefix << "Declare event, replacing existing exchange: "
+                     << name);
+        }
+        //Note: unlike qieth queues, autodeleted exchanges have no
+        //messages, so need no special handling for autodelete in ha
+        CreateExchangeResult result = createExchange(
+            name, values[EXTYPE].asString(), values[DURABLE].asBool(), values[AUTODEL].asBool(), args,
+            values[ALTEX].asString());
+        assert(result.second);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void BrokerReplicator::doEventExchangeDelete(Variant::Map& values) {
     string name = values[EXNAME].asString();
+<<<<<<< HEAD
     boost::shared_ptr<Exchange> exchange = broker.getExchanges().find(name);
     if (!exchange) {
         QPID_LOG(warning, logPrefix << "Exchange delete event, does not exist: " << name);
@@ -378,11 +799,19 @@ void BrokerReplicator::doEventExchangeDelete(Variant::Map& values) {
     } else {
         QPID_LOG(debug, logPrefix << "Exchange delete event:" << name);
         broker.deleteExchange(name, userId, remoteHost);
+=======
+    boost::shared_ptr<Exchange> exchange = exchanges.find(name);
+    if (exchange && replicationTest.getLevel(*exchange)) {
+        QPID_LOG(debug, logPrefix << "Exchange delete event:" << name);
+        if (exchangeTracker.get()) exchangeTracker->event(name);
+        deleteExchange(name);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void BrokerReplicator::doEventBind(Variant::Map& values) {
     boost::shared_ptr<Exchange> exchange =
+<<<<<<< HEAD
         broker.getExchanges().find(values[EXNAME].asString());
     boost::shared_ptr<Queue> queue =
         broker.getQueues().find(values[QNAME].asString());
@@ -398,11 +827,32 @@ void BrokerReplicator::doEventBind(Variant::Map& values) {
                  << " queue=" << queue->getName()
                  << " key=" << key);
         exchange->bind(queue, key, &args);
+=======
+        exchanges.find(values[EXNAME].asString());
+    boost::shared_ptr<Queue> queue =
+        queues.find(values[QNAME].asString());
+    framing::FieldTable args;
+    qpid::amqp_0_10::translate(asMapVoid(values[ARGS]), args);
+    // We only replicate binds for a replicated queue to replicated exchange
+    // that both exist locally. Respect the replication level set in the
+    // bind arguments, but replicate by default.
+    if (exchange && replicationTest.getLevel(*exchange) &&
+        queue && replicationTest.getLevel(*queue) &&
+        ReplicationTest(ALL).getLevel(args))
+    {
+        string key = values[KEY].asString();
+        QPID_LOG(debug, logPrefix << "Bind event: exchange=" << exchange->getName()
+                 << " queue=" << queue->getName()
+                 << " key=" << key
+                 << " args=" << args);
+        queue->bind(exchange, key, args);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void BrokerReplicator::doEventUnbind(Variant::Map& values) {
     boost::shared_ptr<Exchange> exchange =
+<<<<<<< HEAD
         broker.getExchanges().find(values[EXNAME].asString());
     boost::shared_ptr<Queue> queue =
         broker.getQueues().find(values[QNAME].asString());
@@ -413,17 +863,45 @@ void BrokerReplicator::doEventUnbind(Variant::Map& values) {
     {
         framing::FieldTable args;
         amqp_0_10::translate(asMapVoid(values[ARGS]), args);
+=======
+        exchanges.find(values[EXNAME].asString());
+    boost::shared_ptr<Queue> queue =
+        queues.find(values[QNAME].asString());
+    // We only replicate unbinds for a replicated queue to replicated
+    // exchange that both exist locally.
+    if (exchange && replicationTest.getLevel(*exchange) &&
+        queue && replicationTest.getLevel(*queue))
+    {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         string key = values[KEY].asString();
         QPID_LOG(debug, logPrefix << "Unbind event: exchange=" << exchange->getName()
                  << " queue=" << queue->getName()
                  << " key=" << key);
+<<<<<<< HEAD
         exchange->unbind(queue, key, &args);
+=======
+        exchange->unbind(queue, key, 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
 void BrokerReplicator::doEventMembersUpdate(Variant::Map& values) {
     Variant::List members = values[MEMBERS].asList();
+<<<<<<< HEAD
     haBroker.setMembership(members);
+=======
+    setMembership(members);
+}
+
+void BrokerReplicator::doEventSubscribe(Variant::Map& values) {
+    // Ignore queue replicator subscriptions.
+    if (QueueReplicator::isReplicatorName(values[DEST].asString())) return;
+    boost::shared_ptr<QueueReplicator> qr = findQueueReplicator(values[QNAME]);
+    if (qr) {
+        qr->setSubscribed();
+        QPID_LOG(debug, logPrefix << "Subscribe event: " << values[QNAME]);
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace {
@@ -440,6 +918,7 @@ string getAltExchange(const types::Variant& var) {
     }
     else return string();
 }
+<<<<<<< HEAD
 }
 
 void BrokerReplicator::doResponseQueue(Variant::Map& values) {
@@ -460,10 +939,52 @@ void BrokerReplicator::doResponseQueue(Variant::Map& values) {
     // It is normal for the queue to already exist if we are failing over.
     if (queue) startQueueReplicator(queue);
     else QPID_LOG(debug, logPrefix << "Queue already replicated: " << name);
+=======
+
+Variant getHaUuid(const Variant::Map& map) {
+    Variant::Map::const_iterator i = map.find(QPID_HA_UUID);
+    return i == map.end() ? Variant() : i->second;
+}
+
+} // namespace
+
+
+void BrokerReplicator::doResponseQueue(Variant::Map& values) {
+    Variant::Map argsMap(asMapVoid(values[ARGUMENTS]));
+    if (!replicationTest.getLevel(argsMap)) return;
+    string name(values[NAME].asString());
+    if (!queueTracker.get())
+        throw Exception(QPID_MSG("Unexpected queue response: " << values));
+    if (!queueTracker->response(name)) return; // Response is out-of-date
+
+    QPID_LOG(debug, logPrefix << "Queue response: " << name);
+    boost::shared_ptr<Queue> queue = queues.find(name);
+
+    if (queue) { // Already exists
+        bool uuidOk = (getHaUuid(queue->getSettings().original) == getHaUuid(argsMap));
+        if (!uuidOk) QPID_LOG(debug, logPrefix << "UUID mismatch for queue: " << name);
+        if (uuidOk && findQueueReplicator(name)) return; // already replicated, UUID OK.
+        QPID_LOG(debug, logPrefix << "Queue response replacing queue:  " << name);
+        deleteQueue(name);
+    }
+
+    framing::FieldTable args;
+    qpid::amqp_0_10::translate(argsMap, args);
+    boost::shared_ptr<QueueReplicator> qr = replicateQueue(
+        name, values[DURABLE].asBool(), values[AUTODELETE].asBool(), args,
+        getAltExchange(values[ALTEXCHANGE]));
+    if (qr) {
+        Variant::Map::const_iterator i = values.find(CONSUMER_COUNT);
+        if (i != values.end() && isIntegerType(i->second.getType())) {
+            if (i->second.asInt64()) qr->setSubscribed();
+        }
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void BrokerReplicator::doResponseExchange(Variant::Map& values) {
     Variant::Map argsMap(asMapVoid(values[ARGUMENTS]));
+<<<<<<< HEAD
     if (!replicationTest.replicateLevel(argsMap)) return;
     string name = values[NAME].asString();
     QPID_LOG(debug, logPrefix << "Exchange response: " << name);
@@ -474,6 +995,28 @@ void BrokerReplicator::doResponseExchange(Variant::Map& values) {
         getAltExchange(values[ALTEXCHANGE]));
     // It is normal for the exchange to already exist if we are failing over.
     QPID_LOG_IF(debug, !exchange, logPrefix << "Exchange already replicated: " << name);
+=======
+    if (!replicationTest.getLevel(argsMap)) return;
+    string name = values[NAME].asString();
+    if (!exchangeTracker.get())
+        throw Exception(QPID_MSG("Unexpected exchange response: " << values));
+    if (!exchangeTracker->response(name)) return; // Response is out of date.
+    QPID_LOG(debug, logPrefix << "Exchange response: " << name);
+    framing::FieldTable args;
+    qpid::amqp_0_10::translate(argsMap, args);
+    // If we see an exchange with the same name as one we have, but a different UUID,
+    // then replace the one we have.
+    boost::shared_ptr<Exchange> exchange = exchanges.find(name);
+    if (exchange &&
+        exchange->getArgs().getAsString(QPID_HA_UUID) != args.getAsString(QPID_HA_UUID))
+    {
+        QPID_LOG(warning, logPrefix << "Exchange response replacing (UUID mismatch): " << name);
+        deleteExchange(name);
+    }
+    CreateExchangeResult result = createExchange(
+        name, values[TYPE].asString(), values[DURABLE].asBool(), values[AUTODELETE].asBool(), args,
+        getAltExchange(values[ALTEXCHANGE]));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace {
@@ -500,6 +1043,7 @@ const std::string QUEUE_REF("queueRef");
 void BrokerReplicator::doResponseBind(Variant::Map& values) {
     std::string exName = getRefName(EXCHANGE_REF_PREFIX, values[EXCHANGE_REF]);
     std::string qName = getRefName(QUEUE_REF_PREFIX, values[QUEUE_REF]);
+<<<<<<< HEAD
     boost::shared_ptr<Exchange> exchange = broker.getExchanges().find(exName);
     boost::shared_ptr<Queue> queue = broker.getQueues().find(qName);
 
@@ -514,6 +1058,26 @@ void BrokerReplicator::doResponseBind(Variant::Map& values) {
         framing::FieldTable args;
         amqp_0_10::translate(asMapVoid(values[ARGUMENTS]), args);
         exchange->bind(queue, key, &args);
+=======
+    boost::shared_ptr<Exchange> exchange = exchanges.find(exName);
+    boost::shared_ptr<Queue> queue = queues.find(qName);
+
+    framing::FieldTable args;
+    qpid::amqp_0_10::translate(asMapVoid(values[ARGUMENTS]), args);
+
+    // Automatically replicate binding if queue and exchange exist and are replicated.
+    // Respect replicate setting in binding args but default to replicated.
+    if (exchange && replicationTest.getLevel(*exchange) &&
+        queue && replicationTest.getLevel(*queue) &&
+        ReplicationTest(ALL).getLevel(args))
+    {
+        string key = values[BINDING_KEY].asString();
+        QPID_LOG(debug, logPrefix << "Bind response: exchange:" << exName
+                 << " queue:" << qName
+                 << " key:" << key
+                 << " args:" << args);
+        queue->bind(exchange, key, args);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 }
 
@@ -524,6 +1088,7 @@ const string REPLICATE_DEFAULT="replicateDefault";
 // Received the ha-broker configuration object for the primary broker.
 void BrokerReplicator::doResponseHaBroker(Variant::Map& values) {
     try {
+<<<<<<< HEAD
         QPID_LOG(trace, logPrefix << "HA Broker response: " << values);
         ReplicateLevel mine = haBroker.getSettings().replicateDefault.get();
         ReplicateLevel primary = replicationTest.replicateLevel(
@@ -561,12 +1126,70 @@ void BrokerReplicator::stopQueueReplicator(const std::string& name) {
 }
 
 boost::shared_ptr<Queue> BrokerReplicator::createQueue(
+=======
+        QPID_LOG(debug, logPrefix << "HA Broker response: " << values);
+        ReplicateLevel mine = haBroker.getSettings().replicateDefault.get();
+        ReplicateLevel primary = replicationTest.getLevel(values[REPLICATE_DEFAULT].asString());
+        if (mine != primary)
+            throw Exception(QPID_MSG("Replicate default on backup (" << mine
+                                     << ") does not match primary (" <<  primary << ")"));
+        setMembership(values[MEMBERS].asList());
+    } catch (const std::exception& e) {
+        haBroker.shutdown(
+            QPID_MSG(logPrefix << "Invalid HA Broker response: " << e.what()
+                     << ": " << values));
+
+        throw;
+    }
+}
+
+boost::shared_ptr<QueueReplicator> BrokerReplicator::startQueueReplicator(
+    const boost::shared_ptr<Queue>& queue)
+{
+    if (replicationTest.getLevel(*queue) == ALL) {
+        if (TxReplicator::isTxQueue(queue->getName())) 
+            return TxReplicator::create(haBroker, queue, link);
+        else
+            return QueueReplicator::create(haBroker, queue, link);
+    }
+    return boost::shared_ptr<QueueReplicator>();
+}
+
+void BrokerReplicator::deleteQueue(const std::string& name, bool purge) {
+    Queue::shared_ptr queue = queues.find(name);
+    if (queue) {
+        // Purge before deleting to ensure that we don't reroute any
+        // messages. Any reroutes will be done at the primary and
+        // replicated as normal.
+        if (purge) queue->purge(0, boost::shared_ptr<Exchange>());
+        haBroker.getBroker().deleteQueue(name, userId, remoteHost);
+        QPID_LOG(debug, logPrefix << "Queue deleted: " << name);
+    }
+}
+
+void BrokerReplicator::deleteExchange(const std::string& name) {
+    boost::shared_ptr<broker::Exchange> exchange = exchanges.find(name);
+    if (!exchange) {
+        QPID_LOG(warning, logPrefix << "Cannot delete exchange, not found: " << name);
+        return;
+    }
+    if (exchange->inUseAsAlternate()) {
+        QPID_LOG(warning, logPrefix << "Cannot delete exchange, in use as alternate: " << name);
+        return;
+    }
+    broker.deleteExchange(name, userId, remoteHost);
+    QPID_LOG(debug, logPrefix << "Exchange deleted: " << name);
+}
+
+boost::shared_ptr<QueueReplicator> BrokerReplicator::replicateQueue(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     const std::string& name,
     bool durable,
     bool autodelete,
     const qpid::framing::FieldTable& arguments,
     const std::string& alternateExchange)
 {
+<<<<<<< HEAD
     std::pair<boost::shared_ptr<Queue>, bool> result =
         broker.createQueue(
             name,
@@ -595,14 +1218,49 @@ boost::shared_ptr<Exchange> BrokerReplicator::createExchange(
     const std::string& alternateExchange)
 {
     std::pair<boost::shared_ptr<Exchange>, bool> result =
+=======
+    QueueSettings settings(durable, autodelete);
+    settings.populate(arguments, settings.storeSettings);
+    CreateQueueResult result =
+        broker.createQueue(
+            name,
+            settings,
+            0,// no owner regardless of exclusivity on primary
+            string(), // Set alternate exchange below
+            userId,
+            remoteHost);
+    boost::shared_ptr<QueueReplicator> qr;
+    if (!findQueueReplicator(name)) qr = startQueueReplicator(result.first);
+    if (result.second && !alternateExchange.empty()) {
+        alternates.setAlternate(
+            alternateExchange, boost::bind(&Queue::setAlternateExchange, result.first, _1));
+    }
+    return qr;
+}
+
+BrokerReplicator::CreateExchangeResult BrokerReplicator::createExchange(
+    const std::string& name,
+    const std::string& type,
+    bool durable,
+    bool autodelete,
+    const qpid::framing::FieldTable& args,
+    const std::string& alternateExchange)
+{
+    CreateExchangeResult result =
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         broker.createExchange(
             name,
             type,
             durable,
+<<<<<<< HEAD
+=======
+            autodelete,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             string(),  // Set alternate exchange below
             args,
             userId,
             remoteHost);
+<<<<<<< HEAD
     if (result.second) {
         alternates.addExchange(result.first);
         if (!alternateExchange.empty()) {
@@ -612,12 +1270,67 @@ boost::shared_ptr<Exchange> BrokerReplicator::createExchange(
         return result.first;
     }
     else return  boost::shared_ptr<Exchange>();
+=======
+    alternates.addExchange(result.first);
+    if (!alternateExchange.empty()) {
+        alternates.setAlternate(
+            alternateExchange, boost::bind(&Exchange::setAlternate, result.first, _1));
+    }
+    return result;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 bool BrokerReplicator::bind(boost::shared_ptr<Queue>, const string&, const framing::FieldTable*) { return false; }
 bool BrokerReplicator::unbind(boost::shared_ptr<Queue>, const string&, const framing::FieldTable*) { return false; }
 bool BrokerReplicator::isBound(boost::shared_ptr<Queue>, const string* const, const framing::FieldTable* const) { return false; }
+<<<<<<< HEAD
 
 string BrokerReplicator::getType() const { return QPID_CONFIGURATION_REPLICATOR; }
 
+=======
+bool BrokerReplicator::hasBindings() { return false; }
+
+// ConnectionObserver methods
+void BrokerReplicator::connection(broker::Connection&) {}
+void BrokerReplicator::opened(broker::Connection&) {}
+
+void BrokerReplicator::closed(broker::Connection& c) {
+    if (link && &c == connect) disconnected();
+}
+
+void BrokerReplicator::forced(broker::Connection& c, const std::string& message) {
+    if (link && &c == link->getConnection()) {
+        haBroker.shutdown(
+            QPID_MSG(logPrefix << "Connection forced, cluster may be misconfigured: "
+                     << message));
+    }
+    closed(c);
+}
+
+string BrokerReplicator::getType() const { return QPID_CONFIGURATION_REPLICATOR; }
+
+void BrokerReplicator::disconnectedQueueReplicator(
+    const boost::shared_ptr<QueueReplicator>& qr)
+{
+    qr->disconnect();
+    if (TxReplicator::isTxQueue(qr->getQueue()->getName())) {
+        // Transactions are aborted on failover so clean up tx-queues
+        deleteQueue(qr->getQueue()->getName());
+    }
+}
+
+// Called by ConnectionObserver::disconnected, disconnected from the network side.
+void BrokerReplicator::disconnected() {
+    QPID_LOG(info, logPrefix << "Disconnected from primary " << primary);
+    connect = 0;
+    QueueReplicators qrs(broker.getExchanges());
+    for_each(qrs.begin(), qrs.end(),
+             boost::bind(&BrokerReplicator::disconnectedQueueReplicator, this, _1));
+}
+
+void BrokerReplicator::setMembership(const Variant::List& brokers) {
+    haBroker.getMembership().assign(brokers);
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }} // namespace broker

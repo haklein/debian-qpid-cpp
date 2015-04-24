@@ -246,6 +246,7 @@ ostream& operator<<(ostream& out, const ObjectId& i)
 }}
 
 ManagementObject::ManagementObject(Manageable* _core) :
+<<<<<<< HEAD
 createTime(qpid::sys::Duration(sys::EPOCH, sys::now())),
         destroyTime(0), updateTime(createTime), configChanged(true),
         instChanged(true), deleted(false),
@@ -254,12 +255,26 @@ createTime(qpid::sys::Duration(sys::EPOCH, sys::now())),
 void ManagementObject::setUpdateTime()
 {
     updateTime = sys::Duration(sys::EPOCH, sys::now());
+=======
+    createTime(qpid::sys::Duration::FromEpoch()),
+    destroyTime(0), updateTime(createTime), configChanged(true),
+    instChanged(true), deleted(false),
+    coreObject(_core), flags(0), forcePublish(false) {}
+
+void ManagementObject::setUpdateTime()
+{
+    updateTime = sys::Duration::FromEpoch();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void ManagementObject::resourceDestroy()
 {
     QPID_LOG(trace, "Management object marked deleted: " << getObjectId().getV2Key());
+<<<<<<< HEAD
     destroyTime = sys::Duration(sys::EPOCH, sys::now());
+=======
+    destroyTime = sys::Duration::FromEpoch();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     deleted     = true;
 }
 

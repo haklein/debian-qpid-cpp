@@ -33,7 +33,11 @@ class Message;
 namespace client {
 namespace amqp0_10 {
 
+<<<<<<< HEAD
 struct OutgoingMessage;
+=======
+class OutgoingMessage;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 /**
  *

@@ -44,20 +44,38 @@ namespace tests {
 
 QPID_AUTO_TEST_SUITE(XmlClientSessionTest)
 
+<<<<<<< HEAD
 using namespace qpid::client;
 
 using namespace qpid::client::arg;
 using namespace qpid::framing;
 using namespace qpid;
 using qpid::sys::Shlib;
+=======
+struct XmlFixture {
+    XmlFixture() {
+        qpid::sys::Shlib shlib(getLibPath("XML_LIB"));
+    }
+    ~XmlFixture() {}
+};
+
+using namespace qpid::client;
+using namespace qpid::client::arg;
+using namespace qpid::framing;
+using namespace qpid;
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using qpid::sys::Monitor;
 using std::string;
 using std::cout;
 using std::endl;
 
 
+<<<<<<< HEAD
 Shlib shlib(getLibPath("XML_LIB"));
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 class SubscribedLocalQueue : public LocalQueue {
   private:
     SubscriptionManager& subscriptions;
@@ -104,7 +122,11 @@ struct ClientSessionFixture : public SessionFixture
 
 // ########### START HERE ####################################
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXmlBinding) {
+=======
+QPID_FIXTURE_TEST_CASE(testXmlBinding, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
     SubscriptionManager subscriptions(f.session);
@@ -135,7 +157,11 @@ QPID_AUTO_TEST_CASE(testXmlBinding) {
 /**
  * Ensure that multiple queues can be bound using the same routing key
  */
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXMLBindMultipleQueues) {
+=======
+QPID_FIXTURE_TEST_CASE(testXMLBindMultipleQueues, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
 
@@ -166,7 +192,11 @@ QPID_AUTO_TEST_CASE(testXMLBindMultipleQueues) {
 //### Test: Bad XML does not kill the server - and does not even
 // raise an exception, the content is not required to be XML.
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXMLSendBadXML) {
+=======
+QPID_FIXTURE_TEST_CASE(testXMLSendBadXML, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
     f.session.exchangeDeclare(arg::exchange="xml", arg::type="xml");
@@ -192,7 +222,11 @@ lour", arg::arguments=red);
 
 //### Test: Bad XQuery does not kill the server, but does raise an exception
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXMLBadXQuery) {
+=======
+QPID_FIXTURE_TEST_CASE(testXMLBadXQuery, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
     f.session.exchangeDeclare(arg::exchange="xml", arg::type="xml");
@@ -216,7 +250,11 @@ olour", arg::arguments=blue);
 
 //### Test: double, string, and integer field values can all be bound to queries
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXmlBindingUntyped) {
+=======
+QPID_FIXTURE_TEST_CASE(testXmlBindingUntyped, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
     SubscriptionManager subscriptions(f.session);
@@ -252,7 +290,11 @@ QPID_AUTO_TEST_CASE(testXmlBindingUntyped) {
 
 //### Test: double, string, and integer field values can all be bound to queries
 
+<<<<<<< HEAD
 QPID_AUTO_TEST_CASE(testXmlBindingTyped) {
+=======
+QPID_FIXTURE_TEST_CASE(testXmlBindingTyped, XmlFixture) {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ClientSessionFixture f;
 
     SubscriptionManager subscriptions(f.session);

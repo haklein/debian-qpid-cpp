@@ -21,6 +21,7 @@
 
 #include "LoadPlugins.h"
 
+<<<<<<< HEAD
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #endif
@@ -29,6 +30,16 @@
 #include <string>
 #include <vector>
 
+=======
+#include "qpid/Modules.h"
+#include "qpid/sys/Shlib.h"
+
+#include <string>
+#include <vector>
+
+#include "config.h"
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 using std::vector;
 using std::string;
 
@@ -48,7 +59,11 @@ struct LoadtimeInitialise {
         for (vector<string>::iterator iter = moduleOptions.load.begin();
              iter != moduleOptions.load.end();
              iter++)
+<<<<<<< HEAD
             qpid::tryShlib (iter->data(), false);
+=======
+            qpid::tryShlib (*iter);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     
         if (!moduleOptions.noLoad) {
             bool isDefault = defaultPath == moduleOptions.loadDir;

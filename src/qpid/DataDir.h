@@ -42,11 +42,19 @@ class DataDir
 
   public:
 
+<<<<<<< HEAD
 	QPID_COMMON_EXTERN DataDir (std::string path);
 	QPID_COMMON_EXTERN ~DataDir ();
 
     bool isEnabled() { return enabled; }
     const std::string& getPath() { return dirPath; }
+=======
+	QPID_COMMON_EXTERN DataDir (const std::string& path);
+	QPID_COMMON_EXTERN ~DataDir ();
+
+    bool isEnabled() const { return enabled; }
+    const std::string& getPath() const { return dirPath; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
  
 } // namespace qpid

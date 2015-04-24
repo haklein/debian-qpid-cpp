@@ -20,7 +20,11 @@
  */
 
 #include "TestOptions.h"
+<<<<<<< HEAD
 
+=======
+#include "qpid/OptionsTemplates.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/client/AsyncSession.h"
 #include "qpid/client/SubscriptionManager.h"
 #include "qpid/client/Connection.h"
@@ -69,7 +73,10 @@ ostream& operator<<(ostream& out, Mode mode) {
     return out << modeNames[mode];
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 struct Opts : public TestOptions {
 
     // Actions
@@ -683,7 +690,15 @@ struct SubscribeThread : public Client {
     }
 };
 
+<<<<<<< HEAD
 }} // namespace qpid::tests
+=======
+}
+
+template po::value_semantic* create_value(tests::Mode& val, const std::string& arg);
+
+} // namespace qpid::tests
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 using namespace qpid::tests;
 

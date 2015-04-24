@@ -45,6 +45,7 @@ Exception::Exception(const std::string& msg) throw() : message(msg) {
 
 Exception::~Exception() throw() {}
 
+<<<<<<< HEAD
 std::string Exception::getPrefix() const { return ""; }
 
 std::string Exception::getMessage() const { return message; }
@@ -55,6 +56,22 @@ const char* Exception::what() const throw() {
         whatStr = getPrefix();
         if (!whatStr.empty()) whatStr +=  ": ";
         whatStr += message;
+=======
+std::string Exception::getPrefix() const { return std::string(); }
+
+std::string Exception::getMessage() const { return message; }
+
+namespace { const std::string COLON(": "); }
+
+const char* Exception::what() const throw() {
+    // Construct the what string the first time it is needed.
+    if (whatStr.empty()) {
+        if (message.compare(0, getPrefix().size(), getPrefix()) == 0 || // Already has prefix
+            getPrefix().empty())                                        // No prefix
+            whatStr = message;
+        else
+            whatStr = getPrefix() + COLON + message;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     return whatStr.c_str();
 }

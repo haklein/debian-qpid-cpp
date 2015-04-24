@@ -24,6 +24,12 @@
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/sys/Socket.h"
+<<<<<<< HEAD
+=======
+#include "qpid/sys/windows/WinSocket.h"
+#include "qpid/sys/SecuritySettings.h"
+#include "qpid/sys/SocketAddress.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include "qpid/sys/Poller.h"
 #include "qpid/sys/Thread.h"
 #include "qpid/sys/Time.h"
@@ -40,6 +46,11 @@
 #include <windows.h>
 
 #include <boost/bind.hpp>
+<<<<<<< HEAD
+=======
+#include <boost/shared_array.hpp>
+#include "qpid/sys/windows/AsynchIO.h"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace {
 
@@ -49,8 +60,13 @@ namespace {
  * The function pointers for AcceptEx and ConnectEx need to be looked up
  * at run time.
  */
+<<<<<<< HEAD
 const LPFN_ACCEPTEX lookUpAcceptEx(const qpid::sys::Socket& s) {
     SOCKET h = toSocketHandle(s);
+=======
+const LPFN_ACCEPTEX lookUpAcceptEx(const qpid::sys::IOHandle& io) {
+    SOCKET h = io.fd;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     GUID guidAcceptEx = WSAID_ACCEPTEX;
     DWORD dwBytes = 0;
     LPFN_ACCEPTEX fnAcceptEx;
@@ -78,6 +94,7 @@ namespace windows {
  * Asynch Acceptor
  *
  */
+<<<<<<< HEAD
 class AsynchAcceptor : public qpid::sys::AsynchAcceptor {
 
     friend class AsynchAcceptResult;
@@ -98,6 +115,12 @@ private:
 AsynchAcceptor::AsynchAcceptor(const Socket& s, Callback callback)
   : acceptedCallback(callback),
     socket(s),
+=======
+AsynchAcceptor::AsynchAcceptor(const Socket& s, Callback callback)
+  : acceptedCallback(callback),
+    socket(s),
+    wSocket(IOHandle(s).fd),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     fnAcceptEx(lookUpAcceptEx(s)) {
 
     s.setNonblocking();
@@ -120,8 +143,13 @@ void AsynchAcceptor::restart(void) {
                                                         this,
                                                         socket);
     BOOL status;
+<<<<<<< HEAD
     status = fnAcceptEx(toSocketHandle(socket),
                         toSocketHandle(*result->newSocket),
+=======
+    status = fnAcceptEx(wSocket,
+                        IOHandle(*result->newSocket).fd,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                         result->addressBuffer,
                         0,
                         AsynchAcceptResult::SOCKADDRMAXLEN,
@@ -132,6 +160,7 @@ void AsynchAcceptor::restart(void) {
 }
 
 
+<<<<<<< HEAD
 AsynchAcceptResult::AsynchAcceptResult(AsynchAcceptor::Callback cb,
                                        AsynchAcceptor *acceptor,
                                        const Socket& listener)
@@ -142,6 +171,32 @@ AsynchAcceptResult::AsynchAcceptResult(AsynchAcceptor::Callback cb,
 
 void AsynchAcceptResult::success(size_t /*bytesTransferred*/) {
     ::setsockopt (toSocketHandle(*newSocket),
+=======
+Socket* createSameTypeSocket(const Socket& sock) {
+    SOCKET socket = IOHandle(sock).fd;
+    // Socket currently has no actual socket attached
+    if (socket == INVALID_SOCKET)
+        return new WinSocket;
+
+    ::sockaddr_storage sa;
+    ::socklen_t salen = sizeof(sa);
+    QPID_WINSOCK_CHECK(::getsockname(socket, (::sockaddr*)&sa, &salen));
+    SOCKET s = ::socket(sa.ss_family, SOCK_STREAM, 0); // Currently only work with SOCK_STREAM
+    if (s == INVALID_SOCKET) throw QPID_WINDOWS_ERROR(WSAGetLastError());
+    return new WinSocket(s);
+}
+
+AsynchAcceptResult::AsynchAcceptResult(AsynchAcceptor::Callback cb,
+                                       AsynchAcceptor *acceptor,
+                                       const Socket& lsocket)
+  : callback(cb), acceptor(acceptor),
+    listener(IOHandle(lsocket).fd),
+    newSocket(createSameTypeSocket(lsocket)) {
+}
+
+void AsynchAcceptResult::success(size_t /*bytesTransferred*/) {
+    ::setsockopt (IOHandle(*newSocket).fd,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                   SOL_SOCKET,
                   SO_UPDATE_ACCEPT_CONTEXT,
                   (char*)&listener,
@@ -164,6 +219,7 @@ void AsynchAcceptResult::failure(int /*status*/) {
  * event handle to associate with the connecting handle. But there's no
  * time for that right now...
  */
+<<<<<<< HEAD
 class AsynchConnector : public qpid::sys::AsynchConnector {
 private:
     ConnectedCallback connCallback;
@@ -181,6 +237,8 @@ public:
     void start(Poller::shared_ptr poller);
 };
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 AsynchConnector::AsynchConnector(const Socket& sock,
                                  const std::string& hname,
                                  const std::string& p,
@@ -194,7 +252,11 @@ AsynchConnector::AsynchConnector(const Socket& sock,
 void AsynchConnector::start(Poller::shared_ptr)
 {
     try {
+<<<<<<< HEAD
         socket.connect(hostname, port);
+=======
+        socket.connect(SocketAddress(hostname, port));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         socket.setNonblocking();
         connCallback(socket);
     } catch(std::exception& e) {
@@ -204,6 +266,16 @@ void AsynchConnector::start(Poller::shared_ptr)
     }
 }
 
+<<<<<<< HEAD
+=======
+// This can never be called in the current windows code as connect
+// is blocking and requestCallback only makes sense if connect is
+// non-blocking with the results returned via a poller callback.
+void AsynchConnector::requestCallback(RequestCallback rCb)
+{
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 } // namespace windows
 
 AsynchAcceptor* AsynchAcceptor::create(const Socket& s, 
@@ -232,6 +304,7 @@ AsynchConnector* qpid::sys::AsynchConnector::create(const Socket& s,
 
 namespace windows {
 
+<<<<<<< HEAD
 class AsynchIO : public qpid::sys::AsynchIO {
 public:
     AsynchIO(const Socket& s,
@@ -353,12 +426,18 @@ private:
     void cancelRead();
 };
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // This is used to encapsulate pure callbacks into a handle
 class CallbackHandle : public IOHandle {
 public:
     CallbackHandle(AsynchIoResult::Completer completeCb,
                    AsynchIO::RequestCallback reqCb = 0) :
+<<<<<<< HEAD
     IOHandle(new IOHandlePrivate (INVALID_SOCKET, completeCb, reqCb))
+=======
+        IOHandle(INVALID_SOCKET, completeCb, reqCb)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     {}
 };
 
@@ -377,6 +456,10 @@ AsynchIO::AsynchIO(const Socket& s,
     emptyCallback(eCb),
     idleCallback(iCb),
     socket(s),
+<<<<<<< HEAD
+=======
+    bufferCount(BufferCount),
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     opsInProgress(0),
     writeInProgress(false),
     readInProgress(false),
@@ -385,6 +468,7 @@ AsynchIO::AsynchIO(const Socket& s,
     working(false) {
 }
 
+<<<<<<< HEAD
 struct deleter
 {
     template <typename T>
@@ -394,6 +478,9 @@ struct deleter
 AsynchIO::~AsynchIO() {
     std::for_each( bufferQueue.begin(), bufferQueue.end(), deleter());
     std::for_each( writeQueue.begin(), writeQueue.end(), deleter());
+=======
+AsynchIO::~AsynchIO() {
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void AsynchIO::queueForDeletion() {
@@ -426,6 +513,27 @@ void AsynchIO::start(Poller::shared_ptr poller0) {
     startReading();
 }
 
+<<<<<<< HEAD
+=======
+uint32_t AsynchIO::getBufferCount(void) { return bufferCount; }
+
+void AsynchIO::setBufferCount(uint32_t count) { bufferCount = count; }
+
+
+void AsynchIO::createBuffers(uint32_t size) {
+    // Allocate all the buffer memory at once
+    bufferMemory.reset(new char[size*bufferCount]);
+
+    // Create the Buffer structs in a vector
+    // And push into the buffer queue
+    buffers.reserve(bufferCount);
+    for (uint32_t i = 0; i < bufferCount; i++) {
+        buffers.push_back(BufferBase(&bufferMemory[i*size], size));
+        queueReadBuffer(&buffers[i]);
+    }
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void AsynchIO::queueReadBuffer(AsynchIO::BufferBase* buff) {
     assert(buff);
     buff->dataStart = 0;
@@ -496,6 +604,12 @@ void AsynchIO::startReading() {
             assert(buff);
             bufferQueue.pop_front();
         }
+<<<<<<< HEAD
+=======
+        else {
+            logNoBuffers("startReading");
+        }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     if (buff != 0) {
         int readCount = buff->byteCount - buff->dataCount;
@@ -506,7 +620,11 @@ void AsynchIO::startReading() {
         DWORD bytesReceived = 0, flags = 0;
         InterlockedIncrement(&opsInProgress);
         readInProgress = true;
+<<<<<<< HEAD
         int status = WSARecv(toSocketHandle(socket),
+=======
+        int status = WSARecv(IOHandle(socket).fd,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                              const_cast<LPWSABUF>(result->getWSABUF()), 1,
                              &bytesReceived,
                              &flags,
@@ -528,6 +646,7 @@ void AsynchIO::startReading() {
     return;
 }
 
+<<<<<<< HEAD
 // stopReading was added to prevent a race condition with read-credit on Linux.
 // It may or may not be required on windows.
 // 
@@ -537,6 +656,8 @@ void AsynchIO::startReading() {
 // 
 void AsynchIO::stopReading() {}
 
+=======
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 // Queue the specified callback for invocation from an I/O thread.
 void AsynchIO::requestCallback(RequestCallback callback) {
     // This method is generally called from a processing thread; transfer
@@ -557,12 +678,26 @@ void AsynchIO::requestCallback(RequestCallback callback) {
  */
 AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
     QLock l(bufferQueueLock);
+<<<<<<< HEAD
     // Always keep at least one buffer (it might have data that was
     // "unread" in it).
     if (bufferQueue.size() <= 1)
         return 0;
     BufferBase* buff = bufferQueue.back();
     assert(buff);
+=======
+    BufferBase* buff = bufferQueue.empty() ? 0 : bufferQueue.back();
+    // An "unread" buffer is reserved for future read operations (which
+    // take from the front of the queue).
+    if (!buff || (buff->dataCount && bufferQueue.size() == 1)) {
+        if (buff)
+            logNoBuffers("getQueuedBuffer with unread data");
+        else
+            logNoBuffers("getQueuedBuffer with empty queue");
+        return 0;
+    }
+    assert(buff->dataCount == 0);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     bufferQueue.pop_back();
     return buff;
 }
@@ -573,6 +708,7 @@ void AsynchIO::notifyEof(void) {
 }
 
 void AsynchIO::notifyDisconnect(void) {
+<<<<<<< HEAD
     if (disCallback)
         disCallback(*this);
 }
@@ -580,6 +716,27 @@ void AsynchIO::notifyDisconnect(void) {
 void AsynchIO::notifyClosed(void) {
     if (closedCallback)
         closedCallback(*this, socket);
+=======
+    if (disCallback) {
+        DisconnectCallback dcb = disCallback;
+        closedCallback = 0;
+        disCallback = 0;
+        dcb(*this);
+        // May have just been deleted.
+        return;
+    }
+}
+
+void AsynchIO::notifyClosed(void) {
+    if (closedCallback) {
+        ClosedCallback ccb = closedCallback;
+        closedCallback = 0;
+        disCallback = 0;
+        ccb(*this, socket);
+        // May have just been deleted.
+        return;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void AsynchIO::notifyBuffersEmpty(void) {
@@ -604,7 +761,11 @@ void AsynchIO::startWrite(AsynchIO::BufferBase* buff) {
                               buff,
                               buff->dataCount);
     DWORD bytesSent = 0;
+<<<<<<< HEAD
     int status = WSASend(toSocketHandle(socket),
+=======
+    int status = WSASend(IOHandle(socket).fd,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                          const_cast<LPWSABUF>(result->getWSABUF()), 1,
                          &bytesSent,
                          0,
@@ -630,6 +791,16 @@ void AsynchIO::close(void) {
     notifyClosed();
 }
 
+<<<<<<< HEAD
+=======
+SecuritySettings AsynchIO::getSecuritySettings() {
+    SecuritySettings settings;
+    settings.ssf = socket.getKeyLen();
+    settings.authid = socket.getClientAuthId();
+    return settings;
+}
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 void AsynchIO::readComplete(AsynchReadResult *result) {
     int status = result->getStatus();
     size_t bytes = result->getTransferred();
@@ -674,7 +845,12 @@ void AsynchIO::writeComplete(AsynchWriteResult *result) {
         else {
             // An error... if it's a connection close, ignore it - it will be
             // noticed and handled on a read completion any moment now.
+<<<<<<< HEAD
             // What to do with real error??? Save the Buffer?
+=======
+            // What to do with real error??? Save the Buffer?  TBD.
+            queueReadBuffer(buff);     // All done; back to the pool
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         }
     }
 
@@ -780,6 +956,24 @@ void AsynchIO::cancelRead() {
     socket.close();
 }
 
+<<<<<<< HEAD
+=======
+/*
+ * Track down cause of unavailable buffer if it recurs: QPID-5033
+ */
+void AsynchIO::logNoBuffers(const char *context) {
+    QPID_LOG(error, "No IO buffers available: " << context <<
+             ". Debug data: " << bufferQueue.size() <<
+             ' ' << writeQueue.size() <<
+             ' ' << completionQueue.size() <<
+             ' ' << opsInProgress <<
+             ' ' << writeInProgress <<
+             ' ' << readInProgress <<
+             ' ' << working);
+}
+
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 } // namespace windows
 
 AsynchIO* qpid::sys::AsynchIO::create(const Socket& s,

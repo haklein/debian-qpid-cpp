@@ -45,9 +45,15 @@ DirectExchange::DirectExchange(const string& _name, Manageable* _parent, Broker*
         mgmtExchange->set_type(typeName);
 }
 
+<<<<<<< HEAD
 DirectExchange::DirectExchange(const string& _name, bool _durable,
                                const FieldTable& _args, Manageable* _parent, Broker* b) :
     Exchange(_name, _durable, _args, _parent, b)
+=======
+DirectExchange::DirectExchange(const string& _name, bool _durable, bool autodelete,
+                               const FieldTable& _args, Manageable* _parent, Broker* b) :
+    Exchange(_name, _durable, autodelete, _args, _parent, b)
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
     if (mgmtExchange != 0)
         mgmtExchange->set_type(typeName);
@@ -63,14 +69,22 @@ bool DirectExchange::bind(Queue::shared_ptr queue, const string& routingKey, con
         fedOp = args->getAsString(qpidFedOp);
         fedTags = args->getAsString(qpidFedTags);
         fedOrigin = args->getAsString(qpidFedOrigin);
+<<<<<<< HEAD
         exclusiveBinding = args->get(qpidExclusiveBinding);  // only direct exchanges take exclusive bindings
+=======
+        exclusiveBinding = !!args->get(qpidExclusiveBinding);  // only direct exchanges take exclusive bindings
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
 
     bool propagate = false;
 
     if (args == 0 || fedOp.empty() || fedOp == fedOpBind) {
         Mutex::ScopedLock l(lock);
+<<<<<<< HEAD
         Binding::shared_ptr b(new Binding(routingKey, queue, this, FieldTable(), fedOrigin));
+=======
+        Binding::shared_ptr b(new Binding(routingKey, queue, this, args ? *args : FieldTable(), fedOrigin));
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         BoundKey& bk = bindings[routingKey];
         if (exclusiveBinding) bk.queues.clear();
 
@@ -131,6 +145,10 @@ bool DirectExchange::unbind(Queue::shared_ptr queue, const string& routingKey, c
 {
     string fedOrigin(args ? args->getAsString(qpidFedOrigin) : "");
     bool propagate = false;
+<<<<<<< HEAD
+=======
+    bool empty = false;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     QPID_LOG(debug, "Unbinding key [" << routingKey << "] from queue " << queue->getName()
              << " on exchange " << getName() << " origin=" << fedOrigin << ")" );
@@ -144,6 +162,10 @@ bool DirectExchange::unbind(Queue::shared_ptr queue, const string& routingKey, c
             }
             if (bk.queues.empty()) {
                 bindings.erase(routingKey);
+<<<<<<< HEAD
+=======
+                if (bindings.empty()) empty = true;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
             }
         } else {
             return false;
@@ -153,6 +175,10 @@ bool DirectExchange::unbind(Queue::shared_ptr queue, const string& routingKey, c
     // If I delete my local binding, propagate this unbind to any upstream brokers
     if (propagate)
         propagateFedOp(routingKey, string(), fedOpUnbind, string());
+<<<<<<< HEAD
+=======
+    if (empty) checkAutodelete();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     return true;
 }
 
@@ -163,7 +189,12 @@ void DirectExchange::route(Deliverable& msg)
     ConstBindingList b;
     {
         Mutex::ScopedLock l(lock);
+<<<<<<< HEAD
         b = bindings[routingKey].queues.snapshot();
+=======
+        Bindings::iterator i = bindings.find(routingKey);
+        if (i != bindings.end()) b = i->second.queues.snapshot();
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     }
     doRoute(msg, b);
 }
@@ -196,6 +227,21 @@ bool DirectExchange::isBound(Queue::shared_ptr queue, const string* const routin
     return false;
 }
 
+<<<<<<< HEAD
 DirectExchange::~DirectExchange() {}
 
 const std::string DirectExchange::typeName("direct");
+=======
+DirectExchange::~DirectExchange() {
+    if (mgmtExchange != 0)
+        mgmtExchange->debugStats("destroying");
+}
+
+const std::string DirectExchange::typeName("direct");
+
+bool DirectExchange::hasBindings()
+{
+    Mutex::ScopedLock l(lock);
+    return !bindings.empty();
+}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32

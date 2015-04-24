@@ -257,6 +257,11 @@ class CMakeLists(Makefile):
 
 
 class Generator:
+<<<<<<< HEAD
+=======
+  verbose = False
+  
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   """
   This class manages code generation using template files.  It is instantiated
   once for an entire code generation session.
@@ -304,11 +309,31 @@ class Generator:
   def testGenQMFv1 (self, variables):
     return variables["genQmfV1"]
 
+<<<<<<< HEAD
+=======
+  def testGenLogs (self, variables):
+    return variables["genLogs"]
+
+  def testInBroker (self, variables):
+    return variables['genForBroker']
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   def genDisclaimer (self, stream, variables):
     prefix = variables["commentPrefix"]
     stream.write (prefix + " This source file was created by a code generator.\n")
     stream.write (prefix + " Please do not edit.")
 
+<<<<<<< HEAD
+=======
+  def genExternClass (self, stream, variables):
+    if variables['genForBroker']:
+      stream.write("QPID_BROKER_CLASS_EXTERN")
+
+  def genExternMethod (self, stream, variables):
+    if variables['genForBroker']:
+      stream.write("QPID_BROKER_EXTERN")
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
   def fileExt (self, path):
     dot = path.rfind (".")
     if dot == -1:
@@ -336,7 +361,13 @@ class Generator:
       pass
 
     os.rename (tempFile, target)
+<<<<<<< HEAD
     print "Generated:", target
+=======
+
+    if self.verbose:
+      print "Generated:", target
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
   def targetPackageFile (self, schema, templateFile):
     dot = templateFile.find(".")

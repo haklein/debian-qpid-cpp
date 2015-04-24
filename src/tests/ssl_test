@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+#!/usr/bin/env bash
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -20,6 +24,7 @@
 #
 
 # Run a simple test over SSL
+<<<<<<< HEAD
 source ./test_env.sh
 
 CONFIG=$(dirname $0)/config.null
@@ -29,10 +34,32 @@ TEST_HOSTNAME=127.0.0.1
 TEST_CLIENT_CERT=rumplestiltskin
 COUNT=10
 
+=======
+
+#set -x
+
+CONFIG=$(dirname $0)/config.null
+TEST_CERT_DIR=`pwd`/test_cert_dir
+CERT_DB=${TEST_CERT_DIR}/test_cert_db
+CERT_PW_FILE=`pwd`/cert.password
+TEST_HOSTNAME=127.0.0.1
+TEST_CLIENT_CERT=rumplestiltskin
+CA_PEM_FILE=${TEST_CERT_DIR}/ca_cert.pem
+OTHER_CA_CERT_DB=${TEST_CERT_DIR}/x_ca_cert_db
+OTHER_CA_PEM_FILE=${TEST_CERT_DIR}/other_ca_cert.pem
+PY_PING_BROKER=${QPID_TEST_SRC_DIR}/ping_broker
+COUNT=10
+
+if [[ -a $AMQP_LIB ]] ; then
+    MODULES="--load-module $AMQP_LIB"
+fi
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 trap cleanup EXIT
 
 error() { echo $*; exit 1; }
 
+<<<<<<< HEAD
 create_certs() {
     #create certificate and key databases with single, simple, self-signed certificate in it
     mkdir ${CERT_DIR}
@@ -44,11 +71,64 @@ create_certs() {
 delete_certs() {
     if [[ -e ${CERT_DIR} ]] ;  then
         rm -rf ${CERT_DIR}
+=======
+# create the test certificate database
+#    $1 = string used as Subject in server's certificate
+#    $2 = string used as SubjectAlternateName (SAN) in server's certificate
+create_certs() {
+
+    local CERT_SUBJECT=${1:-"CN=${TEST_HOSTNAME},O=MyCo,ST=Massachusetts,C=US"}
+    local CERT_SAN=${2:-"*.server.com"}
+
+    mkdir -p ${TEST_CERT_DIR}
+    rm -rf ${TEST_CERT_DIR}/*
+
+    # Set Up a CA with a self-signed Certificate
+    #
+    mkdir -p ${CERT_DB}
+    certutil -N -d ${CERT_DB} -f ${CERT_PW_FILE}
+    certutil -S -d ${CERT_DB} -n "Test-CA" -s "CN=Test-CA,O=MyCo,ST=Massachusetts,C=US" -t "CT,," -x -f ${CERT_PW_FILE} -z /bin/sh >/dev/null 2>&1
+    certutil -L -d ${CERT_DB} -n "Test-CA" -a -o ${CERT_DB}/rootca.crt -f ${CERT_PW_FILE}
+    #certutil -L -d ${CERT_DB} -f ${CERT_PW_FILE}
+
+    # create server certificate signed by Test-CA
+    #
+    certutil -R -d ${CERT_DB} -s "${CERT_SUBJECT}" -o ${TEST_CERT_DIR}/server.req -f ${CERT_PW_FILE} -z /bin/sh > /dev/null 2>&1
+    certutil -C -d ${CERT_DB} -c "Test-CA" -8 "${CERT_SAN}" -i ${TEST_CERT_DIR}/server.req -o ${TEST_CERT_DIR}/server.crt -f ${CERT_PW_FILE} -m ${RANDOM}
+    certutil -A -d ${CERT_DB} -n ${TEST_HOSTNAME} -i ${TEST_CERT_DIR}/server.crt -t "Pu,,"
+
+    # create a certificate to identify the client
+    #
+    certutil -R -d ${CERT_DB} -s "CN=${TEST_CLIENT_CERT}" -o ${TEST_CERT_DIR}/client.req -f ${CERT_PW_FILE} -z /bin/sh > /dev/null 2>&1
+    certutil -C -d ${CERT_DB} -c "Test-CA" -8 "*.client.com" -i ${TEST_CERT_DIR}/client.req -o ${TEST_CERT_DIR}/client.crt -f ${CERT_PW_FILE} -m ${RANDOM}
+    certutil -A -d ${CERT_DB} -n ${TEST_CLIENT_CERT} -i ${TEST_CERT_DIR}/client.crt -t "Pu,,"
+    ###
+    #certutil -N -d ${SERVER_CERT_DIR} -f ${CERT_PW_FILE}
+    #certutil -S -d ${SERVER_CERT_DIR} -n ${TEST_HOSTNAME} -s "CN=${TEST_HOSTNAME}" -t "CT,," -x -f ${CERT_PW_FILE} -z /usr/bin/certutil
+    #certutil -S -d ${SERVER_CERT_DIR} -n ${TEST_CLIENT_CERT} -s "CN=${TEST_CLIENT_CERT}" -t "CT,," -x -f ${CERT_PW_FILE} -z /usr/bin/certutil
+
+    # Set up a separate DB with its own CA for testing failure to validate scenario
+    #
+    mkdir -p ${OTHER_CA_CERT_DB}
+    certutil -N -d ${OTHER_CA_CERT_DB} -f ${CERT_PW_FILE}
+    certutil -S -d ${OTHER_CA_CERT_DB} -n "Other-Test-CA" -s "CN=Another Test CA,O=MyCo,ST=Massachusetts,C=US" -t "CT,," -x -f ${CERT_PW_FILE} -z /bin/sh >/dev/null 2>&1
+    certutil -L -d ${OTHER_CA_CERT_DB} -n "Other-Test-CA" -a -o ${OTHER_CA_CERT_DB}/rootca.crt -f ${CERT_PW_FILE}
+    #certutil -L -d ${OTHER_CA_CERT_DB} -f ${CERT_PW_FILE}
+}
+
+delete_certs() {
+    if [[ -e ${TEST_CERT_DIR} ]] ;  then
+        rm -rf ${TEST_CERT_DIR}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     fi
 }
 
 # Don't need --no-module-dir or --no-data-dir as they are set as env vars in test_env.sh
+<<<<<<< HEAD
 COMMON_OPTS="--daemon --config $CONFIG --load-module $SSL_LIB --ssl-cert-db $CERT_DIR --ssl-cert-password-file $CERT_PW_FILE --ssl-cert-name $TEST_HOSTNAME"
+=======
+COMMON_OPTS="--daemon --config $CONFIG --ssl-cert-db $CERT_DB --ssl-cert-password-file $CERT_PW_FILE --ssl-cert-name $TEST_HOSTNAME"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 # Start new brokers:
 #   $1 must be integer
@@ -57,7 +137,11 @@ COMMON_OPTS="--daemon --config $CONFIG --load-module $SSL_LIB --ssl-cert-db $CER
 start_brokers() {
     local -a ports
     for (( i=0; $i<$1; i++)) do
+<<<<<<< HEAD
         ports[$i]=$($QPIDD_EXEC --port 0 $COMMON_OPTS $2) || error "Could not start broker $i"
+=======
+    ports[$i]=$($QPIDD_EXEC --port 0 --interface 127.0.0.1 $COMMON_OPTS $2) || error "Could not start broker $i"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     done
     PORTS=( ${PORTS[@]} ${ports[@]} )
 }
@@ -81,7 +165,11 @@ stop_brokers() {
 
 pick_port() {
     # We need a fixed port to set --cluster-url. Use qpidd to pick a free port.
+<<<<<<< HEAD
     PICK=`../qpidd --no-module-dir -dp0`
+=======
+    PICK=`../qpidd --no-module-dir --listen-disable ssl -dp0`
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ../qpidd --no-module-dir -qp $PICK
     echo $PICK
 }
@@ -89,10 +177,18 @@ pick_port() {
 cleanup() {
     stop_brokers
     delete_certs
+<<<<<<< HEAD
 }
 
 start_ssl_broker() {
     start_brokers 1 "--transport ssl --ssl-port 0 --require-encryption --auth no"
+=======
+    rm -f ${CERT_PW_FILE}
+}
+
+start_ssl_broker() {
+    start_brokers 1 "--transport ssl --ssl-port 0 --require-encryption --auth no $MODULES"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 start_ssl_mux_broker() {
@@ -100,17 +196,28 @@ start_ssl_mux_broker() {
     PORTS=( ${PORTS[@]} $1 )
 }
 
+<<<<<<< HEAD
 sasl_config_dir=$builddir/sasl_config
 
 start_authenticating_broker() {
     start_brokers 1 "--transport ssl --ssl-port 0 --require-encryption --ssl-sasl-no-dict --ssl-require-client-authentication --auth yes --sasl-config=${sasl_config_dir}"
+=======
+sasl_config_dir=$QPID_TEST_EXEC_DIR/sasl_config
+
+start_authenticating_broker() {
+    start_brokers 1 "--transport ssl --ssl-port 0 --require-encryption --ssl-sasl-no-dict --ssl-require-client-authentication --auth yes --sasl-config=${sasl_config_dir} $MODULES"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 ssl_cluster_broker() {		# $1 = port
     start_brokers 1 "--ssl-port $1 --auth no --load-module  $CLUSTER_LIB --cluster-name ssl_test.$HOSTNAME.$$ --cluster-url amqp:ssl:$TEST_HOSTNAME:$1"
 
     # Wait for broker to be ready
+<<<<<<< HEAD
     qpid-ping -Pssl -b $TEST_HOSTNAME -qp $1 || { echo "Cannot connect to broker on $1"; exit 1; }
+=======
+    qpid-ping -Pssl -b $TEST_HOSTNAME:$1 -q || { echo "Cannot connect to broker on $1"; exit 1; }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 CERTUTIL=$(type -p certutil)
@@ -123,14 +230,22 @@ if [[ !(-e ${CERT_PW_FILE}) ]] ;  then
     echo password > ${CERT_PW_FILE}
 fi
 delete_certs
+<<<<<<< HEAD
 create_certs || error "Could not create test certificate"
+=======
+create_certs || error "Could not create test certificate database"
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 start_ssl_broker
 PORT=${PORTS[0]}
 echo "Running SSL test on port $PORT"
 export QPID_NO_MODULE_DIR=1
+<<<<<<< HEAD
 export QPID_LOAD_MODULE=$SSLCONNECTOR_LIB
 export QPID_SSL_CERT_DB=${CERT_DIR}
+=======
+export QPID_SSL_CERT_DB=${CERT_DB}
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 export QPID_SSL_CERT_PASSWORD_FILE=${CERT_PW_FILE}
 
 ## Test connection via connection settings
@@ -142,12 +257,34 @@ URL=amqp:ssl:$TEST_HOSTNAME:$PORT
 MSG=`./qpid-receive -b $URL -a "foo;{create:always}" --messages 1`
 test "$MSG" = "hello" || { echo "receive failed '$MSG' != 'hello'"; exit 1; }
 
+<<<<<<< HEAD
+=======
+if [[ -a $AMQP_LIB ]] ; then
+    echo "Testing ssl over AMQP 1.0"
+    ./qpid-send --connection-options '{protocol:amqp1.0}'  -b $URL --content-string=hello -a "foo;{create:always}"
+    MSG=`./qpid-receive --connection-options '{protocol:amqp1.0}' -b $URL -a "foo;{create:always}" --messages 1`
+    test "$MSG" = "hello" || { echo "receive failed for AMQP 1.0 '$MSG' != 'hello'"; exit 1; }
+fi
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 ## Test connection with a combination of URL and connection options (in messaging API)
 URL=$TEST_HOSTNAME:$PORT
 ./qpid-send -b $URL --connection-options '{transport:ssl,heartbeat:2}' --content-string='hello again' -a "foo;{create:always}"
 MSG=`./qpid-receive -b $URL --connection-options '{transport:ssl,heartbeat:2}' -a "foo;{create:always}" --messages 1`
 test "$MSG" = "hello again" || { echo "receive failed '$MSG' != 'hello again'"; exit 1; }
 
+<<<<<<< HEAD
+=======
+## Test using the Python client
+if test -d $PYTHON_DIR; then
+    echo "Testing Non-Authenticating with Python Client..."
+    URL=amqps://$TEST_HOSTNAME:$PORT
+    if `$PY_PING_BROKER -b $URL`; then echo "    Passed"; else { echo "    Failed"; exit 1; }; fi
+else
+    echo "Skipping python part of ssl_test, no python dir."
+fi
+
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #### Client Authentication tests
 
 start_authenticating_broker
@@ -189,6 +326,7 @@ echo "Running SSL/TCP mux test on random port $PORT"
 
 stop_brokers
 
+<<<<<<< HEAD
 test -z $CLUSTER_LIB && exit 0	# Exit if cluster not supported.
 
 ## Test failover in a cluster using SSL only
@@ -213,4 +351,83 @@ wait				# Wait for qpid-receive
 { echo one; echo two; } > ssl_test_receive.cmp
 diff  ssl_test_receive.tmp ssl_test_receive.cmp || { echo "Failover failed"; exit 1; }
 rm -f ssl_test_receive.*
+=======
+### Additional tests that require 'openssl' and 'pk12util' to be installed (optional)
+
+PK12UTIL=$(type -p pk12util)
+if [[ !(-x $PK12UTIL) ]] ; then
+    echo >&2 "'pk12util' command not available, skipping remaining tests"
+    exit 0
+fi
+
+OPENSSL=$(type -p openssl)
+if [[ !(-x $OPENSSL) ]] ; then
+    echo >&2 "'openssl' command not available, skipping remaining tests"
+    exit 0
+fi
+
+if test -d $PYTHON_DIR; then
+## verify python version > 2.5 (only 2.6+ does certificate checking)
+    PY_VERSION=$(python -c "import sys; print hex(sys.hexversion)")
+    if (( PY_VERSION < 0x02060000 )); then
+	echo >&2 "Detected python version < 2.6 - skipping certificate verification tests"
+	exit 0
+    fi
+
+    echo "Testing Certificate validation and Authentication with the Python Client..."
+
+# extract the CA's certificate as a PEM file
+    get_ca_certs() {
+	$PK12UTIL -o ${TEST_CERT_DIR}/CA_pk12.out -d ${CERT_DB} -n "Test-CA"  -w ${CERT_PW_FILE} -k ${CERT_PW_FILE} > /dev/null
+	$OPENSSL pkcs12 -in ${TEST_CERT_DIR}/CA_pk12.out -out ${CA_PEM_FILE} -nokeys -passin file:${CERT_PW_FILE} >/dev/null
+	$PK12UTIL -o ${TEST_CERT_DIR}/other_CA_pk12.out -d ${OTHER_CA_CERT_DB} -n "Other-Test-CA" -w ${CERT_PW_FILE} -k ${CERT_PW_FILE} > /dev/null
+	$OPENSSL pkcs12 -in ${TEST_CERT_DIR}/other_CA_pk12.out -out ${OTHER_CA_PEM_FILE} -nokeys -passin file:${CERT_PW_FILE} >/dev/null
+    }
+
+    get_ca_certs || error "Could not extract CA certificates as PEM files"
+    start_ssl_broker
+    PORT=${PORTS[0]}
+    URL=amqps://$TEST_HOSTNAME:$PORT
+# verify the python client can authenticate the broker using the CA
+    if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${CA_PEM_FILE}`; then echo "    Passed"; else { echo "    Failed"; exit 1; }; fi
+# verify the python client fails to authenticate the broker when using the other CA
+    if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${OTHER_CA_PEM_FILE} > /dev/null 2>&1`; then { echo "    Failed"; exit 1; }; else echo "    Passed"; fi
+    stop_brokers
+
+# create a certificate without matching TEST_HOSTNAME, should fail to verify
+
+    create_certs "O=MyCo" "*.${TEST_HOSTNAME}.com" || error "Could not create server test certificate"
+    get_ca_certs || error "Could not extract CA certificates as PEM files"
+    start_ssl_broker
+    PORT=${PORTS[0]}
+    URL=amqps://$TEST_HOSTNAME:$PORT
+    if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${CA_PEM_FILE} > /dev/null 2>&1`; then { echo "    Failed"; exit 1; }; else echo "    Passed"; fi
+# but disabling the check for the hostname should pass
+    if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${CA_PEM_FILE} --ssl-skip-hostname-check`; then echo "    Passed"; else { echo "    Failed"; exit 1; }; fi
+    stop_brokers
+
+# test SubjectAltName parsing
+
+    if (( PY_VERSION >= 0x02070300 )); then
+    # python 2.7.3+ supports SubjectAltName extraction
+    # create a certificate with TEST_HOSTNAME only in SAN, should verify OK
+	create_certs "O=MyCo" "*.foo.com,${TEST_HOSTNAME},*xyz.com" || error "Could not create server test certificate"
+	get_ca_certs || error "Could not extract CA certificates as PEM files"
+	start_ssl_broker
+	PORT=${PORTS[0]}
+	URL=amqps://$TEST_HOSTNAME:$PORT
+	if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${CA_PEM_FILE}`; then echo "    Passed"; else { echo "    Failed"; exit 1; }; fi
+	stop_brokers
+
+	create_certs "O=MyCo" "*${TEST_HOSTNAME}" || error "Could not create server test certificate"
+	get_ca_certs || error "Could not extract CA certificates as PEM files"
+	start_ssl_broker
+	PORT=${PORTS[0]}
+	URL=amqps://$TEST_HOSTNAME:$PORT
+	if `${PY_PING_BROKER} -b $URL --ssl-trustfile=${CA_PEM_FILE}`; then echo "    Passed"; else { echo "    Failed"; exit 1; }; fi
+	stop_brokers
+    fi
+
+fi
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 

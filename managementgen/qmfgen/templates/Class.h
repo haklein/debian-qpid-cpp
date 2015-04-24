@@ -24,7 +24,15 @@
 /*MGEN:Root.Disclaimer*/
 
 #include "qpid/management/ManagementObject.h"
+<<<<<<< HEAD
 #include "qmf/BrokerImportExport.h"
+=======
+/*MGEN:IF(Root.InBroker)*/
+#include "qmf/BrokerImportExport.h"
+#include <boost/shared_ptr.hpp>
+/*MGEN:ENDIF*/
+#include <limits>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
 namespace qpid {
     namespace management {
@@ -35,7 +43,11 @@ namespace qpid {
 namespace qmf {
 /*MGEN:Class.OpenNamespaces*/
 
+<<<<<<< HEAD
 QPID_BROKER_CLASS_EXTERN class /*MGEN:Class.NameCap*/ : public ::qpid::management::ManagementObject
+=======
+/*MGEN:Root.ExternClass*/ class /*MGEN:Class.NameCap*/ : public ::qpid::management::ManagementObject
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 {
   private:
 
@@ -76,6 +88,7 @@ QPID_BROKER_CLASS_EXTERN class /*MGEN:Class.NameCap*/ : public ::qpid::managemen
     void aggregatePerThreadStats(struct PerThreadStats*) const;
 /*MGEN:ENDIF*/
   public:
+<<<<<<< HEAD
     QPID_BROKER_EXTERN static void writeSchema(std::string& schema);
     QPID_BROKER_EXTERN void mapEncodeValues(::qpid::types::Variant::Map& map,
                                           bool includeProperties=true,
@@ -92,6 +105,28 @@ QPID_BROKER_CLASS_EXTERN class /*MGEN:Class.NameCap*/ : public ::qpid::managemen
     QPID_BROKER_EXTERN void writeProperties(std::string& buf) const;
     QPID_BROKER_EXTERN void writeStatistics(std::string& buf, bool skipHeaders = false);
     QPID_BROKER_EXTERN void doMethod(std::string& methodName,
+=======
+/*MGEN:IF(Root.InBroker)*/
+    typedef boost::shared_ptr</*MGEN:Class.NameCap*/> shared_ptr;
+/*MGEN:ENDIF*/
+
+    /*MGEN:Root.ExternMethod*/ static void writeSchema(std::string& schema);
+    /*MGEN:Root.ExternMethod*/ void mapEncodeValues(::qpid::types::Variant::Map& map,
+                                          bool includeProperties=true,
+                                          bool includeStatistics=true);
+    /*MGEN:Root.ExternMethod*/ void mapDecodeValues(const ::qpid::types::Variant::Map& map);
+    /*MGEN:Root.ExternMethod*/ void doMethod(std::string&           methodName,
+                                   const ::qpid::types::Variant::Map& inMap,
+                                   ::qpid::types::Variant::Map& outMap,
+                                   const std::string& userId);
+    /*MGEN:Root.ExternMethod*/ std::string getKey() const;
+/*MGEN:IF(Root.GenQMFv1)*/
+    /*MGEN:Root.ExternMethod*/ uint32_t writePropertiesSize() const;
+    /*MGEN:Root.ExternMethod*/ void readProperties(const std::string& buf);
+    /*MGEN:Root.ExternMethod*/ void writeProperties(std::string& buf) const;
+    /*MGEN:Root.ExternMethod*/ void writeStatistics(std::string& buf, bool skipHeaders = false);
+    /*MGEN:Root.ExternMethod*/ void doMethod(std::string& methodName,
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
                                    const std::string& inBuf,
                                    std::string& outBuf,
                                    const std::string& userId);
@@ -104,6 +139,7 @@ QPID_BROKER_CLASS_EXTERN class /*MGEN:Class.NameCap*/ : public ::qpid::managemen
     bool hasInst() { return false; }
 /*MGEN:ENDIF*/
 
+<<<<<<< HEAD
     QPID_BROKER_EXTERN /*MGEN:Class.NameCap*/(
         ::qpid::management::ManagementAgent* agent,
         ::qpid::management::Manageable* coreObject/*MGEN:Class.ParentArg*//*MGEN:Class.ConstructorArgs*/);
@@ -113,6 +149,19 @@ QPID_BROKER_CLASS_EXTERN class /*MGEN:Class.NameCap*/ : public ::qpid::managemen
     /*MGEN:Class.SetGeneralReferenceDeclaration*/
 
     QPID_BROKER_EXTERN static void registerSelf(
+=======
+    /*MGEN:Root.ExternMethod*/ /*MGEN:Class.NameCap*/(
+        ::qpid::management::ManagementAgent* agent,
+        ::qpid::management::Manageable* coreObject/*MGEN:Class.ParentArg*//*MGEN:Class.ConstructorArgs*/);
+
+    /*MGEN:Root.ExternMethod*/ ~/*MGEN:Class.NameCap*/();
+
+    void debugStats (const std::string& comment);
+
+    /*MGEN:Class.SetGeneralReferenceDeclaration*/
+
+    /*MGEN:Root.ExternMethod*/ static void registerSelf(
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
         ::qpid::management::ManagementAgent* agent);
 
     std::string& getPackageName() const { return packageName; }

@@ -23,12 +23,22 @@
  */
 
 #include "types.h"
+<<<<<<< HEAD
 #include "QueueRange.h"
 #include "qpid/framing/SequenceNumber.h"
 #include "qpid/framing/SequenceSet.h"
 #include "qpid/types/Uuid.h"
 #include "qpid/sys/Mutex.h"
 #include <boost/shared_ptr.hpp>
+=======
+#include "hash.h"
+#include "LogPrefix.h"
+#include "qpid/types/Uuid.h"
+#include "qpid/sys/Mutex.h"
+#include "qpid/sys/unordered_map.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/intrusive_ptr.hpp>
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 #include <deque>
 #include <set>
 
@@ -37,6 +47,10 @@ namespace broker {
 class Queue;
 struct QueuedMessage;
 class Message;
+<<<<<<< HEAD
+=======
+class AsyncCompletion;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 namespace ha {
@@ -53,29 +67,52 @@ class ReplicatingSubscription;
  *
  * THREAD SAFE: Concurrent calls:
  *  - enqueued() via QueueObserver in arbitrary connection threads.
+<<<<<<< HEAD
  *  - attach(), cancel(), complete() from ReplicatingSubscription in subscription thread.
  */
 class QueueGuard {
   public:
     QueueGuard(broker::Queue& q, const BrokerInfo&);
+=======
+ *  - cancel(), complete() from ReplicatingSubscription in subscription thread.
+ *
+ */
+class QueueGuard {
+  public:
+    QueueGuard(broker::Queue& q, const BrokerInfo&, const LogPrefix&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
     ~QueueGuard();
 
     /** QueueObserver override. Delay completion of the message.
      * NOTE: Called under the queues message lock.
      */
+<<<<<<< HEAD
     void enqueued(const broker::QueuedMessage&);
+=======
+    void enqueued(const broker::Message&);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** QueueObserver override: Complete a delayed message.
      * NOTE: Called under the queues message lock.
      */
+<<<<<<< HEAD
     void dequeued(const broker::QueuedMessage&);
 
     /** Complete a delayed message. */
     void complete(const broker::QueuedMessage&);
+=======
+    void dequeued(const broker::Message&);
+
+    /** Complete a delayed message.
+     *@return true if the ID was delayed
+     */
+    bool complete(ReplicationId);
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 
     /** Complete all delayed messages. */
     void cancel();
 
+<<<<<<< HEAD
     void attach(ReplicatingSubscription&);
 
     /**
@@ -112,6 +149,29 @@ class QueueGuard {
     ReplicatingSubscription* subscription;
     boost::shared_ptr<QueueObserver> observer;
     QueueRange range;
+=======
+    /** Return the first known guarded position on the queue.  It is possible
+     * that the guard has seen a few messages before this point.
+     */
+    QueuePosition getFirst() const { return first; } // Thread safe: Immutable.
+
+  private:
+    class QueueObserver;
+    typedef qpid::sys::unordered_map<ReplicationId,
+                                     boost::intrusive_ptr<broker::AsyncCompletion>,
+                                     Hasher<ReplicationId> > Delayed;
+
+    bool complete(ReplicationId, sys::Mutex::ScopedLock &);
+    void complete(Delayed::iterator, sys::Mutex::ScopedLock &);
+
+    sys::Mutex lock;
+    QueuePosition first;
+    bool cancelled;
+    LogPrefix2 logPrefix;
+    broker::Queue& queue;
+    Delayed delayed;
+    boost::shared_ptr<QueueObserver> observer;
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 };
 }} // namespace qpid::ha
 

@@ -28,6 +28,7 @@ using namespace qpid::broker;
 FifoDistributor::FifoDistributor(Messages& container)
     : messages(container) {}
 
+<<<<<<< HEAD
 bool FifoDistributor::nextConsumableMessage( Consumer::shared_ptr&, QueuedMessage& next )
 {
     return messages.consume(next);
@@ -43,6 +44,16 @@ bool FifoDistributor::allocate(const std::string&, const QueuedMessage& )
 bool FifoDistributor::nextBrowsableMessage( Consumer::shared_ptr& c, QueuedMessage& next )
 {
     return messages.browse(c->getPosition(), next, !c->browseAcquired());
+=======
+bool FifoDistributor::acquire(const std::string&, Message& msg)
+{
+    if (msg.getState() == AVAILABLE) {
+        msg.setState(ACQUIRED);
+        return true;
+    } else {
+        return false;
+    }
+>>>>>>> 3bbfc42... Imported Upstream version 0.32
 }
 
 void FifoDistributor::query(qpid::types::Variant::Map&) const
