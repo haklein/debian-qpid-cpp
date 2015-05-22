@@ -1,8 +1,8 @@
-qpid-cpp (0.32-1) UNRELEASED; urgency=low
+qpid-cpp (0.32-1) unstable; urgency=low
 
   * Rebased on Qpid 0.32. 
 
- -- Darryl L. Pierce <dpierce@redhat.com>  Thu, 23 Apr 2015 10:12:46 -0400
+ -- Darryl L. Pierce <dpierce@redhat.com>  Fri, 22 May 2015 09:00:32 -0400
 
 qpid-cpp (0.28-10) unstable; urgency=low
 
