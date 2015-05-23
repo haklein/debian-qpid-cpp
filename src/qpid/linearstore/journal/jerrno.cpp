@@ -42,6 +42,7 @@ const uint32_t jerrno::JERR__UNEXPRESPONSE       = 0x0108;
 const uint32_t jerrno::JERR__RECNFOUND           = 0x0109;
 const uint32_t jerrno::JERR__NOTIMPL             = 0x010a;
 const uint32_t jerrno::JERR__NULL                = 0x010b;
+const uint32_t jerrno::JERR__SYMLINK             = 0x010c;
 
 // class jcntl
 const uint32_t jerrno::JERR_JCNTL_STOPPED        = 0x0200;
@@ -85,6 +86,7 @@ const uint32_t jerrno::JERR_WMGR_ENQDISCONT      = 0x0803;
 const uint32_t jerrno::JERR_WMGR_DEQDISCONT      = 0x0804;
 const uint32_t jerrno::JERR_WMGR_DEQRIDNOTENQ    = 0x0805;
 const uint32_t jerrno::JERR_WMGR_BADFH           = 0x0806;
+const uint32_t jerrno::JERR_WMGR_NOTSBLKALIGNED  = 0x0807;
 
 // class RecoveryManager
 const uint32_t jerrno::JERR_RCVM_OPENRD          = 0x0900;
@@ -93,8 +95,8 @@ const uint32_t jerrno::JERR_RCVM_READ            = 0x0902;
 const uint32_t jerrno::JERR_RCVM_WRITE           = 0x0903;
 const uint32_t jerrno::JERR_RCVM_NULLXID         = 0x0904;
 const uint32_t jerrno::JERR_RCVM_NOTDBLKALIGNED  = 0x0905;
-const uint32_t jerrno::JERR_RCVM_NULLFID         = 0x0906;
-
+const uint32_t jerrno::JERR_RCVM_NULLFID         = 0x0907;
+const uint32_t jerrno::JERR_RCVM_INVALIDEFPID    = 0x0908;
 
 // class data_tok
 const uint32_t jerrno::JERR_DTOK_ILLEGALSTATE    = 0x0a00;
@@ -111,6 +113,11 @@ const uint32_t jerrno::JERR_EFP_BADPARTITIONDIR  = 0x0d02;
 const uint32_t jerrno::JERR_EFP_BADEFPDIRNAME    = 0x0d03;
 const uint32_t jerrno::JERR_EFP_NOEFP            = 0x0d04;
 const uint32_t jerrno::JERR_EFP_EMPTY            = 0x0d05;
+const uint32_t jerrno::JERR_EFP_LSTAT            = 0x0d06;
+const uint32_t jerrno::JERR_EFP_BADFILETYPE      = 0x0d07;
+const uint32_t jerrno::JERR_EFP_FOPEN            = 0x0d08;
+const uint32_t jerrno::JERR_EFP_FWRITE           = 0x0d09;
+const uint32_t jerrno::JERR_EFP_MKDIR            = 0x0d0a;
 
 // Negative returns for some functions
 const int32_t jerrno::AIO_TIMEOUT                = -1;
@@ -135,6 +142,7 @@ jerrno::__init()
     _err_map[JERR__RECNFOUND] = "JERR__RECNFOUND: Record not found.";
     _err_map[JERR__NOTIMPL] = "JERR__NOTIMPL: Not implemented";
     _err_map[JERR__NULL] = "JERR__NULL: Operation on null pointer";
+    _err_map[JERR__SYMLINK] = "JERR__SYMLINK: Symbolic link operation failed";
 
     // class jcntl
     _err_map[JERR_JCNTL_STOPPED] = "JERR_JCNTL_STOPPED: Operation on stopped journal.";
@@ -178,6 +186,7 @@ jerrno::__init()
     _err_map[JERR_WMGR_DEQDISCONT] = "JERR_WMGR_DEQDISCONT: Dequeued new dtok when previous dequeue returned partly completed (state DEQ_PART).";
     _err_map[JERR_WMGR_DEQRIDNOTENQ] = "JERR_WMGR_DEQRIDNOTENQ: Dequeue rid is not enqueued.";
     _err_map[JERR_WMGR_BADFH] = "JERR_WMGR_BADFH: Bad file handle.";
+    _err_map[JERR_WMGR_NOTSBLKALIGNED] = "JERR_WMGR_NOTSBLKALIGNED: Offset is not soft block (sblk)-aligned";
 
     // class RecoveryManager
     _err_map[JERR_RCVM_OPENRD] = "JERR_RCVM_OPENRD: Unable to open file for read";
@@ -187,6 +196,7 @@ jerrno::__init()
     _err_map[JERR_RCVM_NULLXID] = "JERR_RCVM_NULLXID: Null XID when XID length non-null in header";
     _err_map[JERR_RCVM_NOTDBLKALIGNED] = "JERR_RCVM_NOTDBLKALIGNED: Offset is not data block (dblk)-aligned";
     _err_map[JERR_RCVM_NULLFID] = "JERR_RCVM_NULLFID: Null file id (FID)";
+    _err_map[JERR_RCVM_INVALIDEFPID] = "JERR_RCVM_INVALIDEFPID: Invalid EFP identity (partition/size)";
 
     // class data_tok
     _err_map[JERR_DTOK_ILLEGALSTATE] = "JERR_MTOK_ILLEGALSTATE: Attempted to change to illegal state.";
@@ -203,6 +213,11 @@ jerrno::__init()
     _err_map[JERR_EFP_BADPARTITIONDIR] = "JERR_EFP_BADPARTITIONDIR: Invalid partition directory";
     _err_map[JERR_EFP_NOEFP] = "JERR_EFP_NOEFP: No Empty File Pool found for given partition and empty file size";
     _err_map[JERR_EFP_EMPTY] = "JERR_EFP_EMPTY: Empty File Pool is empty";
+    _err_map[JERR_EFP_LSTAT] = "JERR_EFP_LSTAT: lstat() operation failed";
+    _err_map[JERR_EFP_BADFILETYPE] = "JERR_EFP_BADFILETYPE: File type incorrect for operation";
+    _err_map[JERR_EFP_FOPEN] = "JERR_EFP_FOPEN: Unable to fopen file for write";
+    _err_map[JERR_EFP_FWRITE] = "JERR_EFP_FWRITE: Write failed";
+    _err_map[JERR_EFP_MKDIR] = "JERR_EFP_MKDIR: Directory creation failed";
 
     //_err_map[] = "";
 

@@ -61,7 +61,7 @@ QPID_AUTO_TEST_CASE(testEncodeDecode)
     qpid::framing::Buffer buffer(&bytes[0], bytes.size());
     msg.getPersistentContext()->encode(buffer);
     buffer.reset();
-    ProtocolRegistry registry;
+    ProtocolRegistry registry(std::set<std::string>(), 0);
     msg = registry.decode(buffer);
 
     BOOST_CHECK_EQUAL(routingKey, msg.getRoutingKey());
@@ -70,6 +70,18 @@ QPID_AUTO_TEST_CASE(testEncodeDecode)
     //BOOST_CHECK_EQUAL(messageId, msg->getProperties<MessageProperties>()->getMessageId());
     BOOST_CHECK_EQUAL(string("xyz"), msg.getPropertyAsString("abc"));
     BOOST_CHECK(msg.isPersistent());
+}
+
+QPID_AUTO_TEST_CASE(testMessageProperties)
+{
+  string data("abcdefghijklmn");
+
+  qpid::types::Variant::Map properties;
+  properties["abc"] = "xyz";
+  Message msg = MessageUtils::createMessage(properties, data);
+
+  // Regression test that looking up a property doesn't return a prefix
+  BOOST_CHECK_EQUAL(msg.getProperty("abcdef").getType(), qpid::types::VAR_VOID);
 }
 
 QPID_AUTO_TEST_SUITE_END()

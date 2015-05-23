@@ -55,6 +55,7 @@ using qpid::messaging::AssertionFailed;
 using qpid::framing::ExchangeBoundResult;
 using qpid::framing::ExchangeQueryResult;
 using qpid::framing::FieldTable;
+using qpid::framing::FieldValue;
 using qpid::framing::QueueQueryResult;
 using qpid::framing::ReplyTo;
 using qpid::framing::Uuid;
@@ -140,6 +141,11 @@ const std::string PREFIX_AMQ("amq.");
 const std::string PREFIX_QPID("qpid.");
 
 const Verifier verifier;
+
+bool areEquivalent(const FieldValue& a, const FieldValue& b)
+{
+    return ((a == b) || (a.convertsTo<int64_t>() && b.convertsTo<int64_t>() && a.get<int64_t>() == b.get<int64_t>()));
+}
 }
 
 struct Binding
@@ -215,7 +221,7 @@ class Exchange : protected Node
     const std::string specifiedType;
   private:
     const bool durable;
-    const bool autoDelete;
+    bool autoDelete;
     const std::string alternateExchange;
     FieldTable arguments;
 };
@@ -326,6 +332,7 @@ struct Opt
     bool asBool(bool defaultValue) const;
     const Variant::List& asList() const;
     void collect(qpid::framing::FieldTable& args) const;
+    bool hasKey(const std::string&) const;
 
     const Variant::Map* options;
     const Variant* value;
@@ -382,6 +389,15 @@ void Opt::collect(qpid::framing::FieldTable& args) const
 {
     if (value) {
         translate(value->asMap(), args);
+    }
+}
+bool Opt::hasKey(const std::string& key) const
+{
+    if (value) {
+        Variant::Map::const_iterator i = value->asMap().find(key);
+        return i != value->asMap().end();
+    } else {
+        return false;
     }
 }
 
@@ -524,19 +540,19 @@ Subscription::Subscription(const Address& address, const std::string& type)
       reliable(durable ? !AddressResolution::is_unreliable(address) : AddressResolution::is_reliable(address)),
       actualType(type.empty() ? (specifiedType.empty() ? TOPIC_EXCHANGE : specifiedType) : type),
       exclusiveQueue((Opt(address)/LINK/X_DECLARE/EXCLUSIVE).asBool(true)),
-      autoDeleteQueue((Opt(address)/LINK/X_DECLARE/AUTO_DELETE).asBool(true)),
+      autoDeleteQueue((Opt(address)/LINK/X_DECLARE/AUTO_DELETE).asBool(!(durable || reliable))),
       exclusiveSubscription((Opt(address)/LINK/X_SUBSCRIBE/EXCLUSIVE).asBool(exclusiveQueue)),
       alternateExchange((Opt(address)/LINK/X_DECLARE/ALTERNATE_EXCHANGE).str())
 {
-    const Variant* timeout = (Opt(address)/LINK/TIMEOUT).value;
-    if (timeout) {
+
+    if ((Opt(address)/LINK).hasKey(TIMEOUT)) {
+        const Variant* timeout = (Opt(address)/LINK/TIMEOUT).value;
         if (timeout->asUint32()) queueOptions.setInt("qpid.auto_delete_timeout", timeout->asUint32());
-    } else if (durable && !(Opt(address)/LINK/RELIABILITY).value) {
-        //if durable but not explicitly reliable, then set a non-zero
-        //default for the autodelete timeout (previously this would
-        //have defaulted to autodelete immediately anyway, so the risk
-        //of the change causing problems is mitigated)
-        queueOptions.setInt("qpid.auto_delete_delay", 15*60);
+    } else if (durable && !AddressResolution::is_reliable(address) && !(Opt(address)/LINK/X_DECLARE).hasKey(AUTO_DELETE)) {
+        //if durable, not explicitly reliable, and auto-delete not
+        //explicitly set, then set a non-zero default for the
+        //autodelete timeout
+        queueOptions.setInt("qpid.auto_delete_timeout", 2*60);
     }
     (Opt(address)/LINK/X_DECLARE/ARGUMENTS).collect(queueOptions);
     (Opt(address)/LINK/X_SUBSCRIBE/ARGUMENTS).collect(subscriptionOptions);
@@ -599,7 +615,7 @@ void Subscription::subscribe(qpid::client::AsyncSession& session, const std::str
 
     //create subscription queue:
     session.queueDeclare(arg::queue=queue, arg::exclusive=exclusiveQueue,
-                         arg::autoDelete=autoDeleteQueue && (!(durable || reliable)), arg::durable=durable,
+                         arg::autoDelete=autoDeleteQueue, arg::durable=durable,
                          arg::alternateExchange=alternateExchange,
                          arg::arguments=queueOptions);
     //'default' binding:
@@ -632,9 +648,7 @@ void ExchangeSink::declare(qpid::client::AsyncSession& session, const std::strin
 
 void ExchangeSink::send(qpid::client::AsyncSession& session, const std::string&, OutgoingMessage& m)
 {
-    m.message.getDeliveryProperties().setRoutingKey(m.getSubject());
-    m.status = session.messageTransfer(arg::destination=name, arg::content=m.message);
-    QPID_LOG(debug, "Sending to exchange " << name << " " << m.message.getMessageProperties() << " " << m.message.getDeliveryProperties());
+    m.send(session, name, m.getSubject());
 }
 
 void ExchangeSink::cancel(qpid::client::AsyncSession& session, const std::string&)
@@ -653,9 +667,7 @@ void QueueSink::declare(qpid::client::AsyncSession& session, const std::string&)
 }
 void QueueSink::send(qpid::client::AsyncSession& session, const std::string&, OutgoingMessage& m)
 {
-    m.message.getDeliveryProperties().setRoutingKey(name);
-    m.status = session.messageTransfer(arg::content=m.message);
-    QPID_LOG(debug, "Sending to queue " << name << " " << m.message.getMessageProperties() << " " << m.message.getDeliveryProperties());
+    m.send(session, name);
 }
 
 void QueueSink::cancel(qpid::client::AsyncSession& session, const std::string&)
@@ -668,8 +680,10 @@ Address AddressResolution::convert(const qpid::framing::ReplyTo& rt)
 {
     Address address;
     if (rt.getExchange().empty()) {//if default exchange, treat as queue
-        address.setName(rt.getRoutingKey());
-        address.setType(QUEUE_ADDRESS);
+        if (!rt.getRoutingKey().empty()) {
+            address.setName(rt.getRoutingKey());
+            address.setType(QUEUE_ADDRESS);
+        }
     } else {
         address.setName(rt.getExchange());
         address.setSubject(rt.getRoutingKey());
@@ -727,8 +741,9 @@ Queue::Queue(const Address& a) : Node(a),
     linkBindings.setDefaultQueue(name);
     if (qpid::messaging::AddressImpl::isTemporary(a) && createPolicy.isVoid()) {
         createPolicy = "always";
-        autoDelete = true;
-        exclusive = true;
+        Opt specified = Opt(a)/NODE/X_DECLARE;
+        if (!specified.hasKey(AUTO_DELETE)) autoDelete = true;
+        if (!specified.hasKey(EXCLUSIVE)) exclusive = true;
     }
 }
 
@@ -797,7 +812,7 @@ void Queue::checkAssert(qpid::client::AsyncSession& session, CheckMode mode)
                 FieldTable::ValuePtr v = result.getArguments().get(i->first);
                 if (!v) {
                     throw AssertionFailed((boost::format("Option %1% not set for %2%") % i->first % name).str());
-                } else if (*i->second != *v) {
+                } else if (!areEquivalent(*i->second, *v)) {
                     throw AssertionFailed((boost::format("Option %1% does not match for %2%, expected %3%, got %4%")
                                           % i->first % name % *(i->second) % *v).str());
                 }
@@ -816,6 +831,10 @@ Exchange::Exchange(const Address& a) : Node(a),
     (Opt(a)/NODE/X_DECLARE/ARGUMENTS).collect(arguments);
     nodeBindings.setDefaultExchange(name);
     linkBindings.setDefaultExchange(name);
+    if (qpid::messaging::AddressImpl::isTemporary(a) && createPolicy.isVoid()) {
+        createPolicy = "always";
+        if (!(Opt(a)/NODE/X_DECLARE).hasKey(AUTO_DELETE)) autoDelete = true;
+    }
 }
 
 bool Exchange::isReservedName()
@@ -893,7 +912,7 @@ void Exchange::checkAssert(qpid::client::AsyncSession& session, CheckMode mode)
                 FieldTable::ValuePtr v = result.getArguments().get(i->first);
                 if (!v) {
                     throw AssertionFailed((boost::format("Option %1% not set for %2%") % i->first % name).str());
-                } else if (*i->second != *v) {
+                } else if (!areEquivalent(*i->second, *v)) {
                     throw AssertionFailed((boost::format("Option %1% does not match for %2%, expected %3%, got %4%")
                                           % i->first % name % *(i->second) % *v).str());
                 }

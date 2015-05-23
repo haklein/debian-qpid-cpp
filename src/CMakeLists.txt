@@ -42,6 +42,7 @@ include(CheckIncludeFiles)
 include(CheckIncludeFileCXX)
 include(CheckLibraryExists)
 include(CheckSymbolExists)
+include(CheckSizetDistinct)
 
 find_package(PkgConfig)
 find_package(Ruby)
@@ -62,9 +63,6 @@ CHECK_INCLUDE_FILES (sasl/sasl.h FOUND_SASL_H)
 find_package_handle_standard_args(SASL DEFAULT_MSG FOUND_SASL_LIB FOUND_SASL_H)
 
 #set (CMAKE_VERBOSE_MAKEFILE ON)  # for debugging
-
-# Define windows versions and library helpers
-include (msvc.cmake)
 
 # Add a test to check the exported library API against expected API symbols
 MACRO (add_api_test libname)
@@ -154,92 +152,6 @@ if (VALGRIND_FOUND)
   option(ENABLE_VALGRIND "Use valgrind to detect run-time problems" ON)
 endif (VALGRIND_FOUND)
 
-# Do not keep on linking against transitive library dependencies
-# TODO Need to rework CMake files to use INTERFACE_LINK_LIBRARIES target property
-# When that is done we can remove the next 4 lines completely
-set (CMAKE_LINK_INTERFACE_LIBRARIES "")
-if (DEFINED CMAKE_VERSION AND NOT CMAKE_VERSION VERSION_LESS "2.8.12")
-  cmake_policy(SET CMP0022 OLD)
-endif (DEFINED CMAKE_VERSION AND NOT CMAKE_VERSION VERSION_LESS "2.8.12")
-
-if (CMAKE_COMPILER_IS_GNUCXX)
-   # Warnings: Enable as many as possible, keep the code clean. Please
-   # do not disable warnings or remove -Werror without discussing on
-   # qpid-dev list.
-   #
-   # The following warnings are deliberately omitted, they warn on valid code.
-   # -Wunreachable-code -Wpadded -Winline
-   # -Wshadow - warns about boost headers.
-   set (WARNING_FLAGS
-        "-Werror -pedantic -Wall -Wextra -Wno-shadow -Wpointer-arith -Wcast-qual -Wcast-align -Wno-long-long -Wvolatile-register-var -Winvalid-pch -Wno-system-headers -Woverloaded-virtual")
-
-   set (CATCH_UNDEFINED "-Wl,--no-undefined")
-   # gcc on SunOS uses native linker whose "-z defs" is too fussy
-   if (CMAKE_SYSTEM_NAME STREQUAL SunOS)
-      set (CATCH_UNDEFINED "")
-   endif (CMAKE_SYSTEM_NAME STREQUAL SunOS)
-   set (COMPILER_FLAGS "-fvisibility-inlines-hidden")
-   # gcc 4.1.2 on RHEL 5 needs -Wno-attributes to avoid an error that's fixed
-   # in later gcc versions.
-   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
-                   OUTPUT_VARIABLE GCC_VERSION)
-   if (GCC_VERSION VERSION_EQUAL 4.1.2)
-     message (STATUS "Cannot restrict library symbol export on gcc 4.1.2")
-     set (HIDE_SYMBOL_FLAGS "-fno-visibility-inlines-hidden")
-   else (GCC_VERSION VERSION_EQUAL 4.1.2)
-     set (HIDE_SYMBOL_FLAGS "-fno-visibility-inlines-hidden -fvisibility=hidden")
-     set (QPID_LINKMAP ${CMAKE_CURRENT_SOURCE_DIR}/qpid.linkmap)
-     set (LINK_VERSION_SCRIPT_FLAG "-Wl,--version-script=${QPID_LINKMAP}")
-   endif (GCC_VERSION VERSION_EQUAL 4.1.2)
-endif (CMAKE_COMPILER_IS_GNUCXX)
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL SunPro)
-  set (COMPILER_FLAGS "-library=stlport4 -mt")
-  set (WARNING_FLAGS "+w")
-  set (CATCH_UNDEFINED "")
-  set (HIDE_SYMBOL_FLAGS "")
-endif (CMAKE_CXX_COMPILER_ID STREQUAL SunPro)
-
-if (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  # Allow MSVC user to select 'WinXP-SP3/Windows Server 2003' as build target version
-  set (win32_winnt_default OFF)
-  if (MSVC)
-    set (win32_winnt_default ON)
-  endif (MSVC)
-  option(SET_WIN32_WINNT "In Windows-MSVC build: define _WIN32_WINNT=0x0502 to select target version: Windows XP with SP3" ${win32_winnt_default})
-endif (CMAKE_SYSTEM_NAME STREQUAL Windows)
-
-if (MSVC)
-  add_definitions(
-    /D "_CRT_NONSTDC_NO_WARNINGS"
-    /D "NOMINMAX"
-    /D "WIN32_LEAN_AND_MEAN"
-    /wd4244
-    /wd4800
-    /wd4355
-    /wd4267
-  )
-
-  if (SET_WIN32_WINNT)
-    add_definitions(/D "_WIN32_WINNT=0x0502")
-  endif (SET_WIN32_WINNT)
-
-  # set the RelWithDebInfo compile/link switches to equal Release
-  set (CMAKE_CXX_FLAGS_RELWITHDEBINFO "/MD /O2 /Ob2 /D NDEBUG")
-  set (CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO "/debug /INCREMENTAL:NO")
-
-  if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../bindings/qpid/dotnet/src)
-    # Set the windows version for the .NET Binding cpp project
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../bindings/qpid/dotnet/src/org.apache.qpid.messaging.template.rc
-                   ${CMAKE_CURRENT_BINARY_DIR}/windows/resources/org.apache.qpid.messaging.rc)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../bindings/qpid/dotnet/src/AssemblyInfo-template.cpp
-                   ${CMAKE_CURRENT_BINARY_DIR}/windows/generated_src/AssemblyInfo.cpp)
-    # Set the windows version for the .NET Binding sessionreceiver project
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../bindings/qpid/dotnet/src/sessionreceiver/properties/sessionreceiver-AssemblyInfo-template.cs
-                   ${CMAKE_CURRENT_BINARY_DIR}/windows/generated_src/sessionreceiver-AssemblyInfo.cs)
-  endif (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/../bindings/qpid/dotnet/src)
-endif (MSVC)
-
 option(ENABLE_WARNINGS "Enable lots of compiler warnings (recommended)" ON)
 if (NOT ENABLE_WARNINGS)
   set (WARNING_FLAGS "")
@@ -266,7 +178,8 @@ if (NOT DEFINED Boost_ADDITIONAL_VERSIONS)
   set (Boost_ADDITIONAL_VERSIONS
         "1.45" "1.45.0" "1.46" "1.46.0" "1.47" "1.47.0"
         "1.48" "1.48.0" "1.49" "1.49.0" "1.50" "1.50.0"
-        "1.51" "1.51.0" "1.52" "1.52.0" "1.53" "1.53.0")
+        "1.51" "1.51.0" "1.52" "1.52.0" "1.53" "1.53.0"
+        "1.54" "1.54.0" "1.55" "1.55.0")
 endif (NOT DEFINED Boost_ADDITIONAL_VERSIONS)
 
 # Discover Boost version
@@ -369,6 +282,32 @@ include_directories( ${CMAKE_CURRENT_BINARY_DIR}/../include )
 
 link_directories( ${Boost_LIBRARY_DIRS} )
 
+CHECK_SYMBOL_EXISTS(uuid_generate "uuid/uuid.h" UUID_GENERATE_IN_LIBC)
+if (UUID_GENERATE_IN_LIBC)
+  set(uuid_SRC "")
+  set(uuid_LIB "")
+else (UUID_GENERATE_IN_LIBC)
+  CHECK_LIBRARY_EXISTS (uuid uuid_generate "" UUID_GENERATE_IN_UUID)
+  if (UUID_GENERATE_IN_UUID)
+    set(uuid_SRC "")
+    set(uuid_LIB uuid)
+  else (UUID_GENERATE_IN_UUID)
+    CHECK_SYMBOL_EXISTS(uuid_create "uuid.h" UUID_CREATE_IN_LIBC)
+    if (UUID_CREATE_IN_LIBC)
+      set(uuid_SRC qpid/sys/FreeBSD/uuid.cpp)
+      set(uuid_LIB "")
+    else (UUID_CREATE_IN_LIBC)
+      CHECK_SYMBOL_EXISTS(UuidToString "rpc.h" WIN_UUID)
+      if (WIN_UUID)
+        set(uuid_SRC qpid/sys/windows/uuid.cpp)
+        set(uuid_LIB rpcrt4)
+      else (WIN_UUID)
+        message(FATAL_ERROR "No Uuid API found")
+      endif (WIN_UUID)
+    endif (UUID_CREATE_IN_LIBC)
+  endif (UUID_GENERATE_IN_UUID)
+endif (UUID_GENERATE_IN_LIBC)
+
 # These dependencies aren't found on windows
 if (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
   # Ensure we have clock_gettime
@@ -381,14 +320,6 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
     message(FATAL_ERROR "Cannot find clock_gettime()")
   endif (CLOCK_GETTIME_IN_RT)
   endif (NOT CLOCK_GETTIME_IN_LIBC)
-
-  # Ensure we have uuid library
-  CHECK_LIBRARY_EXISTS (uuid uuid_generate "" HAVE_UUID)
-  CHECK_INCLUDE_FILES(uuid/uuid.h HAVE_UUID_H)
-  if (NOT HAVE_UUID AND NOT HAVE_UUID_H)
-    message(FATAL_ERROR "Uuid library and/or header file not found")
-  endif (NOT HAVE_UUID AND NOT HAVE_UUID_H)
-  set (uuid_LIB "uuid")
 
   # Check for header file for dtrace static probes
   check_include_files(sys/sdt.h HAVE_SDT)
@@ -419,6 +350,8 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
   set(QPID_POLLER ${poller_default} CACHE STRING "Poller implementation (poll/epoll)")
   mark_as_advanced(QPID_POLLER)
 endif (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
+
+check_size_t_distinct (QPID_SIZE_T_DISTINCT)
 
 option(BUILD_SASL "Build with Cyrus SASL support" ${SASL_FOUND})
 if (BUILD_SASL)
@@ -553,8 +486,7 @@ if (BUILD_XML)
   target_link_libraries (xml xerces-c xqilla qpidbroker qpidcommon)
   set_target_properties (xml PROPERTIES
                          PREFIX ""
-                         COMPILE_DEFINITIONS _IN_QPID_BROKER
-                         LINK_FLAGS "${CATCH_UNDEFINED}")
+                         COMPILE_DEFINITIONS _IN_QPID_BROKER)
   install (TARGETS xml
            DESTINATION ${QPIDD_MODULE_DIR}
            COMPONENT ${QPID_COMPONENT_BROKER})
@@ -576,6 +508,8 @@ if (BUILD_ACL)
        qpid/acl/AclConnectionCounter.h
        qpid/acl/AclData.cpp
        qpid/acl/AclData.h
+       qpid/acl/AclLexer.cpp
+       qpid/acl/AclLexer.h
        qpid/acl/AclPlugin.cpp
        qpid/acl/AclReader.cpp
        qpid/acl/AclReader.h
@@ -592,7 +526,6 @@ option(BUILD_HA "Build Active-Passive HA plugin" ${ha_default})
 
 if (BUILD_HA)
     set (ha_SOURCES
-	qpid/ha/QueueSnapshot.h
         qpid/ha/AlternateExchangeSetter.h
         qpid/ha/Backup.cpp
         qpid/ha/Backup.h
@@ -603,24 +536,29 @@ if (BUILD_HA)
         qpid/ha/BrokerReplicator.h
         qpid/ha/ConnectionObserver.cpp
         qpid/ha/ConnectionObserver.h
-	qpid/ha/Event.cpp
-	qpid/ha/Event.h
+        qpid/ha/Event.cpp
+        qpid/ha/Event.h
         qpid/ha/FailoverExchange.cpp
         qpid/ha/FailoverExchange.h
         qpid/ha/HaBroker.cpp
         qpid/ha/HaBroker.h
         qpid/ha/HaPlugin.cpp
-	qpid/ha/IdSetter.h
-        qpid/ha/QueueSnapshot.h
+        qpid/ha/IdSetter.h
+        qpid/ha/LogPrefix.cpp
+        qpid/ha/LogPrefix.h
         qpid/ha/Membership.cpp
         qpid/ha/Membership.h
         qpid/ha/Primary.cpp
         qpid/ha/Primary.h
         qpid/ha/PrimaryQueueLimits.h
+        qpid/ha/PrimaryTxObserver.cpp
+        qpid/ha/PrimaryTxObserver.h
         qpid/ha/QueueGuard.cpp
         qpid/ha/QueueGuard.h
         qpid/ha/QueueReplicator.cpp
         qpid/ha/QueueReplicator.h
+        qpid/ha/QueueSnapshot.h
+        qpid/ha/QueueSnapshot.h
         qpid/ha/RemoteBackup.cpp
         qpid/ha/RemoteBackup.h
         qpid/ha/ReplicatingSubscription.cpp
@@ -634,22 +572,19 @@ if (BUILD_HA)
         qpid/ha/StatusCheck.h
         qpid/ha/TxReplicatingSubscription.cpp
         qpid/ha/TxReplicatingSubscription.h
-        qpid/ha/PrimaryTxObserver.cpp
-        qpid/ha/PrimaryTxObserver.h
+        qpid/ha/TxReplicator.cpp
+        qpid/ha/TxReplicator.h
         qpid/ha/types.cpp
-	qpid/ha/TxReplicator.cpp
-	qpid/ha/TxReplicator.h
         qpid/ha/types.h
     )
 
     add_library (ha MODULE ${ha_SOURCES})
     target_link_libraries (ha
                            qpidtypes qpidcommon qpidbroker qpidmessaging
-                           "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+                           ${Boost_PROGRAM_OPTIONS_LIBRARY})
     set_target_properties (ha PROPERTIES
                            PREFIX ""
-                           COMPILE_DEFINITIONS _IN_QPID_BROKER
-                           LINK_FLAGS "${CATCH_UNDEFINED}")
+                           COMPILE_DEFINITIONS _IN_QPID_BROKER)
     install (TARGETS ha
              DESTINATION ${QPIDD_MODULE_DIR}
              COMPONENT ${QPID_COMPONENT_BROKER})
@@ -671,12 +606,6 @@ set (qpid_memstat_module
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  set (qpidtypes_platform_SOURCES
-    qpid/sys/windows/uuid.cpp
-  )
-  set (qpidtypes_platform_LIBS
-    rpcrt4
-  )
 
   set (qpidcommon_platform_SOURCES
     qpid/log/windows/SinkOptions.cpp
@@ -740,10 +669,6 @@ else (CMAKE_SYSTEM_NAME STREQUAL Windows)
   )
 
   if (CMAKE_SYSTEM_NAME STREQUAL Linux)
-    add_definitions(-pthread)
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
-    set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${CATCH_UNDEFINED} -pthread")
-    set (CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -pthread")
     # On Linux override memory status module
     set (qpid_memstat_module
       qpid/sys/posix/MemStat.cpp
@@ -762,19 +687,21 @@ else (CMAKE_SYSTEM_NAME STREQUAL Windows)
     )
   endif (CMAKE_SYSTEM_NAME STREQUAL SunOS)
 
+  if (CMAKE_SYSTEM_NAME STREQUAL AIX)
+    set (qpid_system_module
+      qpid/sys/aix/SystemInfo.cpp
+    )
+  endif (CMAKE_SYSTEM_NAME STREQUAL AIX)
+
   if (CMAKE_CXX_COMPILER_ID STREQUAL SunPro)
     # -lmalloc needed for mallinfo.
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lmalloc")
     set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -lmalloc")
   endif (CMAKE_CXX_COMPILER_ID STREQUAL SunPro)
 
-  set (qpidtypes_platform_SOURCES)
-  set (qpidtypes_platform_LIBS
-    "${uuid_LIB}"
-  )
-
   set (qpidcommon_platform_SOURCES
     qpid/sys/posix/AsynchIO.cpp
+    qpid/sys/posix/Condition.cpp
     qpid/sys/posix/Fork.cpp
     qpid/sys/posix/Path.cpp
     qpid/sys/posix/FileSysDir.cpp
@@ -800,7 +727,6 @@ else (CMAKE_SYSTEM_NAME STREQUAL Windows)
   set (qpidcommon_platform_LIBS
     "${CMAKE_DL_LIBS}"
     "${clock_gettime_LIB}"
-    "${uuid_LIB}"
   )
 
   set (qpidbroker_platform_SOURCES
@@ -826,6 +752,7 @@ set (qpidcommon_SOURCES
      ${qpidcommon_sasl_source}
      ${sslcommon_SOURCES}
      qpid/assert.cpp
+     qpid/AclHost.cpp
      qpid/Address.cpp
      qpid/DataDir.cpp
      qpid/Exception.cpp
@@ -948,7 +875,7 @@ set(qpidtypes_SOURCES
   qpid/types/Exception.cpp
   qpid/types/Uuid.cpp
   qpid/types/Variant.cpp
-  ${qpidtypes_platform_SOURCES}
+  ${uuid_SRC}
 )
 set_source_files_properties(
      ${qpidtypes_SOURCES}
@@ -957,7 +884,7 @@ set_source_files_properties(
 
 add_msvc_version (qpidtypes library dll)
 add_library(qpidtypes SHARED ${qpidtypes_SOURCES})
-target_link_libraries(qpidtypes ${qpidtypes_platform_LIBS})
+target_link_libraries(qpidtypes "${uuid_LIB}")
 set_target_properties (qpidtypes PROPERTIES
                        LINK_FLAGS "${HIDE_SYMBOL_FLAGS} ${LINK_VERSION_SCRIPT_FLAG}"
                        VERSION ${qpidtypes_version}
@@ -978,6 +905,7 @@ set (qpidclient_SOURCES
      ${sslconnector_SOURCES}
      qpid/client/Bounds.cpp
      qpid/client/Completion.cpp
+     qpid/client/CompletionImpl.cpp
      qpid/client/Connection.cpp
      qpid/client/ConnectionHandler.cpp
      qpid/client/ConnectionImpl.cpp
@@ -1015,7 +943,6 @@ add_msvc_version (qpidclient library dll)
 add_library (qpidclient SHARED ${qpidclient_SOURCES})
 
 target_link_libraries (qpidclient qpidcommon qpidtypes
-                       ${Boost_PROGRAM_OPTIONS_LIBRARY}
                        ${ssl_LIBS})
 
 set_target_properties (qpidclient PROPERTIES
@@ -1084,7 +1011,7 @@ set (qpidmessaging_SOURCES
 add_msvc_version (qpidmessaging library dll)
 
 add_library (qpidmessaging SHARED ${qpidmessaging_SOURCES})
-target_link_libraries (qpidmessaging qpidtypes qpidclient qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}" ${Proton_LIBRARIES})
+target_link_libraries (qpidmessaging qpidtypes qpidclient qpidcommon ${Proton_LIBRARIES})
 set_target_properties (qpidmessaging PROPERTIES
                        LINK_FLAGS "${HIDE_SYMBOL_FLAGS} ${LINK_VERSION_SCRIPT_FLAG}"
                        COMPILE_FLAGS "${HIDE_SYMBOL_FLAGS}"
@@ -1128,7 +1055,6 @@ set (qpidbroker_SOURCES
      qpid/broker/Broker.cpp
      qpid/broker/Credit.cpp
      qpid/broker/Exchange.cpp
-     qpid/broker/ExpiryPolicy.cpp
      qpid/broker/Fairshare.cpp
      qpid/broker/MessageDeque.cpp
      qpid/broker/MessageMap.cpp
@@ -1160,6 +1086,7 @@ set (qpidbroker_SOURCES
      qpid/broker/IngressCompletion.cpp
      qpid/broker/Link.cpp
      qpid/broker/LinkRegistry.cpp
+     qpid/broker/LossyLvq.cpp
      qpid/broker/LossyQueue.cpp
      qpid/broker/Lvq.cpp
      qpid/broker/Message.cpp
@@ -1182,7 +1109,6 @@ set (qpidbroker_SOURCES
      qpid/broker/RecoveredDequeue.cpp
      qpid/broker/RetryList.cpp
      qpid/broker/SecureConnection.cpp
-     qpid/broker/SecureConnectionFactory.cpp
      qpid/broker/Selector.h
      qpid/broker/Selector.cpp
      qpid/broker/SelectorExpression.h
@@ -1207,6 +1133,8 @@ set (qpidbroker_SOURCES
      qpid/broker/TopicExchange.cpp
      qpid/broker/TxAccept.cpp
      qpid/broker/TxBuffer.cpp
+     qpid/broker/TxDequeue.h
+     qpid/broker/TxDequeue.cpp
      qpid/broker/Vhost.cpp
      qpid/broker/amqp_0_10/MessageTransfer.cpp
      qpid/management/ManagementAgent.cpp
@@ -1219,7 +1147,6 @@ add_msvc_version (qpidbroker library dll)
 add_library (qpidbroker SHARED ${qpidbroker_SOURCES})
 
 target_link_libraries (qpidbroker qpidcommon qpidtypes
-                       "${Boost_PROGRAM_OPTIONS_LIBRARY}"
                        "${sasl_LIB}"
                        ${ssl_server_LIBS})
 
@@ -1227,6 +1154,9 @@ set_target_properties (qpidbroker PROPERTIES
                        VERSION ${qpidbroker_version}
                        SOVERSION ${qpidbroker_version_major}
                        COMPILE_DEFINITIONS _IN_QPID_BROKER)
+if (CMAKE_CXX_COMPILER_ID MATCHES XL)
+  set_target_properties (qpidbroker PROPERTIES LINK_FLAGS -Wl,-bbigtoc)
+endif (CMAKE_CXX_COMPILER_ID MATCHES XL)
 
 if (MSVC)
   set_target_properties (qpidbroker PROPERTIES COMPILE_FLAGS /wd4290)
@@ -1246,7 +1176,7 @@ set (qpidd_SOURCES
 )
 add_msvc_version (qpidd application exe)
 add_executable (qpidd ${qpidd_SOURCES})
-target_link_libraries (qpidd qpidbroker qpidcommon ${Boost_PROGRAM_OPTIONS_LIBRARY})
+target_link_libraries (qpidd qpidbroker qpidcommon)
 set_target_properties (qpidd PROPERTIES COMPILE_DEFINITIONS _IN_QPID_BROKER)
 install (TARGETS qpidd
          RUNTIME DESTINATION ${QPID_INSTALL_SBINDIR}
@@ -1365,6 +1295,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake
 add_subdirectory(qpid/store)
 add_subdirectory(tests)
 add_subdirectory(tests/legacystore)
+add_subdirectory(tests/linearstore)
 
 # Support for pkg-config
 

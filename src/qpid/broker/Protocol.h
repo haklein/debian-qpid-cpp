@@ -23,13 +23,14 @@
  */
 #include <map>
 #include <string>
+#include <set>
 #include <boost/shared_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include "qpid/sys/ConnectionCodec.h"
 #include "qpid/broker/BrokerImportExport.h"
 
 namespace qpid {
 namespace sys {
-class ConnectionCodec;
 class OutputControl;
 struct SecuritySettings;
 }
@@ -38,6 +39,7 @@ class Buffer;
 class ProtocolVersion;
 }
 namespace broker {
+class Broker;
 class Message;
 class RecoverableMessage;
 namespace amqp_0_10 {
@@ -59,18 +61,22 @@ class Protocol
     virtual qpid::sys::ConnectionCodec* create(const qpid::framing::ProtocolVersion&, qpid::sys::OutputControl&, const std::string&, const qpid::sys::SecuritySettings&) = 0;
     virtual boost::intrusive_ptr<const qpid::broker::amqp_0_10::MessageTransfer> translate(const Message&) = 0;
     virtual boost::shared_ptr<RecoverableMessage> recover(qpid::framing::Buffer&) = 0;
+    virtual qpid::framing::ProtocolVersion supportedVersion() const = 0;
 
   private:
 };
 
-class ProtocolRegistry : public Protocol
+class ProtocolRegistry : public Protocol, public qpid::sys::ConnectionCodec::Factory
 {
   public:
     QPID_BROKER_EXTERN qpid::sys::ConnectionCodec* create(const qpid::framing::ProtocolVersion&, qpid::sys::OutputControl&, const std::string&, const qpid::sys::SecuritySettings&);
+    QPID_BROKER_EXTERN qpid::sys::ConnectionCodec* create(qpid::sys::OutputControl&, const std::string&, const qpid::sys::SecuritySettings&);
+    QPID_BROKER_EXTERN qpid::framing::ProtocolVersion supportedVersion() const;
     QPID_BROKER_EXTERN boost::intrusive_ptr<const qpid::broker::amqp_0_10::MessageTransfer> translate(const Message&);
     QPID_BROKER_EXTERN boost::shared_ptr<RecoverableMessage> recover(qpid::framing::Buffer&);
     QPID_BROKER_EXTERN Message decode(qpid::framing::Buffer&);
 
+    QPID_BROKER_EXTERN ProtocolRegistry(const std::set<std::string>& enabled, Broker* b);
     QPID_BROKER_EXTERN ~ProtocolRegistry();
     QPID_BROKER_EXTERN void add(const std::string&, Protocol*);
   private:
@@ -78,6 +84,12 @@ class ProtocolRegistry : public Protocol
     //limited manipulation of ordering
     typedef std::map<std::string, Protocol*> Protocols;
     Protocols protocols;
+    const std::set<std::string> enabled;
+    Broker* broker;
+
+    qpid::sys::ConnectionCodec* create_0_10(qpid::sys::OutputControl&, const std::string&, const qpid::sys::SecuritySettings&, bool);
+    bool isEnabled(const std::string&) const;
+
 };
 }} // namespace qpid::broker
 

@@ -30,6 +30,7 @@
 #include "qpid/messaging/Message.h"
 #include "qpid/messaging/MessageImpl.h"
 #include "qpid/log/Statement.h"
+#include "config.h"
 extern "C" {
 #include <proton/engine.h>
 }
@@ -44,12 +45,12 @@ SenderContext::SenderContext(pn_session_t* session, const std::string& n, const 
   : name(n),
     address(a),
     helper(address),
-    sender(pn_sender(session, n.c_str())), capacity(50), unreliable(helper.isUnreliable()),
+    sender(pn_sender(session, n.c_str())), nextId(0), capacity(50), unreliable(helper.isUnreliable()),
     setToOnSend(setToOnSend_) {}
 
 SenderContext::~SenderContext()
 {
-    //pn_link_free(sender);
+    pn_link_free(sender);
 }
 
 void SenderContext::close()
@@ -510,7 +511,11 @@ void SenderContext::Delivery::send(pn_link_t* sender, bool unreliable)
 {
     pn_delivery_tag_t tag;
     tag.size = sizeof(id);
+#ifdef NO_PROTON_DELIVERY_TAG_T
+    tag.start = reinterpret_cast<const char*>(&id);
+#else
     tag.bytes = reinterpret_cast<const char*>(&id);
+#endif
     token = pn_delivery(sender, tag);
     pn_link_send(sender, encoded.getData(), encoded.getSize());
     if (unreliable) {

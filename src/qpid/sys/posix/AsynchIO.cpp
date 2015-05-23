@@ -93,7 +93,7 @@ private:
 AsynchAcceptor::AsynchAcceptor(const Socket& s,
                                AsynchAcceptor::Callback callback) :
     acceptedCallback(callback),
-    handle(s, boost::bind(&AsynchAcceptor::readable, this, _1), 0, 0),
+    handle((const IOHandle&)s, boost::bind(&AsynchAcceptor::readable, this, _1), 0, 0),
     socket(s) {
 
     s.setNonblocking();
@@ -167,7 +167,7 @@ AsynchConnector::AsynchConnector(const Socket& s,
                                  const std::string& port,
                                  ConnectedCallback connCb,
                                  FailedCallback failCb) :
-    DispatchHandle(s,
+    DispatchHandle((const IOHandle&)s,
                    0,
                    boost::bind(&AsynchConnector::connComplete, this, _1),
                    boost::bind(&AsynchConnector::connComplete, this, _1)),
@@ -308,7 +308,7 @@ AsynchIO::AsynchIO(const Socket& s,
                    ReadCallback rCb, EofCallback eofCb, DisconnectCallback disCb,
                    ClosedCallback cCb, BuffersEmptyCallback eCb, IdleCallback iCb) :
 
-    DispatchHandle(s, 
+    DispatchHandle((const IOHandle&)s,
                    boost::bind(&AsynchIO::readable, this, _1),
                    boost::bind(&AsynchIO::writeable, this, _1),
                    boost::bind(&AsynchIO::disconnected, this, _1)),
@@ -414,13 +414,14 @@ void AsynchIO::requestedCall(RequestCallback callback) {
  * to spare
  */
 AsynchIO::BufferBase* AsynchIO::getQueuedBuffer() {
-    // Always keep at least one buffer (it might have data that was "unread" in it)
-    if (bufferQueue.size()<=1)
+    BufferBase* buff = bufferQueue.empty() ? 0 : bufferQueue.back();
+    // An "unread" buffer is reserved for future read operations (which
+    // take from the front of the queue).
+    if (!buff || (buff->dataCount && bufferQueue.size() == 1)) {
+        QPID_LOG(error, "No IO buffers available");
         return 0;
-    BufferBase* buff = bufferQueue.back();
-    assert(buff);
-    buff->dataStart = 0;
-    buff->dataCount = 0;
+    }
+    assert(buff->dataCount == 0);
     bufferQueue.pop_back();
     return buff;
 }
@@ -443,7 +444,6 @@ void AsynchIO::readable(DispatchHandle& h) {
             errno = 0;
             int readCount = buff->byteCount-buff->dataCount;
             int rc = socket.read(buff->bytes + buff->dataCount, readCount);
-            int64_t duration = Duration(readStartTime, AbsTime::now());
             ++readCalls;
             if (rc > 0) {
                 buff->dataCount += rc;
@@ -451,6 +451,7 @@ void AsynchIO::readable(DispatchHandle& h) {
                 total += rc;
 
                 readCallback(*this, buff);
+                int64_t duration = Duration(readStartTime, AbsTime::now());
                 if (rc != readCount) {
                     // If we didn't fill the read buffer then time to stop reading
                     QPID_PROBE4(asynchio_read_finished_done, &h, duration, total, readCalls);
@@ -468,7 +469,7 @@ void AsynchIO::readable(DispatchHandle& h) {
                 bufferQueue.push_front(buff);
                 assert(buff);
 
-                QPID_PROBE5(asynchio_read_finished_error, &h, duration, total, readCalls, errno);
+                QPID_PROBE5(asynchio_read_finished_error, &h, Duration(readStartTime, AbsTime::now()), total, readCalls, errno);
                 // Eof or other side has gone away
                 if (rc == 0 || errno == ECONNRESET) {
                     eofCallback(*this);

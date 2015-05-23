@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -20,9 +19,7 @@
 
 import os, signal, sys, time, imp, re, subprocess, glob, random, logging, shutil, math, unittest
 import traceback
-from qpid.messaging import Message, SessionError, NotFound, ConnectionError, ReceiverError, Connection, Timeout, Disposition, REJECTED, Empty, ServerError
 from qpid.datatypes import uuid4, UUID
-from qpid.harness import Skipped
 from brokertest import *
 from ha_test import *
 from threading import Thread, Lock, Condition
@@ -31,17 +28,8 @@ from qpidtoollibs import BrokerAgent, EventHelper
 
 log = getLogger(__name__)
 
-
 class HaBrokerTest(BrokerTest):
     """Base class for HA broker tests"""
-
-def alt_setup(session, suffix):
-    # Create exchange to use as alternate and a queue bound to it.
-    # altex exchange: acts as alternate exchange
-    session.sender("altex%s;{create:always,node:{type:topic,x-declare:{type:'fanout'}}}"%(suffix))
-    # altq queue bound to altex, collect re-routed messages.
-    session.sender("altq%s;{create:always,node:{x-bindings:[{exchange:'altex%s',queue:altq%s}]}}"%(suffix,suffix,suffix))
-
 
 class ReplicationTests(HaBrokerTest):
     """Correctness tests for  HA replication."""
@@ -50,43 +38,51 @@ class ReplicationTests(HaBrokerTest):
         """Test basic replication of configuration and messages before and
         after backup has connected"""
 
-        def queue(name, replicate):
-            return "%s;{create:always,node:{x-declare:{arguments:{'qpid.replicate':%s}}}}"%(name, replicate)
-
-        def exchange(name, replicate, bindq, key):
-            return "%s/%s;{create:always,node:{type:topic,x-declare:{arguments:{'qpid.replicate':%s}, type:'topic'},x-bindings:[{exchange:'%s',queue:'%s',key:'%s'}]}}"%(name, key, replicate, name, bindq, key)
-
-        def setup(p, prefix, primary):
+        def setup(prefix, primary):
             """Create config, send messages on the primary p"""
+            a = primary.agent
+
+            def queue(name, replicate):
+                a.addQueue(name, options={'qpid.replicate':replicate})
+                return name
+
+            def exchange(name, replicate, bindq, key):
+                a.addExchange("fanout", name, options={'qpid.replicate':replicate})
+                a.bind(name, bindq, key)
+                return name
+
+            # Test replication of messages
+            p = primary.connect().session()
             s = p.sender(queue(prefix+"q1", "all"))
-            for m in ["a", "b", "1"]: s.send(Message(m))
+            for m in ["a", "b", "1"]: s.send(qm.Message(m))
             # Test replication of dequeue
             self.assertEqual(p.receiver(prefix+"q1").fetch(timeout=0).content, "a")
             p.acknowledge()
-            p.sender(queue(prefix+"q2", "configuration")).send(Message("2"))
-            p.sender(queue(prefix+"q3", "none")).send(Message("3"))
-            p.sender(exchange(prefix+"e1", "all", prefix+"q1", "key1")).send(Message("4"))
-            p.sender(exchange(prefix+"e2", "configuration", prefix+"q2", "key2")).send(Message("5"))
+
+            p.sender(queue(prefix+"q2", "configuration")).send(qm.Message("2"))
+            p.sender(queue(prefix+"q3", "none")).send(qm.Message("3"))
+            p.sender(exchange(prefix+"e1", "all", prefix+"q1", "key1")).send(qm.Message("4"))
+            p.sender(exchange(prefix+"e2", "configuration", prefix+"q2", "key2")).send(qm.Message("5"))
             # Test  unbind
-            p.sender(queue(prefix+"q4", "all")).send(Message("6"))
+            p.sender(queue(prefix+"q4", "all")).send(qm.Message("6"))
             s3 = p.sender(exchange(prefix+"e4", "all", prefix+"q4", "key4"))
-            s3.send(Message("7"))
-            # Use old connection to unbind
-            us = primary.connect_old().session(str(uuid4()))
-            us.exchange_unbind(exchange=prefix+"e4", binding_key="key4", queue=prefix+"q4")
-            p.sender(prefix+"e4").send(Message("drop1")) # Should be dropped
+            s3.send(qm.Message("7"))
+            a.unbind(prefix+"e4", prefix+"q4", "key4")
+            p.sender(prefix+"e4").send(qm.Message("drop1")) # Should be dropped
+
             # Test replication of deletes
-            p.sender(queue(prefix+"dq", "all"))
-            p.sender(exchange(prefix+"de", "all", prefix+"dq", ""))
-            p.sender(prefix+"dq;{delete:always}").close()
-            p.sender(prefix+"de;{delete:always}").close()
+            queue(prefix+"dq", "all")
+            exchange(prefix+"de", "all", prefix+"dq", "")
+            a.delQueue(prefix+"dq")
+            a.delExchange(prefix+"de")
+
             # Need a marker so we can wait till sync is done.
-            p.sender(queue(prefix+"x", "configuration"))
+            queue(prefix+"x", "configuration")
 
         def verify(b, prefix, p):
             """Verify setup was replicated to backup b"""
             # Wait for configuration to replicate.
-            wait_address(b, prefix+"x");
+            wait_address(b.connection, prefix+"x");
             self.assert_browse_retry(b, prefix+"q1", ["b", "1", "4"])
 
             self.assertEqual(p.receiver(prefix+"q1").fetch(timeout=0).content, "b")
@@ -94,22 +90,22 @@ class ReplicationTests(HaBrokerTest):
             self.assert_browse_retry(b, prefix+"q1", ["1", "4"])
 
             self.assert_browse_retry(b, prefix+"q2", []) # configuration only
-            assert not valid_address(b, prefix+"q3")
+            assert not valid_address(b.connection, prefix+"q3")
 
             # Verify exchange with replicate=all
-            b.sender(prefix+"e1/key1").send(Message(prefix+"e1"))
+            b.sender(prefix+"e1/key1").send(qm.Message(prefix+"e1"))
             self.assert_browse_retry(b, prefix+"q1", ["1", "4", prefix+"e1"])
 
             # Verify exchange with replicate=configuration
-            b.sender(prefix+"e2/key2").send(Message(prefix+"e2"))
+            b.sender(prefix+"e2/key2").send(qm.Message(prefix+"e2"))
             self.assert_browse_retry(b, prefix+"q2", [prefix+"e2"])
 
-            b.sender(prefix+"e4/key4").send(Message("drop2")) # Verify unbind.
+            b.sender(prefix+"e4/key4").send(qm.Message("drop2")) # Verify unbind.
             self.assert_browse_retry(b, prefix+"q4", ["6","7"])
 
             # Verify deletes
-            assert not valid_address(b, prefix+"dq")
-            assert not valid_address(b, prefix+"de")
+            assert not valid_address(b.connection, prefix+"dq")
+            assert not valid_address(b.connection, prefix+"de")
 
         l = LogLevel(ERROR) # Hide expected WARNING log messages from failover.
         try:
@@ -117,25 +113,26 @@ class ReplicationTests(HaBrokerTest):
             primary = cluster[0]
             backup  = cluster[1]
 
-            p = primary.connect().session()
-
             # Send messages before re-starting the backup, test catch-up replication.
             cluster.kill(1, promote_next=False, final=False)
-            setup(p, "1", primary)
+            setup("1", primary)
             cluster.restart(1)
 
             # Send messages after re-starting the backup, to test steady-state replication.
-            setup(p, "2", primary)
+            setup("2", primary)
+
+            p = primary.connect().session()
 
             # Verify the data on the backup
             b = backup.connect_admin().session()
             verify(b, "1", p)
             verify(b, "2", p)
             # Test a series of messages, enqueue all then dequeue all.
-            s = p.sender(queue("foo","all"))
-            wait_address(b, "foo")
+            primary.agent.addQueue("foo")
+            s = p.sender("foo")
+            wait_address(b.connection, "foo")
             msgs = [str(i) for i in range(10)]
-            for m in msgs: s.send(Message(m))
+            for m in msgs: s.send(qm.Message(m))
             self.assert_browse_retry(p, "foo", msgs)
             self.assert_browse_retry(b, "foo", msgs)
             r = p.receiver("foo")
@@ -145,7 +142,7 @@ class ReplicationTests(HaBrokerTest):
             self.assert_browse_retry(b, "foo", [])
 
             # Another series, this time verify each dequeue individually.
-            for m in msgs: s.send(Message(m))
+            for m in msgs: s.send(qm.Message(m))
             self.assert_browse_retry(p, "foo", msgs)
             self.assert_browse_retry(b, "foo", msgs)
             for i in range(len(msgs)):
@@ -171,11 +168,8 @@ class ReplicationTests(HaBrokerTest):
 
         msgs = [str(i) for i in range(30)]
         b1 = backup1.connect_admin().session()
-        wait_address(b1, "q");
-        self.assert_browse_retry(b1, "q", msgs)
-        b2 = backup2.connect_admin().session()
-        wait_address(b2, "q");
-        self.assert_browse_retry(b2, "q", msgs)
+        backup1.assert_browse_backup("q", msgs)
+        backup2.assert_browse_backup("q", msgs)
 
     def test_send_receive(self):
         """Verify sequence numbers of messages sent by qpid-send"""
@@ -187,14 +181,16 @@ class ReplicationTests(HaBrokerTest):
                  "--broker", brokers[0].host_port(),
                  "--address", "q;{create:always}",
                  "--messages=1000",
-                 "--content-string=x"
+                 "--content-string=x",
+                 "--connection-options={%s}"%self.protocol_option()
                  ])
             receiver = self.popen(
                 ["qpid-receive",
                  "--broker", brokers[0].host_port(),
                  "--address", "q;{create:always}",
                  "--messages=990",
-                 "--timeout=10"
+                 "--timeout=10",
+                 "--connection-options={%s}"%self.protocol_option()
                  ])
             self.assertEqual(sender.wait(), 0)
             self.assertEqual(receiver.wait(), 0)
@@ -215,7 +211,7 @@ class ReplicationTests(HaBrokerTest):
             try:
                 backup.connect().session()
                 self.fail("Expected connection to backup to fail")
-            except ConnectionError: pass
+            except qm.ConnectionError: pass
             # Check that admin connections are allowed to backup.
             backup.connect_admin().close()
 
@@ -224,8 +220,8 @@ class ReplicationTests(HaBrokerTest):
                                reconnect=True)
             s = c.session()
             sender = s.sender("q;{create:always}")
-            backup.wait_backup("q")
-            sender.send("foo")
+            sender.send("foo", sync=True)
+            s.sync()
             primary.kill()
             assert retry(lambda: not is_running(primary.pid))
             backup.promote()
@@ -243,31 +239,36 @@ class ReplicationTests(HaBrokerTest):
         broker_addr = broker.host_port()
 
         # Case 1: Connect before stalling the broker, use the connection after stalling.
-        c = Connection(broker_addr, heartbeat=1)
+        c = qm.Connection(broker_addr, heartbeat=1)
         c.open()
         os.kill(broker.pid, signal.SIGSTOP) # Stall the broker
-        self.assertRaises(ConnectionError, c.session().sender, "foo")
+
+        def make_sender(): c.session().sender("foo")
+        self.assertRaises(qm.ConnectionError, make_sender)
 
         # Case 2: Connect to a stalled broker
-        c = Connection(broker_addr, heartbeat=1)
-        self.assertRaises(ConnectionError, c.open)
+        c = qm.Connection(broker_addr, heartbeat=1)
+        self.assertRaises(qm.ConnectionError, c.open)
 
         # Case 3: Re-connect to a stalled broker.
         broker2 = Broker(self)
-        c = Connection(broker2.host_port(), heartbeat=1, reconnect_limit=1,
-                       reconnect=True, reconnect_urls=[broker_addr],
-                       reconnect_log=False) # Hide expected warnings
+        c = qm.Connection(broker2.host_port(), heartbeat=1, reconnect_limit=1,
+                          reconnect=True, reconnect_urls=[broker_addr],
+                          reconnect_log=False) # Hide expected warnings
         c.open()
         broker2.kill()          # Cause re-connection to broker
-        self.assertRaises(ConnectionError, c.session().sender, "foo")
+        self.assertRaises(qm.ConnectionError, make_sender)
 
     def test_failover_cpp(self):
         """Verify that failover works in the C++ client."""
         cluster = HaCluster(self, 2)
         cluster[0].connect().session().sender("q;{create:always}")
         cluster[1].wait_backup("q")
-        sender = NumberedSender(cluster[0], url=cluster.url, queue="q", failover_updates = False)
-        receiver = NumberedReceiver(cluster[0], url=cluster.url, queue="q", failover_updates = False)
+        # FIXME aconway 2014-02-21: using 0-10, there is a failover problem with 1.0
+        sender = NumberedSender(cluster[0], url=cluster.url, queue="q",
+                                connection_options="reconnect:true,protocol:'amqp0-10'")
+        receiver = NumberedReceiver(cluster[0], url=cluster.url, queue="q",
+                                    connection_options="reconnect:true,protocol:'amqp0-10'")
         receiver.start()
         sender.start()
         assert retry(lambda: receiver.received > 10) # Wait for some messages to get thru
@@ -330,7 +331,7 @@ class ReplicationTests(HaBrokerTest):
         # Set up replication with qpid-config
         ps2 = pc.session().sender("q2;{create:always}")
         backup.config_replicate(primary.host_port(), "q2");
-        ps2.send("x", timeout=1)
+        ps2.send("x")
         backup.assert_browse_backup("q2", ["x"])
 
 
@@ -349,6 +350,7 @@ class ReplicationTests(HaBrokerTest):
             br = backup.connect().session().receiver("q;{create:always}")
             backup.replicate(cluster.url, "q")
             ps.send("a")
+            ps.sync()
             backup.assert_browse_backup("q", ["a"])
             cluster.bounce(0)
             backup.assert_browse_backup("q", ["a"])
@@ -356,6 +358,10 @@ class ReplicationTests(HaBrokerTest):
             backup.assert_browse_backup("q", ["a", "b"])
             cluster[0].wait_status("ready")
             cluster.bounce(1)
+            # FIXME aconway 2014-02-20: pr does not fail over with 1.0/swig
+            if qm == qpid_messaging:
+                print "WARNING: Skipping SWIG client failover bug"
+                return
             self.assertEqual("a", pr.fetch().content)
             pr.session.acknowledge()
             backup.assert_browse_backup("q", ["b"])
@@ -369,7 +375,7 @@ class ReplicationTests(HaBrokerTest):
         s = cluster[0].connect().session().sender("lvq; {create:always, node:{x-declare:{arguments:{'qpid.last_value_queue_key':lvq-key}}}}")
 
         def send(key,value,expect):
-            s.send(Message(content=value,properties={"lvq-key":key}), timeout=1)
+            s.send(qm.Message(content=value,properties={"lvq-key":key}))
             cluster[1].assert_browse_backup("lvq", expect)
 
         send("a", "a-1", ["a-1"])
@@ -387,7 +393,7 @@ class ReplicationTests(HaBrokerTest):
         """Verify that we replicate to an LVQ correctly"""
         cluster = HaCluster(self, 2)
         s = cluster[0].connect().session().sender("q; {create:always, node:{x-declare:{arguments:{'qpid.policy_type':ring, 'qpid.max_count':5}}}}")
-        for i in range(10): s.send(Message(str(i)))
+        for i in range(10): s.send(qm.Message(str(i)))
         cluster[1].assert_browse_backup("q", [str(i) for i in range(5,10)])
 
     def test_reject(self):
@@ -396,11 +402,11 @@ class ReplicationTests(HaBrokerTest):
         primary, backup = cluster
         s = primary.connect().session().sender("q; {create:always, node:{x-declare:{arguments:{'qpid.policy_type':reject, 'qpid.max_count':5}}}}")
         try:
-            for i in range(10): s.send(Message(str(i)), sync=False)
-        except qpid.messaging.exceptions.TargetCapacityExceeded: pass
+            for i in range(10): s.send(qm.Message(str(i)), sync=False)
+        except qm.LinkError: pass
         backup.assert_browse_backup("q", [str(i) for i in range(0,5)])
-        # Detach, don't close as there is a broken session
-        s.session.connection.detach()
+        try: s.session.connection.close()
+        except: pass            # Expect exception from broken session
 
     def test_priority(self):
         """Verify priority queues replicate correctly"""
@@ -408,7 +414,7 @@ class ReplicationTests(HaBrokerTest):
         session = cluster[0].connect().session()
         s = session.sender("priority-queue; {create:always, node:{x-declare:{arguments:{'qpid.priorities':10}}}}")
         priorities = [8,9,5,1,2,2,3,4,9,7,8,9,9,2]
-        for p in priorities: s.send(Message(priority=p))
+        for p in priorities: s.send(qm.Message(priority=p))
         # Can't use browse_backup as browser sees messages in delivery order not priority.
         cluster[1].wait_backup("priority-queue")
         r = cluster[1].connect_admin().session().receiver("priority-queue")
@@ -425,7 +431,7 @@ class ReplicationTests(HaBrokerTest):
         limits={7:0,6:4,5:3,4:2,3:2,2:2,1:2}
         limit_policy = ",".join(["'qpid.fairshare':5"] + ["'qpid.fairshare-%s':%s"%(i[0],i[1]) for i in limits.iteritems()])
         s = session.sender("priority-queue; {create:always, node:{x-declare:{arguments:{'qpid.priorities':%s, %s}}}}"%(levels,limit_policy))
-        messages = [Message(content=str(uuid4()), priority = p) for p in priorities]
+        messages = [qm.Message(content=str(uuid4()), priority = p) for p in priorities]
         for m in messages: s.send(m)
         backup.wait_backup(s.target)
         r = backup.connect_admin().session().receiver("priority-queue")
@@ -439,7 +445,7 @@ class ReplicationTests(HaBrokerTest):
         primary, backup = cluster
         s = primary.connect().session().sender("q; {create:always, node:{x-declare:{arguments:{'qpid.policy_type':ring, 'qpid.max_count':5, 'qpid.priorities':10}}}}")
         priorities = [8,9,5,1,2,2,3,4,9,7,8,9,9,2]
-        for p in priorities: s.send(Message(priority=p))
+        for p in priorities: s.send(qm.Message(priority=p))
         expect = sorted(priorities,reverse=True)[0:5]
         primary.assert_browse("q", expect, transform=lambda m: m.priority)
         backup.assert_browse_backup("q", expect, transform=lambda m: m.priority)
@@ -456,8 +462,8 @@ class ReplicationTests(HaBrokerTest):
             def send(self, connection):
                 """Send messages, then acquire one but don't acknowledge"""
                 s = connection.session()
-                for m in range(10): s.sender(self.address).send(str(m), timeout=1)
-                s.receiver(self.address, timeout=1).fetch()
+                for m in range(10): s.sender(self.address).send(str(m))
+                s.receiver(self.address).fetch()
 
             def verify(self, brokertest, backup):
                 backup.assert_browse_backup(self.queue, self.expect, msg=self.queue)
@@ -492,38 +498,33 @@ class ReplicationTests(HaBrokerTest):
         cluster2[1].wait_status("ready")
         cluster2[0].connect().session().sender("q;{create:always}")
         time.sleep(.1)               # Give replication a chance.
-        try:
-            cluster1[1].connect_admin().session().receiver("q")
-            self.fail("Excpected no-such-queue exception")
-        except NotFound: pass
-        try:
-            cluster2[1].connect_admin().session().receiver("q")
-            self.fail("Excpected no-such-queue exception")
-        except NotFound: pass
+        # Expect queues not to be found
+        self.assertRaises(qm.NotFound, cluster1[1].connect_admin().session().receiver, "q")
+        self.assertRaises(qm.NotFound, cluster2[1].connect_admin().session().receiver, "q")
 
     def test_replicate_binding(self):
         """Verify that binding replication can be disabled"""
         cluster = HaCluster(self, 2)
         primary, backup = cluster[0], cluster[1]
         ps = primary.connect().session()
-        ps.sender("ex;{create:always,node:{type:topic,x-declare:{arguments:{'qpid.replicate':all}, type:'fanout'}}}")
-        ps.sender("q;{create:always,node:{type:queue,x-declare:{arguments:{'qpid.replicate':all}},x-bindings:[{exchange:'ex',queue:'q',key:'',arguments:{'qpid.replicate':none}}]}}")
+        a = primary.agent
+        a.addExchange("fanout", "ex")
+        a.addQueue("q")
+        a.bind("ex", "q", options={'qpid.replicate':'none'})
         backup.wait_backup("q")
 
         primary.kill()
         assert retry(lambda: not is_running(primary.pid)) # Wait for primary to die
         backup.promote()
         bs = backup.connect_admin().session()
-        bs.sender("ex").send(Message("msg"))
+        bs.sender("ex").send(qm.Message("msg"))
         self.assert_browse_retry(bs, "q", [])
 
     def test_invalid_replication(self):
         """Verify that we reject an attempt to declare a queue with invalid replication value."""
         cluster = HaCluster(self, 1, ha_replicate="all")
-        try:
-            c = cluster[0].connect().session().sender("q;{create:always, node:{x-declare:{arguments:{'qpid.replicate':XXinvalidXX}}}}")
-            self.fail("Expected ConnectionError")
-        except ConnectionError: pass
+        self.assertRaises(Exception, cluster[0].connect().session().sender,
+                          "q;{create:always, node:{x-declare:{arguments:{'qpid.replicate':XXinvalidXX}}}}")
 
     def test_exclusive_queue(self):
         """Ensure that we can back-up exclusive queues, i.e. the replicating
@@ -533,12 +534,12 @@ class ReplicationTests(HaBrokerTest):
             c = cluster[0].connect()
             q = addr.split(";")[0]
             r = c.session().receiver(addr)
-            try: c.session().receiver(addr); self.fail("Expected exclusive exception")
-            except ReceiverError: pass
+            self.assertRaises(qm.LinkError, c.session().receiver, addr)
             s = c.session().sender(q).send(q)
             cluster[1].assert_browse_backup(q, [q])
-        test("excl_sub;{create:always, link:{x-subscribe:{exclusive:True}}}");
         test("excl_queue;{create:always, node:{x-declare:{exclusive:True}}}")
+        if qm == qpid.messaging: # FIXME aconway 2014-02-20: swig client no exclusive subscribe
+            test("excl_sub;{create:always, link:{x-subscribe:{exclusive:True}}}");
 
     def test_auto_delete_exclusive(self):
         """Verify that we ignore auto-delete, exclusive, non-auto-delete-timeout queues"""
@@ -552,28 +553,28 @@ class ReplicationTests(HaBrokerTest):
 
         s1 = cluster[1].connect_admin().session()
         cluster[1].wait_backup("q")
-        assert not valid_address(s1, "exad")
-        assert valid_address(s1, "ex")
-        assert valid_address(s1, "ad")
-        assert valid_address(s1, "time")
+        assert not valid_address(s1.connection, "exad")
+        assert valid_address(s1.connection, "ex")
+        assert valid_address(s1.connection, "ad")
+        assert valid_address(s1.connection, "time")
 
         # Verify that auto-delete queues are not kept alive by
         # replicating subscriptions
         ad.close()
         s0.sync()
-        assert not valid_address(s0, "ad")
+        assert not valid_address(s0.connection, "ad")
 
     def test_broker_info(self):
         """Check that broker information is correctly published via management"""
         cluster = HaCluster(self, 3)
 
         def ha_broker(broker):
-            ha_broker = broker.agent().getHaBroker();
+            ha_broker = broker.agent.getHaBroker();
             ha_broker.update()
             return ha_broker
 
         for broker in cluster:  # Make sure HA system-id matches broker's
-            self.assertEqual(ha_broker(broker).systemId, UUID(broker.agent().getBroker().systemRef))
+            self.assertEqual(ha_broker(broker).systemId, UUID(broker.agent.getBroker().systemRef))
 
         # Check that all brokers have the same membership as the cluster
         def check_ids(broker):
@@ -610,9 +611,9 @@ acl allow zag@QPID publish exchange
 acl allow zag@QPID delete exchange
 acl allow zag@QPID access method
 acl allow zag@QPID create link
+acl allow zag@QPID access query
 # Normal user
 acl allow zig@QPID all all
-
 acl deny all all
  """)
         aclf.close()
@@ -625,9 +626,14 @@ acl deny all all
             client_credentials=Credentials("zag", "zag", "PLAIN"))
         c = cluster[0].connect(username="zig", password="zig")
         s0 = c.session();
-        s0.sender("q;{create:always}")
-        s0.sender("ex;{create:always,node:{type:topic,x-declare:{type:'fanout'},x-bindings:[{exchange:'ex',queue:'q'}]}}")
+        a = cluster[0].agent
+        a.addQueue("q")
+        a.addExchange("fanout", "ex")
+        a.bind("ex", "q", "")
         s0.sender("ex").send("foo");
+
+        # Transactions should be done over the tx_protocol
+        c = cluster[0].connect(protocol=self.tx_protocol, username="zig", password="zig")
         s1 = c.session(transactional=True)
         s1.sender("ex").send("foo-tx");
         cluster[1].assert_browse_backup("q", ["foo"])
@@ -640,19 +646,22 @@ acl deny all all
         cluster = HaCluster(self, 2)
         s = cluster[0].connect().session()
         # altex exchange: acts as alternate exchange
-        s.sender("altex;{create:always,node:{type:topic,x-declare:{type:'fanout'}}}")
+        a = cluster[0].agent
+        a.addExchange("fanout", "altex")
         # altq queue bound to altex, collect re-routed messages.
-        s.sender("altq;{create:always,node:{x-bindings:[{exchange:'altex',queue:altq}]}}")
+        a.addQueue("altq")
+        a.bind("altex", "altq", "")
         # ex exchange with alternate-exchange altex and no queues bound
-        s.sender("ex;{create:always,node:{type:topic, x-declare:{type:'direct', alternate-exchange:'altex'}}}")
+        a.addExchange("direct", "ex", {"alternate-exchange":"altex"})
         # create queue q with alternate-exchange altex
-        s.sender("q;{create:always,node:{type:queue, x-declare:{alternate-exchange:'altex'}}}")
+        a.addQueue("q", {"alternate-exchange":"altex"})
         # create a bunch of exchanges to ensure we don't clean up prematurely if the
         # response comes in multiple fragments.
         for i in xrange(200): s.sender("ex.%s;{create:always,node:{type:topic}}"%i)
 
         def verify(broker):
-            s = broker.connect().session()
+            c = broker.connect()
+            s = c.session()
             # Verify unmatched message goes to ex's alternate.
             s.sender("ex").send("foo")
             altq = s.receiver("altq")
@@ -662,17 +671,16 @@ acl deny all all
             s.sender("q").send("bar")
             msg = s.receiver("q").fetch(timeout=0)
             self.assertEqual("bar", msg.content)
-            s.acknowledge(msg, Disposition(REJECTED)) # Reject the message
+            s.acknowledge(msg, qm.Disposition(qm.REJECTED)) # Reject the message
             self.assertEqual("bar", altq.fetch(timeout=0).content)
             s.acknowledge()
-
-        def ss(n): return cluster[n].connect().session()
+            c.close()
 
         # Sanity check: alternate exchanges on original broker
         verify(cluster[0])
-        # Altex is in use as an alternate exchange.
-        self.assertRaises(SessionError,
-                          lambda:ss(0).sender("altex;{delete:always}").close())
+        a = cluster[0].agent
+        # Altex is in use as an alternate exchange, we should get an exception
+        self.assertRaises(Exception, a.delExchange, "altex")
         # Check backup that was connected during setup.
         cluster[1].wait_status("ready")
         cluster[1].wait_backup("ex")
@@ -689,15 +697,12 @@ acl deny all all
         verify(cluster[2])
 
         # Check that alt-exchange in-use count is replicated
-        s = cluster[2].connect().session();
-
-        self.assertRaises(SessionError,
-                          lambda:ss(2).sender("altex;{delete:always}").close())
-        s.sender("q;{delete:always}").close()
-        self.assertRaises(SessionError,
-                          lambda:ss(2).sender("altex;{delete:always}").close())
-        s.sender("ex;{delete:always}").close()
-        s.sender("altex;{delete:always}").close()
+        a = cluster[2].agent
+        self.assertRaises(Exception, a.delExchange, "altex")
+        a.delQueue("q")
+        self.assertRaises(Exception, a.delExchange, "altex")
+        a.delExchange("ex")
+        a.delExchange("altex")
 
     def test_priority_reroute(self):
         """Regression test for QPID-4262, rerouting messages from a priority queue
@@ -705,8 +710,11 @@ acl deny all all
         cluster = HaCluster(self, 2)
         primary = cluster[0]
         session = primary.connect().session()
-        s = session.sender("pq; {create:always, node:{x-declare:{arguments:{'qpid.priorities':10}},x-bindings:[{exchange:'amq.fanout',queue:pq}]}}")
-        for m in xrange(100): s.send(Message(str(m), priority=m%10))
+        a = primary.agent
+        a.addQueue("pq", {'qpid.priorities':10})
+        a.bind("amq.fanout", "pq")
+        s = session.sender("pq")
+        for m in xrange(100): s.send(qm.Message(str(m), priority=m%10))
         pq =  QmfAgent(primary.host_port()).getQueue("pq")
         pq.reroute(request=0, useAltExchange=False, exchange="amq.fanout")
         # Verify that consuming is in priority order
@@ -740,8 +748,8 @@ acl deny all all
         # Verify the backup deletes the surplus queue and exchange
         cluster[1].wait_status("ready")
         s = cluster[1].connect_admin().session()
-        self.assertRaises(NotFound, s.receiver, ("q2"));
-        self.assertRaises(NotFound, s.receiver, ("e2"));
+        self.assertRaises(qm.NotFound, s.receiver, ("q2"));
+        self.assertRaises(qm.NotFound, s.receiver, ("e2"));
 
 
     def test_delete_qpid_4285(self):
@@ -753,61 +761,72 @@ acl deny all all
         cluster[1].wait_backup("q")
         cluster.kill(0)       # Make the backup take over.
         s = cluster[1].connect().session()
-        s.receiver("q;{delete:always}").close() # Delete q on new primary
-        try:
-            s.receiver("q")
-            self.fail("Expected NotFound exception") # Should not be avaliable
-        except NotFound: pass
-        assert not cluster[1].agent().getQueue("q") # Should not be in QMF
+        cluster[1].agent.delQueue("q") # Delete q on new primary
+        self.assertRaises(qm.NotFound, s.receiver, "q")
+        assert not cluster[1].agent.getQueue("q") # Should not be in QMF
 
     def test_auto_delete_failover(self):
         """Test auto-delete queues. Verify that:
         - queues auto-deleted on the primary are deleted on the backup.
-        - auto-delete queues with/without timeout are deleted after a failover.
+        - auto-delete queues with/without timeout are deleted after a failover correctly
+        - auto-delete queues never used (subscribe to) to are not deleted
         - messages are correctly routed to the alternate exchange.
         """
         cluster = HaCluster(self, 3)
         s = cluster[0].connect().session()
-        def setup(q, timeout=""):
-            if timeout: timeout = ",arguments:{'qpid.auto_delete_timeout':%s}"%timeout
-            # Create alternate exchange, auto-delete queue and queue bound to alt. ex.
-            s.sender("%s-altex;{create:always,node:{type:topic,x-declare:{type:fanout}}}"%q)
-            qs = s.sender("%s;{create:always,node:{x-declare:{auto-delete:True,alternate-exchange:%s-altex%s}}}"%(q,q,timeout))
-            s.sender("%s-altq;{create:always,node:{x-bindings:[{exchange:%s-altex,queue:%s-altq}]}}"%(q,q,q))
-            qs.send(q) # Send a message to the auto-delete queue
-            return s
+        a = cluster[0].agent
 
-        for args in [("q1",""),("q2","0"),("q3","1"),("q4",""),("q5","")]: setup(*args)
-        receivers = [s.receiver("q%s"%i) for i in [1,2,3,4]] # Subscribe to queues
-        # Note q5 is never subscribed to, so should not be auto-deleted.
+        def setup(q, timeout=None):
+            # Create alternate exchange, auto-delete queue and queue bound to alt. ex.
+            a.addExchange("fanout", q+"-altex")
+            args = {"auto-delete":True, "alternate-exchange":q+"-altex"}
+            if timeout is not None: args['qpid.auto_delete_timeout'] = timeout
+            a.addQueue(q, args)
+            a.addQueue(q+"-altq")
+            a.bind("%s-altex"%q, "%s-altq"%q)
+
+        for args in [["q1"],["q2",0],["q3",1],["q4"],["q5"]]: setup(*args)
+        receivers = []
+        for i in xrange(1,5):   # Don't use q5
+            q = "q%s"%i
+            receivers.append(s.receiver(q)) # Subscribe
+            qs = s.sender(q); qs.send(q); qs.close() # Send q name as message
+
         receivers[3].close()    # Trigger auto-delete for q4
-        cluster[0].kill(final=False)
+        for b in cluster[1:3]: b.wait_no_queue("q4") # Verify deleted on backups
+
+        cluster[0].kill(final=False) # Kill primary
         cluster[2].promote()
         cluster.restart(0)
-        cluster[2].assert_browse("q3",["q3"]) # Not yet auto-deleted, 1 sec timeout.
-        for i in [2,1,0]:
-            for q in ["q1", "q2", "q3","q4"]:
-                cluster[i].wait_no_queue(q,timeout=2)      # auto-deleted
-                cluster[i].assert_browse_backup("%s-altq"%q, [q]) # Routed to alternate
-            cluster[i].assert_browse_backup("q5", ["q5"]) # Never subscribed, not deleted.
-            cluster[i].assert_browse_backup("q5-altq", [])
+        cluster[2].wait_queue("q3") # Not yet auto-deleted, 1 sec timeout.
+        for b in cluster:
+            for q in ["q%s"%i for i in xrange(1,5)]:
+                b.wait_no_queue(q,timeout=2, msg=str(b))      # auto-deleted
+                b.assert_browse_backup("%s-altq"%q, [q]) # Routed to alternate
+        cluster[2].wait_queue("q5") # Not auto-deleted, never subscribed
+        cluster[2].connect().session().receiver("q5").close()
+        cluster[2].wait_no_queue("q5")
 
     def test_auto_delete_close(self):
         """Verify auto-delete queues are deleted on backup if auto-deleted
         on primary"""
         cluster=HaCluster(self, 2)
+
+        # Create altex to use as alternate exchange, with altq bound to it
+        a = cluster[0].agent
+        a.addExchange("fanout", "altex")
+        a.addQueue("altq", {"auto-delete":True})
+        a.bind("altex", "altq")
+
         p = cluster[0].connect().session()
-        alt_setup(p, "1")
-        r = p.receiver("adq1;{create:always,node:{x-declare:{auto-delete:True,alternate-exchange:'altex1'}}}", capacity=1)
+        r = p.receiver("adq1;{create:always,node:{x-declare:{auto-delete:True,alternate-exchange:'altex'}}}")
         s = p.sender("adq1")
         for m in ["aa","bb","cc"]: s.send(m)
-        p.sender("adq2;{create:always,node:{x-declare:{auto-delete:True}}}")
+        s.close()
         cluster[1].wait_queue("adq1")
-        cluster[1].wait_queue("adq2")
         r.close()               # trigger auto-delete of adq1
         cluster[1].wait_no_queue("adq1")
-        cluster[1].assert_browse_backup("altq1", ["aa","bb","cc"])
-        cluster[1].wait_queue("adq2")
+        cluster[1].assert_browse_backup("altq", ["aa","bb","cc"])
 
     def test_expired(self):
         """Regression test for QPID-4379: HA does not properly handle expired messages"""
@@ -815,7 +834,7 @@ acl deny all all
         cluster = HaCluster(self, 2)
         s = cluster[0].connect().session().sender("q;{create:always}", capacity=2)
         def send_ttl_messages():
-            for i in xrange(100): s.send(Message(str(i), ttl=0.001), timeout=1)
+            for i in xrange(100): s.send(qm.Message(str(i), ttl=0.001))
         send_ttl_messages()
         cluster.start()
         send_ttl_messages()
@@ -827,7 +846,9 @@ acl deny all all
         s = cluster[0].connect().session()
         s.sender("keep;{create:always}") # Leave this queue in place.
         for i in xrange(100):
-            s.sender("deleteme%s;{create:always,delete:always}"%(i)).close()
+            q = "deleteme%s"%(i)
+            cluster[0].agent.addQueue(q)
+            cluster[0].agent.delQueue(q)
         # It is possible for the backup to attempt to subscribe after the queue
         # is deleted. This is not an error, but is logged as an error on the primary.
         # The backup does not log this as an error so we only check the backup log for errors.
@@ -846,58 +867,46 @@ acl deny all all
         cluster[1].assert_browse_backup("qq", msgs)
         cluster[2].assert_browse_backup("qq", msgs)
         # Set up an exchange with a binding.
-        sn.sender("xx;{create:always,node:{type:topic}}")
-        sn.sender("xxq;{create:always,node:{x-bindings:[{exchange:'xx',queue:'xxq',key:xxq}]}}")
+        a = cluster[0].agent
+        a.addExchange("fanout", "xx")
+        a.addQueue("xxq")
+        a.bind("xx", "xxq", "xxq")
         cluster[1].wait_address("xx")
-        self.assertEqual(cluster[1].agent().getExchange("xx").values["bindingCount"], 1)
+        self.assertEqual(cluster[1].agent.getExchange("xx").values["bindingCount"], 1)
         cluster[2].wait_address("xx")
-        self.assertEqual(cluster[2].agent().getExchange("xx").values["bindingCount"], 1)
+        self.assertEqual(cluster[2].agent.getExchange("xx").values["bindingCount"], 1)
 
         # Simulate the race by re-creating the objects before promoting the new primary
         cluster.kill(0, promote_next=False)
         xdecl = "x-declare:{arguments:{'qpid.replicate':'all'}}"
         node = "node:{%s}"%(xdecl)
         sn = cluster[1].connect_admin().session()
-        sn.sender("qq;{delete:always}").close()
+        a = cluster[1].agent
+        a.delQueue("qq", if_empty=False)
         s = sn.sender("qq;{create:always, %s}"%(node))
         s.send("foo")
-        sn.sender("xx;{delete:always}").close()
+        a.delExchange("xx")
         sn.sender("xx;{create:always,node:{type:topic,%s}}"%(xdecl))
         cluster[1].promote()
         cluster[1].wait_status("active")
         # Verify we are not still using the old objects on cluster[2]
         cluster[2].assert_browse_backup("qq", ["foo"])
         cluster[2].wait_address("xx")
-        self.assertEqual(cluster[2].agent().getExchange("xx").values["bindingCount"], 0)
-
-    def test_redeclare_exchange(self):
-        """Ensure that re-declaring an exchange is an HA no-op"""
-        cluster = HaCluster(self, 2)
-        ps = cluster[0].connect().session()
-        ps.sender("ex1;{create:always,node:{type:topic,x-declare:{arguments:{'qpid.replicate':all}, type:'fanout'}}}")
-        ps.sender("ex2;{create:always,node:{type:topic,x-declare:{arguments:{'qpid.replicate':all}, type:'fanout', alternate-exchange:'ex1'}}}")
-        cluster[1].wait_backup("ex1")
-        cluster[1].wait_backup("ex2")
-
-        # Use old API to re-declare the exchange
-        old_conn = cluster[0].connect_old()
-        old_sess = old_conn.session(str(qpid.datatypes.uuid4()))
-        old_sess.exchange_declare(exchange='ex1', type='fanout')
-        cluster[1].wait_backup("ex1")
+        self.assertEqual(cluster[2].agent.getExchange("xx").values["bindingCount"], 0)
 
     def test_resource_limit_bug(self):
         """QPID-5666 Regression test: Incorrect resource limit exception for queue creation."""
         cluster = HaCluster(self, 3)
         qs = ["q%s"%i for i in xrange(10)]
-        s = cluster[0].connect().session()
-        s.sender("q;{create:always}").close()
+        a = cluster[0].agent
+        a.addQueue("q")
         cluster.kill(0)
         cluster[1].promote()
         cluster[1].wait_status("active")
-        s = cluster[1].connect().session()
-        s.receiver("q;{delete:always}").close()
-        s.sender("qq;{create:always}").close()
-                
+        a = cluster[1].agent
+        a.delQueue("q")
+        a.addQueue("q")
+
 def fairshare(msgs, limit, levels):
     """
     Generator to return prioritised messages in expected order for a given fairshare limit
@@ -948,12 +957,12 @@ class LongTests(HaBrokerTest):
         n = 10
         senders = [
             NumberedSender(
-                brokers[0], url=brokers.url,max_depth=50, failover_updates=False,
+                brokers[0], url=brokers.url,max_depth=50,
                 queue="test%s"%(i), args=["--capacity=10"]) for i in xrange(n)]
 
         receivers = [
             NumberedReceiver(
-                brokers[0], url=brokers.url, sender=senders[i],failover_updates=False,
+                brokers[0], url=brokers.url, sender=senders[i],
                 queue="test%s"%(i), args=["--capacity=10"]) for i in xrange(n)]
 
         for r in receivers: r.start()
@@ -1017,6 +1026,7 @@ class LongTests(HaBrokerTest):
              "--address", "q;{create:always}",
              "--messages=1000",
              "--tx=10"
+             # TODO aconway 2014-02-21: can't use amqp1.0 for transactions yet
              ])
         receiver = self.popen(
             ["qpid-receive",
@@ -1025,6 +1035,7 @@ class LongTests(HaBrokerTest):
              "--messages=990",
              "--timeout=10",
              "--tx=10"
+             # TODO aconway 2014-02-21: can't use amqp1.0 for transactions yet
              ])
         self.assertEqual(sender.wait(), 0)
         self.assertEqual(receiver.wait(), 0)
@@ -1053,7 +1064,7 @@ class LongTests(HaBrokerTest):
                     try:
                         self.connection.session().receiver(
                             self.qname+";{create:always,node:{x-declare:{auto-delete:True}}}")
-                    except NotFound: pass # Can occur occasionally, not an error.
+                    except qm.NotFound: pass # Can occur occasionally, not an error.
                     try: self.connection.close()
                     except: pass
 
@@ -1119,7 +1130,8 @@ class RecoveryTests(HaBrokerTest):
             cluster[0].wait_status("active")
             for b in cluster[1:4]: b.wait_status("ready")
             # Create a queue before the failure.
-            s1 = cluster.connect(0).session().sender("q1;{create:always}")
+            # FIXME aconway 2014-02-20: SWIG client doesn't respect sync=False
+            s1 = cluster.connect(0, native=True).session().sender("q1;{create:always}")
             for b in cluster: b.wait_backup("q1")
             for i in xrange(10): s1.send(str(i), timeout=0.1)
 
@@ -1130,13 +1142,11 @@ class RecoveryTests(HaBrokerTest):
             cluster[3].wait_status("recovering")
 
             def assertSyncTimeout(s):
-                try:
-                    s.sync(timeout=.01)
-                    self.fail("Expected Timeout exception")
-                except Timeout: pass
+                self.assertRaises(qpid.messaging.Timeout, s.sync, timeout=.01)
 
             # Create a queue after the failure
-            s2 = cluster.connect(3).session().sender("q2;{create:always}")
+            # FIXME aconway 2014-02-20: SWIG client doesn't respect sync=False
+            s2 = cluster.connect(3, native=True).session().sender("q2;{create:always}")
 
             # Verify that messages sent are not completed
             for i in xrange(10,20):
@@ -1182,12 +1192,11 @@ class RecoveryTests(HaBrokerTest):
         # Should not go active till the expected backup connects or times out.
         cluster[2].wait_status("recovering")
         # Messages should be held till expected backup times out
-        s = cluster[2].connect().session().sender("q;{create:always}")
+        ss = cluster[2].connect().session()
+        s = ss.sender("q;{create:always}")
         s.send("foo", sync=False)
-        # Verify message held initially.
-        try: s.sync(timeout=.01); self.fail("Expected Timeout exception")
-        except Timeout: pass
-        s.sync(timeout=1)       # And released after the timeout.
+        self.assertEqual(s.unsettled(), 1) # Verify message not settled immediately.
+        s.sync(timeout=1)                  # And settled after timeout.
         cluster[2].wait_status("active")
 
     def test_join_ready_cluster(self):
@@ -1203,55 +1212,13 @@ class RecoveryTests(HaBrokerTest):
         cluster.bounce(0, promote_next=False)
         cluster[0].promote()
 
-
-class ConfigurationTests(HaBrokerTest):
-    """Tests for configuration settings."""
-
-    def test_client_broker_url(self):
-        """Check that setting of broker and public URLs obeys correct defaulting
-        and precedence"""
-
-        def check(broker, brokers, public):
-            qmf = broker.qmf()
-            self.assertEqual(brokers, qmf.brokersUrl)
-            self.assertEqual(public, qmf.publicUrl)
-
-        def start(brokers, public, known=None):
-            args=[]
-            if brokers: args.append("--ha-brokers-url="+brokers)
-            if public: args.append("--ha-public-url="+public)
-            if known: args.append("--known-hosts-url="+known)
-            return HaBroker(self, args=args)
-
-        # Both set explictily, no defaulting
-        b = start("foo:123", "bar:456")
-        check(b, "amqp:tcp:foo:123", "amqp:tcp:bar:456")
-        b.set_brokers_url("foo:999")
-        check(b, "amqp:tcp:foo:999", "amqp:tcp:bar:456")
-        b.set_public_url("bar:999")
-        check(b, "amqp:tcp:foo:999", "amqp:tcp:bar:999")
-
-        # Allow "none" to mean "not set"
-        b = start("none", "none")
-        check(b, "", "")
-
-    def test_failover_exchange(self):
-        """Verify that the failover exchange correctly reports cluster membership"""
-
-        def strip_url(url): return re.sub('amqp:|tcp:', '', url)
-
-        def assert_url(m, url):
-            urls = m.properties['amq.failover']
-            self.assertEqual(1, len(urls))
-            self.assertEqual(strip_url(urls[0]), url)
-
-        cluster = HaCluster(self, 1, args=["--ha-public-url=foo:1234"])
-        r = cluster[0].connect().session().receiver("amq.failover")
-        assert_url(r.fetch(1), "foo:1234")
-        cluster[0].set_public_url("bar:1234")
-        assert_url(r.fetch(1), "bar:1234")
-        cluster[0].set_brokers_url(cluster.url+",xxx:1234")
-        self.assertRaises(Empty, r.fetch, 0) # Not updated for brokers URL
+    def test_stalled_backup(self):
+        """Make sure that a stalled backup broker does not stall the primary"""
+        cluster = HaCluster(self, 3, args=["--link-heartbeat-interval=1"])
+        os.kill(cluster[1].pid, signal.SIGSTOP)
+        s = cluster[0].connect().session()
+        s.sender("q;{create:always}").send("x")
+        self.assertEqual("x", s.receiver("q").fetch(0).content)
 
 class StoreTests(HaBrokerTest):
     """Test for HA with persistence."""
@@ -1268,18 +1235,19 @@ class StoreTests(HaBrokerTest):
         sn = cluster[0].connect().session()
         # Create queue qq, exchange exx and binding between them
         s = sn.sender("qq;{create:always,node:{durable:true}}")
-        sk = sn.sender("exx/k;{create:always,node:{type:topic, durable:true, x-declare:{type:'direct'}, x-bindings:[{exchange:exx,key:k,queue:qq}]}}")
-        for m in ["foo", "bar", "baz"]: s.send(Message(m, durable=True))
+        sk = sn.sender("exx/k;{create:always,node:{type:topic, durable:true, x-declare:{type:'direct'}}}")
+        cluster[0].agent.bind("exx", "qq", "k")
+        for m in ["foo", "bar", "baz"]: s.send(qm.Message(m, durable=True))
         r = cluster[0].connect().session().receiver("qq")
         self.assertEqual(r.fetch().content, "foo")
         r.session.acknowledge()
         # Sending this message is a hack to flush the dequeue operation on qq.
-        s.send(Message("flush", durable=True))
+        s.send(qm.Message("flush", durable=True))
 
         def verify(broker, x_count):
             sn = broker.connect().session()
             assert_browse(sn, "qq", [ "bar", "baz", "flush" ]+ (x_count)*["x"])
-            sn.sender("exx/k").send(Message("x", durable=True))
+            sn.sender("exx/k").send(qm.Message("x", durable=True))
             assert_browse(sn, "qq", [ "bar", "baz", "flush" ]+ (x_count+1)*["x"])
 
         verify(cluster[0], 0)   # Sanity check
@@ -1300,13 +1268,14 @@ class StoreTests(HaBrokerTest):
         """Verify that a backup erases queue data from store recovery before
         doing catch-up from the primary."""
         if self.check_skip(): return
-        cluster = HaCluster(self, 2)
+        cluster = HaCluster(self, 2, args=['--log-enable=trace+:ha', '--log-enable=trace+:Store'])
         sn = cluster[0].connect(heartbeat=HaBroker.heartbeat).session()
         s1 = sn.sender("q1;{create:always,node:{durable:true}}")
-        for m in ["foo","bar"]: s1.send(Message(m, durable=True))
+        for m in ["foo","bar"]: s1.send(qm.Message(m, durable=True))
         s2 = sn.sender("q2;{create:always,node:{durable:true}}")
-        sk2 = sn.sender("ex/k2;{create:always,node:{type:topic, durable:true, x-declare:{type:'direct'}, x-bindings:[{exchange:ex,key:k2,queue:q2}]}}")
-        sk2.send(Message("hello", durable=True))
+        sk2 = sn.sender("ex/k2;{create:always,node:{type:topic, durable:true, x-declare:{type:'direct'}}}")
+        cluster[0].agent.bind("ex", "q2", "k2")
+        sk2.send(qm.Message("hello", durable=True))
         # Wait for backup to catch up.
         cluster[1].assert_browse_backup("q1", ["foo","bar"])
         cluster[1].assert_browse_backup("q2", ["hello"])
@@ -1315,11 +1284,9 @@ class StoreTests(HaBrokerTest):
         r1 = cluster[0].connect(heartbeat=HaBroker.heartbeat).session().receiver("q1")
         for m in ["foo", "bar"]: self.assertEqual(r1.fetch().content, m)
         r1.session.acknowledge()
-        for m in ["x","y","z"]: s1.send(Message(m, durable=True))
-        # Use old connection to unbind
-        us = cluster[0].connect_old().session(str(uuid4()))
-        us.exchange_unbind(exchange="ex", binding_key="k2", queue="q2")
-        us.exchange_bind(exchange="ex", binding_key="k1", queue="q1")
+        for m in ["x","y","z"]: s1.send(qm.Message(m, durable=True))
+        cluster[0].agent.unbind("ex", "q2", "k2")
+        cluster[0].agent.bind("ex", "q1", "k1")
         # Restart both brokers from store to get inconsistent sequence numbering.
         cluster.bounce(0, promote_next=False)
         cluster[0].promote()
@@ -1348,13 +1315,14 @@ def open_read(name):
 
 class TransactionTests(HaBrokerTest):
 
-    def tx_simple_setup(self, broker):
+    def tx_simple_setup(self, cluster, broker=0):
         """Start a transaction, remove messages from queue a, add messages to queue b"""
-        c = broker.connect()
+        c = cluster.connect(broker, protocol=self.tx_protocol)
         # Send messages to a, no transaction.
         sa = c.session().sender("a;{create:always,node:{durable:true}}")
         tx_msgs =  ["x","y","z"]
-        for m in tx_msgs: sa.send(Message(content=m, durable=True))
+        for m in tx_msgs: sa.send(qm.Message(content=m, durable=True))
+        sa.close()
 
         # Receive messages from a, in transaction.
         tx = c.session(transactional=True)
@@ -1369,18 +1337,19 @@ class TransactionTests(HaBrokerTest):
         for tx_m,m in zip(tx_msgs2, msgs):
             txs.send(tx_m);
             sb.send(m)
+        sb.close()
         return tx
 
     def tx_subscriptions(self, broker):
         """Return list of queue names for tx subscriptions"""
-        return [q for q in broker.agent().repsub_queues()
+        return [q for q in broker.agent.repsub_queues()
                     if q.startswith("qpid.ha-tx")]
 
     def test_tx_simple_commit(self):
-        cluster = HaCluster(self, 2, test_store=True)
-        tx = self.tx_simple_setup(cluster[0])
+        cluster = HaCluster(self, 2, test_store=True, wait=True)
+        tx = self.tx_simple_setup(cluster)
         tx.sync()
-        tx_queues = cluster[0].agent().tx_queues()
+        tx_queues = cluster[0].agent.tx_queues()
 
         # NOTE: backup does not process transactional dequeues until prepare
         cluster[1].assert_browse_backup("a", ["x","y","z"])
@@ -1389,9 +1358,64 @@ class TransactionTests(HaBrokerTest):
         tx.acknowledge()
         tx.commit()
         tx.sync()
-
         tx.close()
-        for b in cluster: self.assert_simple_commit_outcome(b, tx_queues)
+
+        for b in cluster:
+            self.assert_simple_commit_outcome(b, tx_queues)
+
+        # Verify non-tx dequeue is replicated correctly
+        c = cluster.connect(0, protocol=self.tx_protocol)
+        r = c.session().receiver("b")
+        ri = receiver_iter(r, timeout=1)
+        self.assertEqual(['0', '1', '2', 'x', 'y', 'z'], [m.content for m in ri])
+        r.session.acknowledge()
+        for b in cluster: b.assert_browse_backup("b", [], msg=b)
+        c.close()
+        tx.connection.close()
+
+
+    def check_enq_deq(self, cluster, queue, expect):
+        for b in cluster:
+            q = b.agent.getQueue(queue)
+            self.assertEqual(
+                (b.name,)+expect,
+                (b.name, q.msgTotalEnqueues, q.msgTotalDequeues, q.msgTxnEnqueues, q.msgTxnDequeues))
+
+    def test_tx_enq_notx_deq(self):
+        """Verify that a non-tx dequeue of a tx enqueue is replicated correctly"""
+        cluster = HaCluster(self, 2, test_store=True)
+        c = cluster.connect(0, protocol=self.tx_protocol)
+
+        tx = c.session(transactional=True)
+        c.session().sender("qq;{create:always}").send("m1")
+        tx.sender("qq;{create:always}").send("tx")
+        tx.commit()
+        tx.close()
+        c.session().sender("qq;{create:always}").send("m2")
+        self.check_enq_deq(cluster, 'qq', (3, 0, 1, 0))
+
+        notx = c.session()
+        self.assertEqual(['m1', 'tx', 'm2'], [m.content for m in receiver_iter(notx.receiver('qq'))])
+        notx.acknowledge()
+        self.check_enq_deq(cluster, 'qq', (3, 3, 1, 0))
+        for b in cluster: b.assert_browse_backup('qq', [], msg=b)
+        for b in cluster: self.assert_tx_clean(b)
+
+    def test_tx_enq_notx_deq_qpid_send(self):
+        """Verify that a non-tx dequeue of a tx enqueue is replicated correctly"""
+        cluster = HaCluster(self, 2, test_store=True)
+
+        self.popen(
+            ['qpid-send', '-a', 'qq;{create:always}', '-b', cluster[0].host_port(), '--tx=1',
+             '--content-string=foo']
+        ).assert_exit_ok()
+        for b in cluster: b.assert_browse_backup('qq', ['foo'], msg=b)
+        self.check_enq_deq(cluster, 'qq', (1, 0, 1, 0))
+
+        self.popen(['qpid-receive', '-a', 'qq', '-b', cluster[0].host_port()]).assert_exit_ok()
+        self.check_enq_deq(cluster, 'qq', (1, 1, 1, 0))
+        for b in cluster: b.assert_browse_backup('qq', [], msg=b)
+        for b in cluster: self.assert_tx_clean(b)
 
     def assert_tx_clean(self, b):
         """Verify that there are no transaction artifacts
@@ -1400,7 +1424,7 @@ class TransactionTests(HaBrokerTest):
             def __init__(self, f): self.f, self.value = f, None
             def __call__(self): self.value = self.f(); return self.value
 
-        txq= FunctionCache(b.agent().tx_queues)
+        txq= FunctionCache(b.agent.tx_queues)
         assert retry(lambda: not txq()), "%s: unexpected %s"%(b, txq.value)
         txsub = FunctionCache(lambda: self.tx_subscriptions(b))
         assert retry(lambda: not txsub()), "%s: unexpected %s"%(b, txsub.value)
@@ -1424,13 +1448,14 @@ class TransactionTests(HaBrokerTest):
 
     def test_tx_simple_rollback(self):
         cluster = HaCluster(self, 2, test_store=True)
-        tx = self.tx_simple_setup(cluster[0])
+        tx = self.tx_simple_setup(cluster)
         tx.sync()
-        tx_queues = cluster[0].agent().tx_queues()
+        tx_queues = cluster[0].agent.tx_queues()
         tx.acknowledge()
         tx.rollback()
         tx.close()              # For clean test.
         for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+        tx.connection.close()
 
     def assert_simple_rollback_outcome(self, b, tx_queues):
         b.assert_browse_backup("a", ["x","y","z"], msg=b)
@@ -1443,57 +1468,108 @@ class TransactionTests(HaBrokerTest):
         self.assertEqual(open_read(b.store_log), expect, msg=b)
         self.assert_tx_clean(b)
 
-    def test_tx_simple_failover(self):
+    def test_tx_simple_failure(self):
+        """Verify we throw TransactionAborted if there is a store error during a transaction"""
         cluster = HaCluster(self, 3, test_store=True)
-        tx = self.tx_simple_setup(cluster[0])
+        tx = self.tx_simple_setup(cluster)
         tx.sync()
-        tx_queues = cluster[0].agent().tx_queues()
+        tx_queues = cluster[0].agent.tx_queues()
         tx.acknowledge()
-        cluster.bounce(0)       # Should cause roll-back
-        cluster[0].wait_status("ready") # Restarted.
-        cluster[1].wait_status("active") # Promoted.
-        cluster[2].wait_status("ready")  # Failed over.
-        for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+        l = LogLevel(ERROR) # Hide expected WARNING log messages from failover.
+        try:
+            cluster.bounce(0)       # Should cause roll-back
+            tx.connection.session() # Wait for reconnect
+            for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+            self.assertRaises(qm.TransactionAborted, tx.sync)
+            self.assertRaises(qm.TransactionAborted, tx.commit)
+            try: tx.connection.close()
+            except qm.TransactionAborted: pass # Occasionally get exception on close.
+            for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+        finally: l.restore()
+
+    def test_tx_simple_failover(self):
+        """Verify we throw TransactionAborted if there is a fail-over during a transaction"""
+        cluster = HaCluster(self, 3, test_store=True)
+        tx = self.tx_simple_setup(cluster)
+        tx.sync()
+        tx_queues = cluster[0].agent.tx_queues()
+        tx.acknowledge()
+        l = LogLevel(ERROR) # Hide expected WARNING log messages from failover.
+        try:
+            cluster.bounce(0)       # Should cause roll-back
+            tx.connection.session() # Wait for reconnect
+            for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+            self.assertRaises(qm.TransactionAborted, tx.sync)
+            self.assertRaises(qm.TransactionAborted, tx.commit)
+            try: tx.connection.close()
+            except qm.TransactionAborted: pass # Occasionally get exception on close.
+            for b in cluster: self.assert_simple_rollback_outcome(b, tx_queues)
+        finally: l.restore()
+
+    def test_tx_unknown_failover(self):
+        """Verify we throw TransactionUnknown if there is a failure during commit"""
+        cluster = HaCluster(self, 3, test_store=True)
+        tx = self.tx_simple_setup(cluster)
+        tx.sync()
+        tx_queues = cluster[0].agent.tx_queues()
+        tx.acknowledge()
+        l = LogLevel(ERROR) # Hide expected WARNING log messages from failover.
+        try:
+            os.kill(cluster[2].pid, signal.SIGSTOP) # Delay prepare response
+            class CommitThread(Thread):
+                def run(self):
+                    try: tx.commit()
+                    except Exception, e:
+                        self.error = e
+            t = CommitThread()
+            t.start()            # Commit in progress
+            t.join(timeout=0.01)
+            self.assertTrue(t.isAlive())
+            cluster.bounce(0)
+            os.kill(cluster[2].pid, signal.SIGCONT)
+            t.join()
+            try: raise t.error
+            except qm.TransactionUnknown: pass
+            for b in cluster: self.assert_tx_clean(b)
+            try: tx.connection.close()
+            except TransactionUnknown: pass # Occasionally get exception on close.
+        finally: l.restore()
 
     def test_tx_no_backups(self):
         """Test the special case of a TX where there are no backups"""
 
         # Test commit
         cluster = HaCluster(self, 1, test_store=True)
-        tx = self.tx_simple_setup(cluster[0])
+        tx = self.tx_simple_setup(cluster)
         tx.acknowledge()
         tx.commit()
         tx.sync()
-        tx_queues = cluster[0].agent().tx_queues()
+        tx_queues = cluster[0].agent.tx_queues()
         tx.close()
         self.assert_simple_commit_outcome(cluster[0], tx_queues)
 
         # Test rollback
         cluster = HaCluster(self, 1, test_store=True)
-        tx = self.tx_simple_setup(cluster[0])
+        tx = self.tx_simple_setup(cluster)
         tx.sync()
-        tx_queues = cluster[0].agent().tx_queues()
+        tx_queues = cluster[0].agent.tx_queues()
         tx.acknowledge()
         tx.rollback()
         tx.sync()
         tx.close()
         self.assert_simple_rollback_outcome(cluster[0], tx_queues)
 
-    def assert_commit_raises(self, tx):
-        def commit_sync(): tx.commit(timeout=1); tx.sync(timeout=1)
-        self.assertRaises(ServerError, commit_sync)
-
     def test_tx_backup_fail(self):
-        cluster = HaCluster(
-            self, 2, test_store=True, s_args=[[],["--test-store-throw=bang"]])
-        c = cluster[0].connect()
+        cluster = HaCluster(self, 2, test_store=True, s_args=[[],["--test-store-name=bang"]])
+        c = cluster[0].connect(protocol=self.tx_protocol)
         tx = c.session(transactional=True)
         s = tx.sender("q;{create:always,node:{durable:true}}")
-        for m in ["foo","bang","bar"]: s.send(Message(m, durable=True))
-        self.assert_commit_raises(tx)
+        for m in ["foo","TEST_STORE_DO bang: throw","bar"]: s.send(qm.Message(m, durable=True))
+        def commit_sync(): tx.commit(); tx.sync()
+        self.assertRaises(qm.TransactionAborted, commit_sync)
         for b in cluster: b.assert_browse_backup("q", [])
-        self.assertEqual(open_read(cluster[0].store_log), "<begin tx 1>\n<enqueue q foo tx=1>\n<enqueue q bang tx=1>\n<enqueue q bar tx=1>\n<abort tx=1>\n")
-        self.assertEqual(open_read(cluster[1].store_log), "<begin tx 1>\n<enqueue q foo tx=1>\n<enqueue q bang tx=1>\n<abort tx=1>\n")
+        self.assertEqual(open_read(cluster[0].store_log), "<begin tx 1>\n<enqueue q foo tx=1>\n<enqueue q TEST_STORE_DO bang: throw tx=1>\n<enqueue q bar tx=1>\n<abort tx=1>\n")
+        self.assertEqual(open_read(cluster[1].store_log), "<begin tx 1>\n<enqueue q foo tx=1>\n<enqueue q TEST_STORE_DO bang: throw tx=1>\n<abort tx=1>\n")
 
     def test_tx_join_leave(self):
         """Test cluster members joining/leaving cluster.
@@ -1502,39 +1578,38 @@ class TransactionTests(HaBrokerTest):
         cluster = HaCluster(self, 3)
 
         # Leaving
-        tx = cluster[0].connect().session(transactional=True)
+        tx = cluster[0].connect(protocol=self.tx_protocol).session(transactional=True)
         s = tx.sender("q;{create:always}")
         s.send("a", sync=True)
-        self.assertEqual([1,1,1], [len(b.agent().tx_queues()) for b in cluster])
+        self.assertEqual([1,1,1], [len(b.agent.tx_queues()) for b in cluster])
         cluster[1].kill(final=False)
         s.send("b")
         tx.commit()
-        tx.close()
+        tx.connection.close()
         for b in [cluster[0],cluster[2]]:
             self.assert_tx_clean(b)
             b.assert_browse_backup("q", ["a","b"], msg=b)
         # Joining
-        tx = cluster[0].connect().session(transactional=True)
+        tx = cluster[0].connect(protocol=self.tx_protocol).session(transactional=True)
         s = tx.sender("q;{create:always}")
         s.send("foo")
         cluster.restart(1)      # Not a part of the current transaction.
         tx.commit()
-        tx.close()
+        tx.connection.close()
         for b in cluster: self.assert_tx_clean(b)
         # The new member is not in the tx but  receives the results normal replication.
         for b in cluster: b.assert_browse_backup("q", ["a", "b", "foo"], msg=b)
-        # FIXME aconway 2013-11-07: assert_log_clean
 
     def test_tx_block_threads(self):
         """Verify that TXs blocked in commit don't deadlock."""
         cluster = HaCluster(self, 2, args=["--worker-threads=2"], test_store=True)
         n = 10                  # Number of concurrent transactions
-        sessions = [cluster[0].connect().session(transactional=True) for i in xrange(n)]
+        sessions = [cluster.connect(0, protocol=self.tx_protocol).session(transactional=True) for i in xrange(n)]
         # Have the store delay the response for 10s
         for s in sessions:
             sn = s.sender("qq;{create:always,node:{durable:true}}")
-            sn.send(Message("foo", durable=True))
-        self.assertEqual(n, len(cluster[1].agent().tx_queues()))
+            sn.send(qm.Message("foo", durable=True))
+        self.assertEqual(n, len(cluster[1].agent.tx_queues()))
         threads = [ Thread(target=s.commit) for s in sessions]
         for t in threads: t.start()
         cluster[0].ready(timeout=1) # Check for deadlock
@@ -1542,28 +1617,28 @@ class TransactionTests(HaBrokerTest):
         for t in threads: t.join()
         for s in sessions: s.connection.close()
 
-    def test_broker_tx_tests(self):
+    def test_other_tx_tests(self):
         try:
             import qpid_tests.broker_0_10
         except ImportError:
             raise Skipped("Tests not found")
 
         cluster = HaCluster(self, 3)
-        print "Running python broker tx tests"
-        p = subprocess.Popen(["qpid-python-test",
-                              "-m", "qpid_tests.broker_0_10",
-                              "-b", "localhost:%s"%(cluster[0].port()),
-                              "*.tx.*"])
-        assert not p.wait()
-        print "Finished python broker tx tests"
+        self.popen(["qpid-txtest", "-p%s"%cluster[0].port()]).assert_exit_ok()
+        self.popen(["qpid-python-test",
+                    "-m", "qpid_tests.broker_0_10",
+                    "-b", "localhost:%s"%(cluster[0].port()),
+                    "*.tx.*"]).assert_exit_ok()
 
 if __name__ == "__main__":
-    outdir = "ha_tests.tmp"
-    shutil.rmtree(outdir, True)
-    qpid_ha = os.getenv("QPID_HA_EXEC")
-    if  qpid_ha and os.path.exists(qpid_ha):
+    qpid_ha_exec = os.getenv("QPID_HA_EXEC")
+    if qpid_ha_exec and os.path.isfile(qpid_ha_exec):
+        outdir = "ha_tests.tmp"
+        shutil.rmtree(outdir, True)
         os.execvp("qpid-python-test",
-                  ["qpid-python-test", "-m", "ha_tests", "-DOUTDIR=%s"%outdir]
+                ["qpid-python-test", "-m", "ha_tests", "-DOUTDIR=%s"%outdir]
                   + sys.argv[1:])
     else:
-        print "Skipping ha_tests, %s not available"%(qpid_ha)
+        print "Skipping ha_tests, qpid-ha not available"
+
+

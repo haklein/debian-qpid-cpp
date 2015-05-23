@@ -39,8 +39,8 @@ else (DEFINED legacystore_force)
                 #
                 # allow legacystore to be built
                 #
-                message(STATUS "BerkeleyDB for C++ and libaio found, Legacystore support enabled")
-                set (legacystore_default ON)
+                message(STATUS "BerkeleyDB for C++ and libaio found, Legacystore support disabled by default (deprecated, use linearstore instead).")
+                set (legacystore_default OFF) # Disabled, deprecated. Use linearstore instead.
             else (HAVE_AIO AND HAVE_AIO_H)
                 if (NOT HAVE_AIO)
                     message(STATUS "Legacystore requires libaio which is absent.")
@@ -160,7 +160,6 @@ if (BUILD_LEGACYSTORE)
         aio
         uuid
         qpidcommon qpidtypes qpidbroker
-        ${Boost_PROGRAM_OPTIONS_LIBRARY}
         ${DB_LIBRARY}
     )
 

@@ -86,13 +86,6 @@ ReplicatingSubscription::Factory::create(
     return rs;
 }
 
-namespace {
-void copyIf(boost::shared_ptr<MessageInterceptor> from, boost::shared_ptr<IdSetter>& to) {
-    boost::shared_ptr<IdSetter> result = boost::dynamic_pointer_cast<IdSetter>(from);
-    if (result) to = result;
-}
-} // namespace
-
 ReplicatingSubscription::ReplicatingSubscription(
     HaBroker& hb,
     SemanticState* parent,
@@ -107,7 +100,8 @@ ReplicatingSubscription::ReplicatingSubscription(
     const framing::FieldTable& arguments
 ) : ConsumerImpl(parent, name, queue_, ack, REPLICATOR, exclusive, tag,
                  resumeId, resumeTtl, arguments),
-    position(0), ready(false), cancelled(false),
+    logPrefix(hb.logPrefix),
+    position(0), wasStopped(false), ready(false), cancelled(false),
     haBroker(hb),
     primary(boost::dynamic_pointer_cast<Primary>(haBroker.getRole()))
 {}
@@ -120,7 +114,7 @@ void ReplicatingSubscription::initialize() {
         FieldTable ft;
         if (!getArguments().getTable(ReplicatingSubscription::QPID_BROKER_INFO, ft))
             throw InvalidArgumentException(
-                logPrefix+"Can't subscribe, no broker info: "+getTag());
+                logPrefix.get()+"Can't subscribe, no broker info: "+getTag());
         info.assign(ft);
 
         // Set a log prefix message that identifies the remote broker.
@@ -131,7 +125,7 @@ void ReplicatingSubscription::initialize() {
 
         // If there's already a guard (we are in failover) use it, else create one.
         if (primary) guard = primary->getGuard(queue, info);
-        if (!guard) guard.reset(new QueueGuard(*queue, info));
+        if (!guard) guard.reset(new QueueGuard(*queue, info, logPrefix.prePrefix));
 
         // NOTE: Once the observer is attached we can have concurrent
         // calls to dequeued so we need to lock use of this->dequeues.
@@ -146,7 +140,7 @@ void ReplicatingSubscription::initialize() {
         if (!snapshot) {
             queue->getObservers().remove(
                 boost::dynamic_pointer_cast<ReplicatingSubscription>(shared_from_this()));
-            throw ResourceDeletedException(logPrefix+"Can't subscribe, queue deleted");
+            throw ResourceDeletedException(logPrefix.get()+"Can't subscribe, queue deleted");
         }
         ReplicationIdSet primaryIds = snapshot->getSnapshot();
         std::string backupStr = getArguments().getAsString(ReplicatingSubscription::QPID_ID_SET);
@@ -160,15 +154,15 @@ void ReplicatingSubscription::initialize() {
         {
             sys::Mutex::ScopedLock l(lock); // Concurrent calls to dequeued()
             dequeues += initDequeues;       // Messages on backup that are not on primary.
-            skip = backupIds - initDequeues; // Messages already on the backup.
+            skipEnqueue = backupIds - initDequeues; // Messages already on the backup.
             // Queue front is moving but we know this subscriptions will start at a
             // position >= front so if front is safe then position must be.
             position = front;
 
-            QPID_LOG(debug, logPrefix << "Subscribed: front " << front
-                     << ", back " << back
+            QPID_LOG(debug, logPrefix << "Subscribed: primary ["
+                     << front << "," << back << "]=" << primaryIds
                      << ", guarded " << guard->getFirst()
-                     << ", on backup " << skip);
+                     << ", backup (keep " << skipEnqueue << ", drop " << initDequeues << ")");
             checkReady(l);
         }
 
@@ -186,10 +180,23 @@ void ReplicatingSubscription::initialize() {
 
 ReplicatingSubscription::~ReplicatingSubscription() {}
 
+void ReplicatingSubscription::stopped() {
+    Mutex::ScopedLock l(lock);
+    // We have reached the last available message on the queue.
+    //
+    // Note that if messages have been removed out-of-order this may not be the
+    // head of the queue. We may not even have reached the guard
+    // position. However there are no more messages to protect and we will not
+    // be advanced any further, so we should consider ourselves guarded for
+    // purposes of readiness.
+    wasStopped = true;
+    checkReady(l);
+}
 
 // True if the next position for the ReplicatingSubscription is a guarded position.
 bool ReplicatingSubscription::isGuarded(sys::Mutex::ScopedLock&) {
-    return position+1 >= guard->getFirst();
+    // See comment in stopped()
+    return wasStopped || (position+1 >= guard->getFirst());
 }
 
 // Message is delivered in the subscription's connection thread.
@@ -201,15 +208,15 @@ bool ReplicatingSubscription::deliver(
     position = m.getSequence();
     try {
         bool result = false;
-        if (skip.contains(id)) {
-            QPID_LOG(trace, logPrefix << "Skip " << LogMessageId(*getQueue(), m));
-            skip -= id;
+        if (skipEnqueue.contains(id)) {
+            QPID_LOG(trace, logPrefix << "Skip " << logMessageId(*getQueue(), m));
+            skipEnqueue -= id;
             guard->complete(id); // This will never be acknowledged.
             notify();
             result = true;
         }
         else {
-            QPID_LOG(trace, logPrefix << "Replicated " << LogMessageId(*getQueue(), m));
+            QPID_LOG(trace, logPrefix << "Replicated " << logMessageId(*getQueue(), m));
             if (!ready && !isGuarded(l)) unready += id;
             sendIdEvent(id, l);
             result = ConsumerImpl::deliver(c, m);
@@ -217,7 +224,7 @@ bool ReplicatingSubscription::deliver(
         checkReady(l);
         return result;
     } catch (const std::exception& e) {
-        QPID_LOG(critical, logPrefix << "Error replicating " << LogMessageId(*getQueue(), m)
+        QPID_LOG(critical, logPrefix << "Error replicating " << logMessageId(*getQueue(), m)
                  << ": " << e.what());
         throw;
     }
@@ -228,7 +235,12 @@ void ReplicatingSubscription::checkReady(sys::Mutex::ScopedLock& l) {
         ready = true;
         sys::Mutex::ScopedUnlock u(lock);
         // Notify Primary that a subscription is ready.
-        QPID_LOG(debug, logPrefix << "Caught up");
+        if (position+1 >= guard->getFirst()) {
+            QPID_LOG(debug, logPrefix << "Caught up at " << position);
+        } else {
+            QPID_LOG(debug, logPrefix << "Caught up at " << position << "short of guard at " << guard->getFirst());
+        }
+
         if (primary) primary->readyReplica(*this);
     }
 }
@@ -254,7 +266,7 @@ void ReplicatingSubscription::acknowledged(const broker::DeliveryRecord& r) {
     // Finish completion of message, it has been acknowledged by the backup.
     ReplicationId id = r.getReplicationId();
     QPID_LOG(trace, logPrefix << "Acknowledged " <<
-             LogMessageId(*getQueue(), r.getMessageId(), id));
+             logMessageId(*getQueue(), r.getMessageId(), id));
     guard->complete(id);
     {
         Mutex::ScopedLock l(lock);
@@ -267,6 +279,9 @@ void ReplicatingSubscription::acknowledged(const broker::DeliveryRecord& r) {
 // Called with lock held. Called in subscription's connection thread.
 void ReplicatingSubscription::sendDequeueEvent(Mutex::ScopedLock& l)
 {
+    ReplicationIdSet oldDequeues = dequeues;
+    dequeues -= skipDequeue;    // Don't send skipped dequeues
+    skipDequeue -= oldDequeues; // Forget dequeues that would have been sent.
     if (dequeues.empty()) return;
     QPID_LOG(trace, logPrefix << "Sending dequeues " << dequeues);
     sendEvent(DequeueEvent(dequeues), l);
@@ -318,9 +333,14 @@ bool ReplicatingSubscription::doDispatch()
     }
 }
 
-void ReplicatingSubscription::addSkip(const ReplicationIdSet& ids) {
+void ReplicatingSubscription::skipEnqueues(const ReplicationIdSet& ids) {
     Mutex::ScopedLock l(lock);
-    skip += ids;
+    skipEnqueue += ids;
+}
+
+void ReplicatingSubscription::skipDequeues(const ReplicationIdSet& ids) {
+    Mutex::ScopedLock l(lock);
+    skipDequeue += ids;
 }
 
 }} // namespace qpid::ha

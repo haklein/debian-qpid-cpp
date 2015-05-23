@@ -56,6 +56,9 @@
 #cmakedefine HAVE_SYS_SDT_H ${HAVE_SYS_SDT_H}
 #cmakedefine HAVE_LOG_AUTHPRIV
 #cmakedefine HAVE_LOG_FTP
+#cmakedefine QPID_SIZE_T_DISTINCT
 #cmakedefine HAVE_PROTON_TRACER
-
+#cmakedefine USE_PROTON_TRANSPORT_CONDITION
+#cmakedefine HAVE_PROTON_EVENTS
+#cmakedefine NO_PROTON_DELIVERY_TAG_T
 #endif /* QPID_CONFIG_H */

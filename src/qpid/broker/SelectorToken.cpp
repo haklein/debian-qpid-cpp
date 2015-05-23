@@ -44,14 +44,6 @@ TokenException::TokenException(const std::string& msg) :
     range_error(msg)
 {}
 
-// Not much of a parser...
-void skipWS(std::string::const_iterator& s, std::string::const_iterator& e)
-{
-    while ( s!=e && std::isspace(*s) ) {
-        ++s;
-    }
-}
-
 // Lexically, reserved words are a subset of identifiers
 // so we parse an identifier first then check if it is a reserved word and
 // convert it if it is a reserved word
@@ -113,26 +105,26 @@ bool tokeniseReservedWord(Token& tok)
     return true;
 }
 
-// parsing strings is complicated by the need to allow "''" as an embedded single quote
-bool processString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+// parsing strings is complicated by the need to allow embedded quotes by doubling the quote character
+bool processString(std::string::const_iterator& s, std::string::const_iterator& e, char quoteChar, TokenType type, Token& tok)
 {
     // We only get here once the tokeniser recognises the initial quote for a string
     // so we don't need to check for it again.
-    std::string::const_iterator q = std::find(s+1, e, '\'');
+    std::string::const_iterator q = std::find(s+1, e, quoteChar);
     if ( q==e ) return false;
 
     std::string content(s+1, q);
     ++q;
 
-    while ( q!=e && *q=='\'' ) {
+    while ( q!=e && *q==quoteChar ) {
         std::string::const_iterator p = q;
-        q = std::find(p+1, e, '\'');
+        q = std::find(p+1, e, quoteChar);
         if ( q==e ) return false;
         content += std::string(p, q);
         ++q;
     }
 
-    tok = Token(T_STRING, s, content);
+    tok = Token(type, s, content);
     s = q;
     return true;
 }
@@ -173,6 +165,7 @@ bool tokenise(std::string::const_iterator& s, std::string::const_iterator& e, To
     switch (state) {
     case START:
         if (t==e) {tok = Token(T_EOS, s, END); return true;}
+        else if (std::isspace(*t)) {++t; ++s; continue;}
         else switch (*t) {
         case '(': tokType = T_LPAREN; state = ACCEPT_INC; continue;
         case ')': tokType = T_RPAREN; state = ACCEPT_INC; continue;
@@ -198,7 +191,8 @@ bool tokenise(std::string::const_iterator& s, std::string::const_iterator& e, To
             break;
         }
         if (isIdentifierStart(*t)) {++t; state = IDENTIFIER;}
-        else if (*t=='\'') {return processString(s, e, tok);}
+        else if (*t=='\'') {return processString(s, e, '\'', T_STRING, tok);}
+        else if (*t=='\"') {return processString(s, e, '\"', T_IDENTIFIER, tok);}
         else if (std::isdigit(*t)) {++t; state = DIGIT;}
         else if (*t=='.') {++t; state = DECIMAL_START;}
         else state = REJECT;
@@ -279,8 +273,6 @@ const Token& Tokeniser::nextToken()
 
     // Don't extend stream of tokens further than the end of stream;
     if ( tokp>0 && tokens[tokp-1].type==T_EOS ) return tokens[tokp-1];
-
-    skipWS(inp, inEnd);
 
     tokens.push_back(Token());
     Token& tok = tokens[tokp++];

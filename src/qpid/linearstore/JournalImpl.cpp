@@ -78,7 +78,7 @@ JournalImpl::JournalImpl(::qpid::sys::Timer& timer_,
 
     initManagement(a);
 
-    QLS_LOG2(notice, _jid, "Created");
+    QLS_LOG2(info, _jid, "Created");
     std::ostringstream oss;
     oss << "Journal directory = \"" << journalDirectory << "\"";
     QLS_LOG2(debug, _jid, oss.str());
@@ -99,7 +99,7 @@ JournalImpl::~JournalImpl()
 	_mgmtObject.reset();
     }
 
-    QLS_LOG2(notice, _jid, "Destroyed");
+    QLS_LOG2(info, _jid, "Destroyed");
 }
 
 void
@@ -109,9 +109,8 @@ JournalImpl::initManagement(::qpid::management::ManagementAgent* a)
     if (_agent != 0)
     {
         _mgmtObject = ::qmf::org::apache::qpid::linearstore::Journal::shared_ptr (
-            new ::qmf::org::apache::qpid::linearstore::Journal(_agent, this));
+            new ::qmf::org::apache::qpid::linearstore::Journal(_agent, this, _jid));
 
-        _mgmtObject->set_name(_jid);
         _mgmtObject->set_directory(_jdir.dirname());
 //        _mgmtObject->set_baseFileName(_base_filename);
 //        _mgmtObject->set_readPageSize(JRNL_RMGR_PAGE_SIZE * JRNL_SBLK_SIZE);
@@ -136,7 +135,7 @@ JournalImpl::initialize(::qpid::linearstore::journal::EmptyFilePool* efpp_,
                         ::qpid::linearstore::journal::aio_callback* const cbp)
 {
 //    efpp->createJournal(_jdir);
-//    QLS_LOG2(notice, _jid, "Initialized");
+//    QLS_LOG2(info, _jid, "Initialized");
 //    std::ostringstream oss;
 ////    oss << "Initialize; num_jfiles=" << num_jfiles << " jfsize_sblks=" << jfsize_sblks;
 //    oss << "Initialize; efpPartitionNumber=" << efpp_->getPartitionNumber();

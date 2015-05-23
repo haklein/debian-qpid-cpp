@@ -30,7 +30,6 @@
 #include "qpid/broker/ExchangeRegistry.h"
 #include "qpid/broker/QueueRegistry.h"
 #include "qpid/broker/NullMessageStore.h"
-#include "qpid/broker/ExpiryPolicy.h"
 #include "qpid/framing/DeliveryProperties.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/MessageTransferBody.h"
@@ -40,6 +39,7 @@
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/broker/QueueSettings.h"
+#include "qpid/sys/Thread.h"
 #include "qpid/sys/Timer.h"
 
 #include <iostream>
@@ -64,7 +64,7 @@ public:
     QueueCursor lastCursor;
     Message lastMessage;
     bool received;
-    TestConsumer(std::string name="test", bool acquire = true) : Consumer(name, acquire ? CONSUMER : BROWSER), received(false) {};
+    TestConsumer(std::string name="test", bool acquire = true) : Consumer(name, acquire ? CONSUMER : BROWSER, ""), received(false) {};
 
     virtual bool deliver(const QueueCursor& cursor, const Message& message){
         lastCursor = cursor;
@@ -187,7 +187,6 @@ void addMessagesToQueue(uint count, Queue& queue, uint oddTtl = 200, uint evenTt
 {
     for (uint i = 0; i < count; i++) {
         Message m = MessageUtils::createMessage("exchange", "key", i % 2 ? oddTtl : evenTtl);
-        m.computeExpiration(new broker::ExpiryPolicy);
         queue.deliver(m);
     }
 }
@@ -202,18 +201,22 @@ QPID_AUTO_TEST_CASE(testPurgeExpired) {
 }
 
 QPID_AUTO_TEST_CASE(testQueueCleaner) {
+    boost::shared_ptr<Poller> poller(new Poller);
+    Thread runner(poller.get());
     Timer timer;
     QueueRegistry queues;
     Queue::shared_ptr queue = queues.declare("my-queue", QueueSettings()).first;
     addMessagesToQueue(10, *queue, 200, 400);
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 10u);
 
-    QueueCleaner cleaner(queues, &timer);
+    QueueCleaner cleaner(queues, poller, &timer);
     cleaner.start(100 * qpid::sys::TIME_MSEC);
     ::usleep(300*1000);
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 5u);
     ::usleep(300*1000);
     BOOST_CHECK_EQUAL(queue->getMessageCount(), 0u);
+    poller->shutdown();
+    runner.join();
 }
 namespace {
 int getIntProperty(const Message& message, const std::string& key)

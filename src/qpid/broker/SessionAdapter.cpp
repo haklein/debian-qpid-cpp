@@ -29,15 +29,7 @@
 #include "qpid/log/Statement.h"
 #include "qpid/management/ManagementAgent.h"
 #include "qpid/broker/SessionState.h"
-#include "qmf/org/apache/qpid/broker/EventExchangeDeclare.h"
-#include "qmf/org/apache/qpid/broker/EventExchangeDelete.h"
-#include "qmf/org/apache/qpid/broker/EventQueueDeclare.h"
-#include "qmf/org/apache/qpid/broker/EventQueueDelete.h"
-#include "qmf/org/apache/qpid/broker/EventBind.h"
-#include "qmf/org/apache/qpid/broker/EventUnbind.h"
-#include "qmf/org/apache/qpid/broker/EventSubscribe.h"
-#include "qmf/org/apache/qpid/broker/EventUnsubscribe.h"
-#include <boost/format.hpp>
+ #include <boost/format.hpp>
 #include <boost/cast.hpp>
 #include <boost/bind.hpp>
 
@@ -50,7 +42,6 @@ using namespace qpid;
 using namespace qpid::framing;
 using namespace qpid::framing::dtx;
 using namespace qpid::management;
-namespace _qmf = qmf::org::apache::qpid::broker;
 
 typedef std::vector<Queue::shared_ptr> QueueVector;
 
@@ -292,8 +283,6 @@ void SessionAdapter::QueueHandlerImpl::declare(const string& name, const string&
         } catch (const qpid::types::Exception& e) {
             throw InvalidArgumentException(e.what());
         }
-        // Identify queues that won't survive a failover.
-        settings.isTemporary = exclusive && autoDelete && !settings.autoDeleteDelay;
 
         std::pair<Queue::shared_ptr, bool> queue_created =
             getBroker().createQueue(name, settings,
@@ -425,10 +414,6 @@ SessionAdapter::MessageHandlerImpl::subscribe(const string& queueName,
                   acceptMode == 0, acquireMode == 0, exclusive,
                   resumeId, resumeTtl, arguments);
 
-    ManagementAgent* agent = getBroker().getManagementAgent();
-    if (agent)
-        agent->raiseEvent(_qmf::EventSubscribe(getConnection().getMgmtId(), getConnection().getUserId(),
-                                               queueName, destination, exclusive, ManagementAgent::toMap(arguments)));
     QPID_LOG_CAT(debug, model, "Create subscription. queue:" << queueName
         << " destination:" << destination
         << " user:" << getConnection().getUserId()
@@ -443,10 +428,6 @@ SessionAdapter::MessageHandlerImpl::cancel(const string& destination )
     if (!state.cancel(destination)) {
         throw NotFoundException(QPID_MSG("No such subscription: " << destination));
     }
-
-    ManagementAgent* agent = getBroker().getManagementAgent();
-    if (agent)
-        agent->raiseEvent(_qmf::EventUnsubscribe(getConnection().getMgmtId(), getConnection().getUserId(), destination));
     QPID_LOG_CAT(debug, model, "Delete subscription. destination:" << destination
         << " user:" << getConnection().getUserId()
         << " rhost:" << getConnection().getMgmtId() );
@@ -678,8 +659,8 @@ DtxGetTimeoutResult SessionAdapter::DtxHandlerImpl::getTimeout(const Xid& xid)
 void SessionAdapter::DtxHandlerImpl::setTimeout(const Xid& xid,
                                                 uint32_t timeout)
 {
-    if ((timeout > getBroker().getOptions().dtxMaxTimeout) && (getBroker().getOptions().dtxMaxTimeout > 0))
-        throw InvalidArgumentException(QPID_MSG("xid " << xid << " has timeout " << timeout << " bigger than maximum allowed " << getBroker().getOptions().dtxMaxTimeout));
+    if ((timeout > getBroker().getDtxMaxTimeout()) && (getBroker().getDtxMaxTimeout() > 0))
+        throw InvalidArgumentException(QPID_MSG("xid " << xid << " has timeout " << timeout << " bigger than maximum allowed " << getBroker().getDtxMaxTimeout()));
     getBroker().getDtxManager().setTimeout(DtxManager::convert(xid), timeout);
 }
 

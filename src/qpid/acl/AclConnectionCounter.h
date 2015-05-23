@@ -24,7 +24,7 @@
 
 #include "qpid/broker/ConnectionObserver.h"
 #include "qpid/sys/Mutex.h"
-#include <boost/iterator/iterator_concepts.hpp>
+#include "qpid/acl/AclData.h"
 
 #include <map>
 
@@ -94,8 +94,11 @@ public:
 
     // Connection counting
     bool approveConnection(const broker::Connection& conn,
+                           const std::string& userName,
                            bool enforcingConnectionQuotas,
-                           uint16_t connectionLimit );
+                           uint16_t connectionLimit,
+                           boost::shared_ptr<AclData> localdata
+                          );
 };
 
 }} // namespace qpid::ha

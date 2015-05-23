@@ -70,14 +70,14 @@ class Outgoing : public ManagedOutgoingLink
     /**
      * Signals that this link has been detached
      */
-    virtual void detached() = 0;
+    virtual void detached(bool closed) = 0;
     /**
      * Called when a delivery is writable
      */
     virtual void handle(pn_delivery_t* delivery) = 0;
     void wakeup();
     virtual ~Outgoing() {}
-  private:
+  protected:
     Session& session;
 };
 
@@ -98,7 +98,7 @@ class OutgoingFromQueue : public Outgoing, public qpid::broker::Consumer, public
     void write(const char* data, size_t size);
     void handle(pn_delivery_t* delivery);
     bool canDeliver();
-    void detached();
+    void detached(bool closed);
 
     //Consumer interface:
     bool deliver(const QueueCursor& cursor, const qpid::broker::Message& msg);
@@ -140,7 +140,6 @@ class OutgoingFromQueue : public Outgoing, public qpid::broker::Consumer, public
     pn_link_t* link;
     qpid::sys::OutputControl& out;
     size_t current;
-    int outstanding;
     std::vector<char> buffer;
     std::string subjectFilter;
     boost::scoped_ptr<Selector> selector;

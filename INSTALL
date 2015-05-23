@@ -91,7 +91,7 @@ Or if you have only have a command line environment available
 
 2.1 Building as C++11 (Experimental)
 ====================================
-Currently the Qpoid project uses C++ that conforms to the C++03 standard, as currently
+Currently the Qpid project uses C++ that conforms to the C++03 standard, as currently
 this is the C++ standard that is supported the most widely, so any new code must also
 compile as C++03. As an experiment (and to support a few extra platforms) the Qpid code
 will also now build as C++11.
@@ -126,12 +126,37 @@ norm under Linux). There seems to be a bug in boost::lexical_cast which exhibits
 under C++03 with libc++ but not C++11 with libc++. This means that you have to compile Qpid as C++11
 under FreeBSD 10.
 
- # cmake -DCMAKE_CXX_FLAGS=-std=c++ ..
+ # cmake -DCMAKE_CXX_FLAGS=-std=c++11 -DBUILD_BINDING_PERL=no ..
 
 It is not necessary to specify CXX=clang++ because it is the system compiler under FreeBSD 10;
 similarly we don't try to build the probe code on FreeBSD at this point because it doesn't work
 there yet, so it doesn't need to be explicitly turned off.
 
+We turn building the PERL bindings off because the perl header file is incompatible with C++11 currently.
+
+If you want to use the ports version of cyrus-sasl then you should also add:
+
+ -DCMAKE_REQUIRED_FLAGS=-L/usr/local/lib -DCMAKE_REQUIRED_INCLUDES=/usr/local/include
+
+Which will allow cmake to find libraries installed in /usr/local (which is where cyrus-sasl gets
+installed by ports).
+
+2.4 Building on AIX
+===================
+Qpid has been tested on AIX 7.1 with XL C++ 13.1 and Boost 1.55.0. The
+thread-using variant of the compiler must be used but it isn't the default
+picked up by cmake. Thus, the compiler must be specified at cmake time.
+For example (assuming PATH includes the compiler binaries):
+
+ # CXX=xlC_r CC=cc_r cmake ..
+
+Warnings from Boost header files are expected and can be ignored.
+
+It is normal to see (lots of) multiply-defined symbol warnings when linking
+the shared libraries built as part of Qpid.
+
+The mktemp package must be installed separately in order to execute the
+Qpid test suite.
 
 3. Building a Repository Working Copy
 =====================================
@@ -171,13 +196,11 @@ a source distribution:
 
 Optional support for AMQP 1.0 requires (see AMQP_1.0 for details):
 * Qpid proton-c <http://qpid.apache.org/proton>         (0.5)
-Note: If you are using a custom installed Proton it is recommended that
-you use version 0.7 or later and use the same install prefix for both Proton
-and Qpid. This is the easiest way that will ensure that Qpid finds and uses
-Proton. (If you do wish to use Proton 0.6 in a custom installed location you
-will need to set up the PKG_CONFIG_PATH environment variable. You should add
-the directory that contains Proton's installed libqpid-proton.pc file
-to PKG_CONFIG_PATH.)
+Note: If Proton is installed in a non-standard location, there are two ways to locate it:
+1. Recommended: use proton 0.7 or later and use the same install prefix
+   for both Proton and Qpid.
+2. Using pkg-config: set the PKG_CONFIG_PATH environment variable to
+   <proton-prefix>/lib[64]/pkgconfig before running cmake.
 
 Optional XML exchange requires:
  * xqilla  <http://xqilla.sourceforge.net/HomePage>     (2.0.0)

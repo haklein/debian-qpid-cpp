@@ -24,6 +24,7 @@
 #include "qpid/sys/Time.h"
 #include <ostream>
 #include <istream>
+#include <sstream>
 #include <time.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -42,7 +43,7 @@ AbsTime::AbsTime(const AbsTime& t, const Duration& d) :
     timepoint(d == Duration::max() ? max_abstime() : t.timepoint+d.nanosecs)
 {}
 
-AbsTime AbsTime::Epoch() {
+AbsTime AbsTime::Zero() {
     AbsTime epoch; epoch.timepoint = 0;
     return epoch;
 }
@@ -53,10 +54,20 @@ AbsTime AbsTime::FarFuture() {
 
 AbsTime AbsTime::now() {
     struct timespec ts;
-    ::clock_gettime(CLOCK_REALTIME, &ts);
+    ::clock_gettime(CLOCK_MONOTONIC, &ts);
     AbsTime time_now;
     time_now.timepoint = toTime(ts).nanosecs;
     return time_now;
+}
+
+AbsTime AbsTime::epoch() {
+    return AbsTime(now(), -Duration::FromEpoch());
+}
+
+Duration Duration::FromEpoch() {
+    struct timespec ts;
+    ::clock_gettime(CLOCK_REALTIME, &ts);
+    return toTime(ts).nanosecs;
 }
 
 Duration::Duration(const AbsTime& start, const AbsTime& finish) :
@@ -68,7 +79,8 @@ namespace {
 const time_t TIME_T_MAX = std::numeric_limits<time_t>::max();
 }
 
-struct timespec& toTimespec(struct timespec& ts, const Duration& t) {
+struct timespec& toTimespec(struct timespec& ts, const AbsTime& a) {
+    Duration t(ZERO, a);
     Duration secs = t / TIME_SEC;
     ts.tv_sec = (secs > TIME_T_MAX) ? TIME_T_MAX : static_cast<time_t>(secs);
     ts.tv_nsec = static_cast<long>(t % TIME_SEC);
@@ -95,13 +107,14 @@ std::istream& operator>>(std::istream& i, Duration& d) {
     if (i.eof() || std::isspace(i.peek())) // No suffix
         d = int64_t(number*TIME_SEC);
     else {
-        std::string suffix;
-        i >> suffix;
+        std::stringbuf suffix;
+        i >> &suffix;
         if (i.fail()) return i;
-        if (suffix.compare("s") == 0) d = int64_t(number*TIME_SEC);
-        else if (suffix.compare("ms") == 0) d = int64_t(number*TIME_MSEC);
-        else if (suffix.compare("us") == 0) d = int64_t(number*TIME_USEC);
-        else if (suffix.compare("ns") == 0) d = int64_t(number*TIME_NSEC);
+	std::string suffix_str = suffix.str();
+        if (suffix_str.compare("s") == 0) d = int64_t(number*TIME_SEC);
+        else if (suffix_str.compare("ms") == 0) d = int64_t(number*TIME_MSEC);
+        else if (suffix_str.compare("us") == 0) d = int64_t(number*TIME_USEC);
+        else if (suffix_str.compare("ns") == 0) d = int64_t(number*TIME_NSEC);
         else i.setstate(std::ios::failbit);
     }
     return i;

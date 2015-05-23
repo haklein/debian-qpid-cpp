@@ -36,9 +36,13 @@ ManagedSession::ManagedSession(Broker& broker, ManagedConnection& p, const std::
 {
     qpid::management::ManagementAgent* agent = broker.getManagementAgent();
     if (agent != 0) {
-        session = _qmf::Session::shared_ptr(new _qmf::Session(agent, this, broker.GetVhostObject(), id));
+        std::string name(id);
+        std::string fullName(name);
+        if (name.length() >= std::numeric_limits<uint8_t>::max())
+            name.resize(std::numeric_limits<uint8_t>::max()-1);
+        session = _qmf::Session::shared_ptr(new _qmf::Session(agent, this, broker.GetVhostObject(), name));
+        session->set_fullName(fullName);
         session->set_attached(true);
-        session->set_detachedLifespan(0);
         session->clr_expireTime();
         session->set_connectionRef(parent.GetManagementObject()->getObjectId());
         agent->addObject(session);
@@ -86,6 +90,29 @@ void ManagedSession::incomingMessageRejected()
 {
 
 }
+void ManagedSession::txStarted()
+{
+    if (session) {
+        session->inc_TxnStarts();
+    }
+}
+
+void ManagedSession::txCommitted()
+{
+    if (session) {
+        session->inc_TxnCommits();
+        session->inc_TxnCount();
+    }
+}
+
+void ManagedSession::txAborted()
+{
+    if (session) {
+        session->inc_TxnRejects();
+        session->inc_TxnCount();
+    }
+}
+
 ManagedConnection& ManagedSession::getParent()
 {
     return parent;

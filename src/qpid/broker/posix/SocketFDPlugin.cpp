@@ -21,6 +21,7 @@
 
 #include "qpid/sys/TransportFactory.h"
 
+#include "qpid/Options.h"
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
 #include "qpid/log/Statement.h"
@@ -70,8 +71,7 @@ static class SocketFDPlugin : public Plugin {
         // Only provide to a Broker
         if (broker) {
             if (!options.socketFds.empty()) {
-                const broker::Broker::Options& opts = broker->getOptions();
-                SocketAcceptor* sa = new SocketAcceptor(opts.tcpNoDelay, false, opts.maxNegotiateTime, broker->getTimer());
+                SocketAcceptor* sa = new SocketAcceptor(broker->getTcpNoDelay(), false, broker->getMaxNegotiateTime(), broker->getTimer());
                 for (unsigned i = 0; i<options.socketFds.size(); ++i) {
                     int fd = options.socketFds[i];
                     if (!isSocket(fd)) {

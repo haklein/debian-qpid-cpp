@@ -72,7 +72,7 @@ pair<Exchange::shared_ptr, bool> ExchangeRegistry::declare(
             }else{
                 FunctionMap::iterator i =  factory.find(type);
                 if (i == factory.end()) {
-                    throw UnknownExchangeTypeException();
+                    throw UnknownExchangeTypeException(type);
                 } else {
                     exchange = i->second(name, durable, autodelete, args, parent, broker);
                 }
@@ -155,13 +155,23 @@ void ExchangeRegistry::registerType(const std::string& type, FactoryFunction f)
     factory[type] = f;
 }
 
+void ExchangeRegistry::checkType(const std::string& type)
+{
+    if (type != TopicExchange::typeName && type != DirectExchange::typeName && type != FanOutExchange::typeName
+        && type != HeadersExchange::typeName && type != ManagementDirectExchange::typeName
+        && type != ManagementTopicExchange::typeName && type != Link::exchangeTypeName
+        && factory.find(type) == factory.end()) {
+        throw UnknownExchangeTypeException(type);
+    }
+}
+
 
 namespace
 {
-const std::string empty;
+const std::string EMPTY;
 }
 
 Exchange::shared_ptr ExchangeRegistry::getDefault()
 {
-    return get(empty);
+    return get(EMPTY);
 }

@@ -23,6 +23,7 @@
  */
 
 #include "BrokerInfo.h"
+#include "LogPrefix.h"
 #include "qpid/broker/SemanticState.h"
 #include "qpid/broker/ConsumerFactory.h"
 #include "qpid/broker/QueueObserver.h"
@@ -113,6 +114,8 @@ class ReplicatingSubscription :
     void cancel();
     void acknowledged(const broker::DeliveryRecord&);
     bool browseAcquired() const { return true; }
+    void stopped();
+
     // Hide the "queue deleted" error for a ReplicatingSubscription when a
     // queue is deleted, this is normal and not an error.
     bool hideDeletedError() { return true; }
@@ -135,18 +138,20 @@ class ReplicatingSubscription :
 
     BrokerInfo getBrokerInfo() const { return info; }
 
-    /** Skip replicating enqueue of of ids. */
-    void addSkip(const ReplicationIdSet& ids);
+    void skipEnqueues(const ReplicationIdSet& ids);
+    void skipDequeues(const ReplicationIdSet& ids);
 
   protected:
     bool doDispatch();
 
   private:
-    std::string logPrefix;
+    LogPrefix2 logPrefix;
     QueuePosition position;
     ReplicationIdSet dequeues;  // Dequeues to be sent in next dequeue event.
-    ReplicationIdSet skip;   // Skip enqueues: messages already on backup and tx enqueues.
+    ReplicationIdSet skipEnqueue; // Enqueues to skip: messages already on backup and tx enqueues.
+    ReplicationIdSet skipDequeue; // Dequeues to skip: tx dequeues.
     ReplicationIdSet unready;   // Unguarded, replicated and un-acknowledged.
+    bool wasStopped;
     bool ready;
     bool cancelled;
     BrokerInfo info;

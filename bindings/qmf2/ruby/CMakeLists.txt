@@ -37,22 +37,14 @@ list(APPEND SWIG_MODULE_cqmf2_ruby_EXTRA_DEPS
     ${CMAKE_SOURCE_DIR}/include/qpid/swig_ruby_typemaps.i
 )
 swig_add_module(cqmf2_ruby ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby.i)
-swig_link_libraries(cqmf2_ruby qmf2 ${RUBY_LIBRARY})
+swig_link_libraries(cqmf2_ruby qmf2 qpidmessaging qpidtypes ${RUBY_LIBRARY})
 
 ##----------------------------------
 ## Install the complete Ruby binding
 ##----------------------------------
-if ((${CMAKE_MAJOR_VERSION} EQUAL 2) AND (${CMAKE_MINOR_VERSION} LESS 8))
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cqmf2_ruby.so
-        RENAME cqmf2.so
-        DESTINATION ${RUBY_PFX_ARCH_DIR}
-        COMPONENT ${QPID_COMPONENT_CLIENT}
-        )
-else()
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libcqmf2_ruby.so
-        RENAME cqmf2.so
-        DESTINATION ${RUBY_PFX_ARCH_DIR}
-        COMPONENT ${QPID_COMPONENT_CLIENT}
-        )
-endif ((${CMAKE_MAJOR_VERSION} EQUAL 2) AND (${CMAKE_MINOR_VERSION} LESS 8))
+install(TARGETS ${SWIG_MODULE_cqmf2_ruby_REAL_NAME}
+      RENAME cqmf2.so
+      DESTINATION ${RUBY_PFX_ARCH_DIR}
+      COMPONENT ${QPID_COMPONENT_CLIENT}
+)
 

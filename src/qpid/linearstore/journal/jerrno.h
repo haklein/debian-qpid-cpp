@@ -60,6 +60,7 @@ namespace journal {
         static const uint32_t JERR__RECNFOUND;          ///< Record not found
         static const uint32_t JERR__NOTIMPL;            ///< Not implemented
         static const uint32_t JERR__NULL;               ///< Operation on null pointer
+        static const uint32_t JERR__SYMLINK;            ///< Symbolic Link operation failed
 
         // class jcntl
         static const uint32_t JERR_JCNTL_STOPPED;       ///< Operation on stopped journal
@@ -103,6 +104,7 @@ namespace journal {
         static const uint32_t JERR_WMGR_DEQDISCONT;     ///< Deq. new dtok when previous part compl.
         static const uint32_t JERR_WMGR_DEQRIDNOTENQ;   ///< Deq. rid not enqueued
         static const uint32_t JERR_WMGR_BADFH;          ///< Bad file handle
+        static const uint32_t JERR_WMGR_NOTSBLKALIGNED; ///< Offset is not soft block (sblk)-aligned
 
         // class RecoveryManager
         static const uint32_t JERR_RCVM_OPENRD;         ///< Unable to open file for read
@@ -112,6 +114,7 @@ namespace journal {
         static const uint32_t JERR_RCVM_NULLXID;        ///< Null XID when XID length non-null in header
         static const uint32_t JERR_RCVM_NOTDBLKALIGNED; ///< Offset is not data block (dblk)-aligned
         static const uint32_t JERR_RCVM_NULLFID;        ///< Null file ID (FID)
+        static const uint32_t JERR_RCVM_INVALIDEFPID;   ///< Invalid EFP identity (partition/size)
 
         // class data_tok
         static const uint32_t JERR_DTOK_ILLEGALSTATE;   ///< Attempted to change to illegal state
@@ -128,6 +131,11 @@ namespace journal {
         static const uint32_t JERR_EFP_BADPARTITIONDIR; ///< Invalid partition directory
         static const uint32_t JERR_EFP_NOEFP;           ///< No EFP found for given partition and file size
         static const uint32_t JERR_EFP_EMPTY;           ///< EFP empty
+        static const uint32_t JERR_EFP_LSTAT;           ///< lstat operation failed
+        static const uint32_t JERR_EFP_BADFILETYPE;     ///< Bad file type
+        static const uint32_t JERR_EFP_FOPEN;           ///< Unable to fopen file for write
+        static const uint32_t JERR_EFP_FWRITE;          ///< Write failed
+        static const uint32_t JERR_EFP_MKDIR;           ///< Directory creation failed
 
         // Negative returns for some functions
         static const int32_t AIO_TIMEOUT;               ///< Timeout waiting for AIO return

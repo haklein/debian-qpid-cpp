@@ -30,6 +30,7 @@
 #include "qpid/client/amqp0_10/IncomingMessages.h"
 #include "qpid/sys/Mutex.h"
 #include "qpid/framing/reply_exceptions.h"
+#include "qpid/sys/ExceptionHolder.h"
 #include <boost/intrusive_ptr.hpp>
 
 namespace qpid {
@@ -78,6 +79,7 @@ class SessionImpl : public qpid::messaging::SessionImpl
     qpid::messaging::Connection getConnection() const;
     void checkError();
     bool hasError();
+    bool isTransactional() const;
 
     bool get(ReceiverImpl& receiver, qpid::messaging::Message& message, qpid::messaging::Duration timeout);
 
@@ -96,6 +98,7 @@ class SessionImpl : public qpid::messaging::SessionImpl
     template <class T> bool execute(T& f)
     {
         try {
+            txError.raise();
             f();
             return true;
         } catch (const qpid::TransportFailure&) {
@@ -106,8 +109,13 @@ class SessionImpl : public qpid::messaging::SessionImpl
             else throw qpid::messaging::TargetCapacityExceeded(e.what());
         } catch (const qpid::framing::UnauthorizedAccessException& e) {
             throw qpid::messaging::UnauthorizedAccess(e.what());
+        } catch (const qpid::framing::NotFoundException& e) {
+            throw qpid::messaging::NotFound(e.what());
+        } catch (const qpid::framing::ResourceDeletedException& e) {
+            throw qpid::messaging::NotFound(e.what());
         } catch (const qpid::SessionException& e) {
-            throw qpid::messaging::SessionError(e.what());
+            rethrow(e);
+            return false;       // Keep the compiler happy
         } catch (const qpid::ConnectionException& e) {
             throw qpid::messaging::ConnectionError(e.what());
         } catch (const qpid::ChannelException& e) {
@@ -116,6 +124,7 @@ class SessionImpl : public qpid::messaging::SessionImpl
     }
 
     static SessionImpl& convert(qpid::messaging::Session&);
+    static void rethrow(const qpid::SessionException&);
 
   private:
     typedef std::map<std::string, qpid::messaging::Receiver> Receivers;
@@ -129,6 +138,8 @@ class SessionImpl : public qpid::messaging::SessionImpl
     Receivers receivers;
     Senders senders;
     const bool transactional;
+    bool committing;
+    sys::ExceptionHolder txError;
 
     bool accept(ReceiverImpl*, qpid::messaging::Message*, IncomingMessages::MessageTransfer&);
     bool getIncoming(IncomingMessages::Handler& handler, qpid::messaging::Duration timeout);

@@ -35,6 +35,7 @@
 #if HAVE_SASL
 #include <sys/stat.h>
 #include <sasl/sasl.h>
+#include <sasl/saslplug.h>
 #include "qpid/sys/cyrus/CyrusSecurityLayer.h"
 using qpid::sys::cyrus::CyrusSecurityLayer;
 #endif
@@ -97,6 +98,38 @@ bool SaslAuthenticator::available(void) {
     return true;
 }
 
+// Called by sasl_server_init() when config file name is constructed to allow clients to verify file
+// Returning SASL_FAIL here will cause sasl_server_init() to fail and an exception will be thrown
+int _sasl_verifyfile_callback(void *, const char *configFileName, sasl_verify_type_t type)
+{
+    if (type == SASL_VRFY_CONF) {
+        struct stat st;
+        // verify the file exists
+        if ( ::stat ( configFileName, & st) ) {
+            QPID_LOG(error, "SASL: config file doesn't exist: " << configFileName);
+            return SASL_FAIL;
+        }
+        // verify the file can be read by the broker
+        if ( ::access ( configFileName, R_OK ) ) {
+            QPID_LOG(error, "SASL: broker unable to read the config file. Check file permissions: " << configFileName);
+            return SASL_FAIL;
+        }
+    }
+    return SASL_OK;
+}
+
+#ifndef sasl_callback_ft
+typedef int (*sasl_callback_ft)(void);
+#endif
+
+// passed to sasl_server_init()
+static sasl_callback_t _callbacks[] =
+{
+        {   SASL_CB_VERIFYFILE, (sasl_callback_ft)&_sasl_verifyfile_callback, NULL },
+    {   SASL_CB_LIST_END,   NULL,                                         NULL }
+};
+sasl_callback_t *callbacks = _callbacks;
+
 // Initialize the SASL mechanism; throw if it fails.
 void SaslAuthenticator::init(const std::string& saslName, std::string const & saslConfigPath )
 {
@@ -104,6 +137,8 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
 #if (SASL_VERSION_FULL >= ((2<<16)|(1<<8)|22))
     //  If we are not given a sasl path, do nothing and allow the default to be used.
     if ( saslConfigPath.empty() ) {
+        // don't pass callbacks if there is no config path
+        callbacks = NULL;
         QPID_LOG ( info, "SASL: no config path set - using default." );
     }
     else {
@@ -120,6 +155,11 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
           throw Exception ( QPID_MSG ( "SASL: sasl_set_path failed: cannot stat: " << saslConfigPath ) );
         }
 
+        // Make sure that saslConfigPath is a directory.
+        if (!S_ISDIR(st.st_mode)) {
+            throw Exception ( QPID_MSG ( "SASL: not a directory: " << saslConfigPath ) );
+        }
+
         // Make sure the directory is readable.
         if ( ::access ( saslConfigPath.c_str(), R_OK ) ) {
             throw Exception ( QPID_MSG ( "SASL: sasl_set_path failed: directory not readable:" << saslConfigPath ) );
@@ -134,11 +174,11 @@ void SaslAuthenticator::init(const std::string& saslName, std::string const & sa
     }
 #endif
 
-    int code = sasl_server_init(NULL, saslName.c_str());
+    int code = sasl_server_init(callbacks, saslName.c_str());
     if (code != SASL_OK) {
         // TODO: Figure out who owns the char* returned by
         // sasl_errstring, though it probably does not matter much
-        throw Exception(sasl_errstring(code, NULL, NULL));
+        throw Exception(QPID_MSG("SASL: failed to parse SASL configuration file in (" << saslConfigPath << "), error: " << sasl_errstring(code, NULL, NULL)));
     }
 }
 
@@ -169,18 +209,18 @@ void SaslAuthenticator::fini(void)
 
 std::auto_ptr<SaslAuthenticator> SaslAuthenticator::createAuthenticator(amqp_0_10::Connection& c )
 {
-    if (c.getBroker().getOptions().auth) {
+    if (c.getBroker().isAuthenticating()) {
         return std::auto_ptr<SaslAuthenticator>(
-            new CyrusAuthenticator(c, c.getBroker().getOptions().requireEncrypted));
+            new CyrusAuthenticator(c, c.getBroker().requireEncrypted()));
     } else {
         QPID_LOG(debug, "SASL: No Authentication Performed");
-        return std::auto_ptr<SaslAuthenticator>(new NullAuthenticator(c, c.getBroker().getOptions().requireEncrypted));
+        return std::auto_ptr<SaslAuthenticator>(new NullAuthenticator(c, c.getBroker().requireEncrypted()));
     }
 }
 
 
 NullAuthenticator::NullAuthenticator(amqp_0_10::Connection& c, bool e) : connection(c), client(c.getOutput()),
-                                                              realm(c.getBroker().getOptions().realm), encrypt(e) {}
+                                                              realm(c.getBroker().getRealm()), encrypt(e) {}
 NullAuthenticator::~NullAuthenticator() {}
 
 void NullAuthenticator::getMechanisms(Array& mechanisms)
@@ -192,13 +232,10 @@ void NullAuthenticator::getMechanisms(Array& mechanisms)
 void NullAuthenticator::start(const string& mechanism, const string* response)
 {
     if (encrypt) {
-#if HAVE_SASL
         // encryption required - check to see if we are running over an
         // encrypted SSL connection.
         SecuritySettings external = connection.getExternalSecuritySettings();
-        sasl_ssf_t external_ssf = (sasl_ssf_t) external.ssf;
-        if (external_ssf < 1)    // < 1 == unencrypted
-#endif
+        if (external.ssf < 1)    // < 1 == unencrypted
         {
             QPID_LOG(error, "Rejected un-encrypted connection.");
             throw ConnectionForcedException("Connection must be encrypted.");
@@ -233,6 +270,10 @@ void NullAuthenticator::start(const string& mechanism, const string* response)
     {
         throw ConnectionForcedException("User connection denied by configured limit");
     }
+    qmf::org::apache::qpid::broker::Connection::shared_ptr cnxMgmt = connection.getMgmtObject();
+    if ( cnxMgmt )
+        cnxMgmt->set_saslMechanism(mechanism);
+
     client.tune(framing::CHANNEL_MAX, connection.getFrameMax(), 0, connection.getHeartbeatMax());
 }
 
@@ -268,10 +309,10 @@ void CyrusAuthenticator::init()
           */
     int code;
 
-    const char *realm = connection.getBroker().getOptions().realm.c_str();
+    std::string realm = connection.getBroker().getRealm();
     code = sasl_server_new(BROKER_SASL_NAME, /* Service name */
                            NULL, /* Server FQDN, gethostname() */
-                           realm, /* Authentication realm */
+                           realm.c_str(), /* Authentication realm */
                            NULL, /* Local IP, needed for some mechanism */
                            NULL, /* Remote IP, needed for some mechanism */
                            NULL, /* Callbacks */
@@ -297,6 +338,11 @@ void CyrusAuthenticator::init()
     SecuritySettings external = connection.getExternalSecuritySettings();
     QPID_LOG(debug, "External ssf=" << external.ssf << " and auth=" << external.authid);
     sasl_ssf_t external_ssf = (sasl_ssf_t) external.ssf;
+
+    if ((external_ssf) && (external.authid.empty())) {
+        QPID_LOG(warning, "SASL error: unable to offer EXTERNAL mechanism as authid cannot be determined");
+    }
+
     if (external_ssf) {
         int result = sasl_setprop(sasl_conn, SASL_SSF_EXTERNAL, &external_ssf);
         if (result != SASL_OK) {

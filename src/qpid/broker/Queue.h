@@ -348,8 +348,14 @@ class Queue : public boost::enable_shared_from_this<Queue>,
     QPID_BROKER_EXTERN void recover(Message& msg);
 
     QPID_BROKER_EXTERN void consume(Consumer::shared_ptr c,
-                                    bool exclusive = false);
-    QPID_BROKER_EXTERN void cancel(Consumer::shared_ptr c);
+                                    bool exclusive = false,
+                                    const framing::FieldTable& arguments = framing::FieldTable(),
+                                    const std::string& connectionId=std::string(),
+                                    const std::string& userId=std::string());
+
+    QPID_BROKER_EXTERN void cancel(Consumer::shared_ptr c,
+                                    const std::string& connectionId=std::string(),
+                                    const std::string& userId=std::string());
     /**
      * Used to indicate that the queue is being used in some other
      * context than by a subscriber. The controlling flag should only
@@ -357,7 +363,7 @@ class Queue : public boost::enable_shared_from_this<Queue>,
      * be created.
      */
     QPID_BROKER_EXTERN void markInUse(bool controlling=false);
-    QPID_BROKER_EXTERN void releaseFromUse(bool controlling=false);
+    QPID_BROKER_EXTERN void releaseFromUse(bool controlling=false, bool doDelete=true);
 
     QPID_BROKER_EXTERN uint32_t purge(const uint32_t purge_request=0,  //defaults to all messages
                    boost::shared_ptr<Exchange> dest=boost::shared_ptr<Exchange>(),
@@ -373,7 +379,7 @@ class Queue : public boost::enable_shared_from_this<Queue>,
     QPID_BROKER_EXTERN uint32_t getConsumerCount() const;
     inline const std::string& getName() const { return name; }
     QPID_BROKER_EXTERN bool isExclusiveOwner(const OwnershipToken* const o) const;
-    QPID_BROKER_EXTERN void releaseExclusiveOwnership();
+    QPID_BROKER_EXTERN void releaseExclusiveOwnership(bool immediateExpiry=false);
     QPID_BROKER_EXTERN bool setExclusiveOwner(const OwnershipToken* const o);
     QPID_BROKER_EXTERN bool hasExclusiveConsumer() const;
     QPID_BROKER_EXTERN bool hasExclusiveOwner() const;
@@ -381,15 +387,23 @@ class Queue : public boost::enable_shared_from_this<Queue>,
     inline const QueueSettings& getSettings() const { return settings; }
     inline const qpid::framing::FieldTable& getEncodableSettings() const { return encodableSettings; }
     inline bool isAutoDelete() const { return settings.autodelete; }
+    inline bool isBrowseOnly() const { return settings.isBrowseOnly; }
     QPID_BROKER_EXTERN bool canAutoDelete() const;
-    QPID_BROKER_EXTERN void scheduleAutoDelete();
+    QPID_BROKER_EXTERN void scheduleAutoDelete(bool immediate=false);
     QPID_BROKER_EXTERN bool isDeleted() const;
     const QueueBindings& getBindings() const { return bindings; }
+
+    /**
+     * Dequeue message referenced by cursor. If txn is specified, this will
+     * occur only when txn is committed.
+     */
+    QPID_BROKER_EXTERN void dequeue(const QueueCursor& cursor, TxBuffer* txn);
 
     /**
      * dequeue from store (only done once messages is acknowledged)
      */
     QPID_BROKER_EXTERN void dequeue(TransactionContext* ctxt, const QueueCursor&);
+
     /**
      * Inform the queue that a previous transactional dequeue
      * committed.
@@ -425,8 +439,6 @@ class Queue : public boost::enable_shared_from_this<Queue>,
 
     // Increment the rejected-by-consumer counter.
     QPID_BROKER_EXTERN void countRejected() const;
-    QPID_BROKER_EXTERN void countFlowedToDisk(uint64_t size) const;
-    QPID_BROKER_EXTERN void countLoadedFromDisk(uint64_t size) const;
 
     // Manageable entry points
     QPID_BROKER_EXTERN management::ManagementObject::shared_ptr GetManagementObject(void) const;

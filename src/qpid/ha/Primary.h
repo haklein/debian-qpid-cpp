@@ -25,6 +25,7 @@
 #include "types.h"
 #include "hash.h"
 #include "BrokerInfo.h"
+#include "LogPrefix.h"
 #include "PrimaryQueueLimits.h"
 #include "ReplicationTest.h"
 #include "Role.h"
@@ -81,7 +82,6 @@ class Primary : public Role
     ~Primary();
 
     // Role implementation
-    std::string getLogPrefix() const { return logPrefix; }
     Role* promote();
     void setBrokerUrl(const Url&) {}
 
@@ -90,9 +90,14 @@ class Primary : public Role
     void removeReplica(const ReplicatingSubscription&);
 
     /** Skip replication of ids to queue on backup. */
-    void skip(const types::Uuid& backup,
-              const boost::shared_ptr<broker::Queue>& queue,
-              const ReplicationIdSet& ids);
+    void skipEnqueues(const types::Uuid& backup,
+                      const boost::shared_ptr<broker::Queue>& queue,
+                      const ReplicationIdSet& ids);
+
+    /** Skip replication of dequeue of ids to queue on backup. */
+    void skipDequeues(const types::Uuid& backup,
+                      const boost::shared_ptr<broker::Queue>& queue,
+                      const ReplicationIdSet& ids);
 
     // Called via BrokerObserver
     void queueCreate(const QueuePtr&);
@@ -137,7 +142,7 @@ class Primary : public Role
     mutable sys::Mutex lock;
     HaBroker& haBroker;
     Membership& membership;
-    std::string logPrefix;
+    const LogPrefix& logPrefix;
     bool active;
     ReplicationTest replicationTest;
 

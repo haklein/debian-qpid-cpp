@@ -155,6 +155,8 @@ void ConnectionImpl::setOption(const std::string& name, const Variant& value)
         settings.protocol = value.asString();
     } else if (name == "ssl-cert-name" || name == "ssl_cert_name") {
         settings.sslCertName = value.asString();
+    } else if (name == "ssl-ignore-hostname-verification-failure" || name == "ssl_ignore_hostname_verification_failure") {
+        settings.sslIgnoreHostnameVerificationFailure = value;
     } else if (name == "x-reconnect-on-limit-exceeded" || name == "x_reconnect_on_limit_exceeded") {
         reconnectOnLimitExceeded = value;
     } else if (name == "client-properties" || name == "client_properties") {
@@ -235,7 +237,7 @@ qpid::messaging::Session ConnectionImpl::newSession(bool transactional, const st
         } catch (const qpid::TransportFailure&) {
             reopen();
         } catch (const qpid::SessionException& e) {
-            throw qpid::messaging::SessionError(e.what());
+            SessionImpl::rethrow(e);
         } catch (const std::exception& e) {
             throw qpid::messaging::MessagingException(e.what());
         }
@@ -315,7 +317,9 @@ bool ConnectionImpl::resetSessions(const sys::Mutex::ScopedLock& )
     try {
         qpid::sys::Mutex::ScopedLock l(lock);
         for (Sessions::iterator i = sessions.begin(); i != sessions.end(); ++i) {
-            getImplPtr(i->second)->setSession(connection.newSession(i->first));
+            if (!getImplPtr(i->second)->isTransactional()) {
+                getImplPtr(i->second)->setSession(connection.newSession(i->first));
+            }
         }
         return true;
     } catch (const qpid::TransportFailure& e) {
@@ -389,6 +393,10 @@ std::string ConnectionImpl::getAuthenticatedUsername()
 bool ConnectionImpl::getAutoDecode() const
 {
     return !disableAutoDecode;
+}
+bool ConnectionImpl::getAutoReconnect() const
+{
+    return autoReconnect;
 }
 
 }}} // namespace qpid::client::amqp0_10

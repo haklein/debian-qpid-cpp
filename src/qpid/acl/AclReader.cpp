@@ -26,6 +26,7 @@
 #include "qpid/log/Statement.h"
 #include "qpid/Exception.h"
 #include <boost/lexical_cast.hpp>
+#include <algorithm>
 
 #include <iomanip> // degug
 #include <iostream> // debug
@@ -53,11 +54,6 @@ namespace acl {
 
     bool AclReader::aclRule::addProperty(const SpecProperty p, const std::string v) {
         return props.insert(propNvPair(p, v)).second;
-    }
-
-    bool AclReader::aclRule::validate(const AclHelper::objectMapPtr& /*validationMap*/) {
-        // TODO - invalid rules won't ever be called in real life...
-        return true;
     }
 
     // Debug aid
@@ -89,6 +85,7 @@ namespace acl {
         d->clear();
         QPID_LOG(debug, "ACL: Load Rules");
         bool foundmode = false;
+        bool foundConnectionMode = false;
 
         rlCitr i = rules.end();
         for (int cnt = rules.size(); cnt; cnt--) {
@@ -96,15 +93,64 @@ namespace acl {
             QPID_LOG(debug, "ACL: Processing " << std::setfill(' ') << std::setw(2)
                 << cnt << " " << (*i)->toString());
 
+            if (!(*i)->actionAll && (*i)->objStatus == aclRule::VALUE &&
+                !validator.validateAllowedProperties(
+                    (*i)->action, (*i)->object, (*i)->props, false)) {
+                    // specific object/action has bad property
+                    // this rule gets ignored
+                    continue;
+            } else {
+                // action=all or object=none/all means the rule gets propagated
+                // possibly to many places.
+                // Invalid rule combinations are not propagated.
+            }
+
             if (!foundmode && (*i)->actionAll && (*i)->names.size() == 1
                 && (*((*i)->names.begin())).compare(AclData::ACL_KEYWORD_WILDCARD) == 0) {
                     d->decisionMode = (*i)->res;
                     QPID_LOG(debug, "ACL: FoundMode "
                         << AclHelper::getAclResultStr(d->decisionMode));
                     foundmode = true;
+            } else if ((*i)->action == acl::ACT_CREATE && (*i)->object == acl::OBJ_CONNECTION) {
+                // Intercept CREATE CONNECTION rules process them into separate lists to
+                // be consumed in the connection approval code path.
+                propMap::const_iterator pName = (*i)->props.find(SPECPROP_NAME);
+                if (pName != (*i)->props.end()) {
+                    throw Exception(QPID_MSG("ACL: CREATE CONNECTION rule " << cnt << " must not have a 'name' property"));
+                }
+                propMap::const_iterator pHost = (*i)->props.find(SPECPROP_HOST);
+                if (pHost == (*i)->props.end()) {
+                    throw Exception(QPID_MSG("ACL: CREATE CONNECTION rule " << cnt << " has no 'host' property"));
+                }
+                // create the connection rule
+                bool allUsers = (*(*i)->names.begin()).compare(AclData::ACL_KEYWORD_WILDCARD) == 0;
+                bool allHosts = pHost->second.compare(AclData::ACL_KEYWORD_ALL) == 0;
+                AclBWHostRule bwRule((*i)->res, (allHosts ? "" : pHost->second));
+
+                // apply the rule globally or to user list
+                if (allUsers) {
+                    if (allHosts) {
+                        // allow one specification of allUsers,allHosts
+                        if (foundConnectionMode) {
+                            throw Exception(QPID_MSG("ACL: only one CREATE CONNECTION rule for user=all and host=all allowed"));
+                        }
+                        foundConnectionMode = true;
+                        d->connectionDecisionMode = (*i)->res;
+                        QPID_LOG(trace, "ACL: Found connection mode: " << AclHelper::getAclResultStr( (*i)->res ));
+                    } else {
+                        // Rules for allUsers but not allHosts go into the global list
+                        globalHostRules->insert( globalHostRules->begin(), bwRule );
+                    }
+                } else {
+                    // other rules go into binned rule sets for each user
+                    for (nsCitr itr  = (*i)->names.begin();
+                                itr != (*i)->names.end();
+                                itr++) {
+                        (*userHostRules)[(*itr)].insert( (*userHostRules)[(*itr)].begin(), bwRule);
+                    }
+                }
             } else {
                 AclData::Rule rule(cnt, (*i)->res, (*i)->props);
-
                 // Record which properties have the user substitution string
                 for (pmCitr pItr=rule.props.begin(); pItr!=rule.props.end(); pItr++) {
                     if ((pItr->second.find(AclData::ACL_KEYWORD_USER_SUBST, 0)       != std::string::npos) ||
@@ -156,7 +202,6 @@ namespace acl {
                             d->actionList[acnt][j] = NULL;
                     }
 
-                    // TODO: optimize this loop to limit to valid options only!!
                     for (int ocnt = ((*i)->objStatus != aclRule::VALUE ? 0
                         : (*i)->object);
                         ocnt < acl::OBJECTSIZE;
@@ -176,20 +221,23 @@ namespace acl {
                         for (nsCitr itr  = (allNames ? names.begin() : (*i)->names.begin());
                                     itr != (allNames ? names.end()   : (*i)->names.end());
                                     itr++) {
-                            AclData::actObjItr itrRule =
-                                d->actionList[acnt][ocnt]->find(*itr);
+                            if (validator.validateAllowedProperties(acl::Action(acnt),
+                                                                    acl::ObjectType(ocnt),
+                                                                    (*i)->props,
+                                                                    false)) {
+                                AclData::actObjItr itrRule =
+                                    d->actionList[acnt][ocnt]->find(*itr);
 
-                            if (itrRule == d->actionList[acnt][ocnt]->end()) {
-                                AclData::ruleSet rSet;
-                                rSet.push_back(rule);
-                                d->actionList[acnt][ocnt]->insert
-                                    (make_pair(std::string(*itr), rSet));
+                                if (itrRule == d->actionList[acnt][ocnt]->end()) {
+                                    AclData::ruleSet rSet;
+                                    rSet.push_back(rule);
+                                    d->actionList[acnt][ocnt]->insert
+                                        (make_pair(std::string(*itr), rSet));
+                                } else {
+                                        itrRule->second.push_back(rule);
+                                }
                             } else {
-                                // TODO add code to check for dead rules
-                                // allow peter create queue name=tmp <-- dead rule!!
-                                // allow peter create queue
-
-                                itrRule->second.push_back(rule);
+                                // Skip propagating this rule as it will never match.
                             }
                         }
                     }
@@ -218,14 +266,18 @@ namespace acl {
                     AclHelper::propertyMapToString(&rule.props)
                     << " for users {" <<
                     userstr.str().substr(0,userstr.str().length()-1)
-                    << "}" );
+                    << "}");
             }
         }
 
         // connection quota
-        d->setConnQuotaRuleSettings(connQuotaRulesExist, connQuota);
+        d->setConnQuotaRuleSettings(connQuota);
         // queue quota
-        d->setQueueQuotaRuleSettings(queueQuotaRulesExist, queueQuota);
+        d->setQueueQuotaRuleSettings(queueQuota);
+        // global B/W connection rules
+        d->setConnGlobalRules(globalHostRules);
+        // user B/W connection rules
+        d->setConnUserRules(userHostRules);
     }
 
 
@@ -244,14 +296,14 @@ namespace acl {
 
     AclReader::AclReader(uint16_t theCliMaxConnPerUser, uint16_t theCliMaxQueuesPerUser) :
         lineNumber(0), contFlag(false),
-        validationMap(new AclHelper::objectMap),
         cliMaxConnPerUser (theCliMaxConnPerUser),
         connQuotaRulesExist(false),
         connQuota(new AclData::quotaRuleSet),
         cliMaxQueuesPerUser (theCliMaxQueuesPerUser),
         queueQuotaRulesExist(false),
-        queueQuota(new AclData::quotaRuleSet) {
-        AclHelper::loadValidationMap(validationMap);
+        queueQuota(new AclData::quotaRuleSet),
+        globalHostRules(new AclData::bwHostRuleSet),
+        userHostRules(new AclData::bwHostUserRuleMap) {
         names.insert(AclData::ACL_KEYWORD_WILDCARD);
     }
 
@@ -311,7 +363,16 @@ namespace acl {
         printRules();
         printQuotas(AclData::ACL_KEYWORD_QUOTA_CONNECTIONS, connQuota);
         printQuotas(AclData::ACL_KEYWORD_QUOTA_QUEUES, queueQuota);
-        loadDecisionData(d);
+        try {
+            loadDecisionData(d);
+        } catch (const std::exception& e) {
+            errorStream << "Error loading decision data : " << e.what();
+            return -6;
+        }
+        printGlobalConnectRules();
+        printUserConnectRules();
+        validator.tracePropertyDefs();
+        d->printDecisionRules( printNamesFieldWidth() );
 
         return 0;
     }
@@ -563,7 +624,9 @@ namespace acl {
         names.insert(name);
     }
 
-    // Debug aid
+    /**
+     * Emit debug logs exposing the name lists
+     */
     void AclReader::printNames() const {
         QPID_LOG(debug, "ACL: Group list: " << groups.size() << " groups found:" );
         std::string tmp("ACL: ");
@@ -585,6 +648,17 @@ namespace acl {
             tmp += *k;
         }
         QPID_LOG(debug, tmp);
+    }
+
+    /**
+     * compute the width of longest user name
+     */
+    int AclReader::printNamesFieldWidth() const {
+        std::string::size_type max = 0;
+        for (nsCitr k=names.begin(); k!=names.end(); k++) {
+            max = std::max(max, (*k).length());
+        }
+        return max;
     }
 
     bool AclReader::processAclLine(tokList& toks) {
@@ -674,12 +748,6 @@ namespace acl {
             }
         }
 
-        // If rule validates, add to rule list
-        if (!rule->validate(validationMap)) {
-            errorStream << ACL_FORMAT_ERR_LOG_PREFIX << "Line : " << lineNumber
-                << ", Invalid object/action/property combination.";
-            return false;
-        }
         rules.push_back(rule);
 
         return true;
@@ -691,6 +759,29 @@ namespace acl {
         int cnt = 1;
         for (rlCitr i=rules.begin(); i<rules.end(); i++,cnt++) {
             QPID_LOG(debug, "ACL:   " << std::setfill(' ') << std::setw(2) << cnt << " " << (*i)->toString());
+            if (!(*i)->actionAll && (*i)->objStatus == aclRule::VALUE) {
+                (void)validator.validateAllowedProperties((*i)->action, (*i)->object, (*i)->props, true);
+            }
+        }
+    }
+
+    void AclReader::printConnectionRules(const std::string name, const AclData::bwHostRuleSet& rules) const {
+        QPID_LOG(debug, "ACL: " << name << " Connection Rule list : " << rules.size() << " rules found :");
+        int cnt = 1;
+        for (AclData::bwHostRuleSetItr i=rules.begin(); i<rules.end(); i++,cnt++) {
+            QPID_LOG(debug, "ACL:   " << std::setfill(' ') << std::setw(2) << cnt << " " << i->toString());
+        }
+    }
+
+    void AclReader::printGlobalConnectRules() const {
+        printConnectionRules("global", *globalHostRules);
+    }
+
+    void AclReader::printUserConnectRules() const {
+        QPID_LOG(debug, "ACL: User Connection Rule lists : " << userHostRules->size() << " user lists found :");
+        int cnt = 1;
+        for (AclData::bwHostUserRuleMapItr i=userHostRules->begin(); i!=userHostRules->end(); i++,cnt++) {
+            printConnectionRules(std::string((*i).first), (*i).second);
         }
     }
 

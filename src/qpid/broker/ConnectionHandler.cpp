@@ -93,14 +93,14 @@ void ConnectionHandler::handle(framing::AMQFrame& frame)
         } else if (isOpen()) {
             handler->connection.getChannel(frame.getChannel()).in(frame);
         } else {
-            handler->proxy.close(
+            handler->connection.close(
                 connection::CLOSE_CODE_FRAMING_ERROR,
                 "Connection not yet open, invalid frame received.");
         }
     }catch(ConnectionException& e){
-        handler->proxy.close(e.code, e.what());
+        handler->connection.close(e.code, e.what());
     }catch(std::exception& e){
-        handler->proxy.close(541/*internal error*/, e.what());
+        handler->connection.close(connection::CLOSE_CODE_CONNECTION_FORCED, e.what());
     }
 }
 
@@ -234,22 +234,25 @@ void ConnectionHandler::Handler::tuneOk(uint16_t /*channelmax*/,
 void ConnectionHandler::Handler::open(const string& /*virtualHost*/,
                                       const framing::Array& /*capabilities*/, bool /*insist*/)
 {
+    if (connection.getUserId().empty()) {
+        throw ConnectionForcedException("Not authenticated!");
+    }
+
     if (connection.isFederationLink()) {
         AclModule* acl =  connection.getBroker().getAcl();
         if (acl && acl->userAclRules()) {
             if (!acl->authorise(connection.getUserId(),acl::ACT_CREATE,acl::OBJ_LINK,"")){
-                proxy.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
-                            QPID_MSG("ACL denied " << connection.getUserId()
-                                        << " creating a federation link"));
+                connection.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                                 QPID_MSG("ACL denied " << connection.getUserId()
+                                          << " creating a federation link"));
                 return;
             }
         } else {
-            Broker::Options& conf = connection.getBroker().getOptions();
-            if (conf.auth) {
-                proxy.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
-                            QPID_MSG("User " << connection.getUserId()
-                                << " federation connection denied. Systems with authentication "
-                                   "enabled must specify ACL create link rules."));
+            if (connection.getBroker().isAuthenticating()) {
+                connection.close(framing::connection::CLOSE_CODE_CONNECTION_FORCED,
+                                 QPID_MSG("User " << connection.getUserId()
+                                          << " federation connection denied. Systems with authentication "
+                                          "enabled must specify ACL create link rules."));
                 return;
             }
         }
@@ -303,6 +306,11 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
                                        const framing::Array& supportedMechanisms,
                                        const framing::Array& /*locales*/)
 {
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
+
     string requestedMechanism = connection.getAuthMechanism();
 
     std::string username = connection.getUsername();
@@ -389,6 +397,10 @@ void ConnectionHandler::Handler::start(const FieldTable& serverProperties,
 
 void ConnectionHandler::Handler::secure(const string& challenge )
 {
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
     if (sasl.get()) {
         string response = sasl->step(challenge);
         proxy.secureOk(response);
@@ -403,13 +415,17 @@ void ConnectionHandler::Handler::tune(uint16_t channelMax,
                                       uint16_t /*heartbeatMin*/,
                                       uint16_t heartbeatMax)
 {
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
     maxFrameSize = std::min(maxFrameSize, maxFrameSizeProposed);
     connection.setFrameMax(maxFrameSize);
 
     // this method is only ever called when this Connection
     // is a federation link where this Broker is acting as
     // a client to another Broker
-    sys::Duration interval = connection.getBroker().getOptions().linkHeartbeatInterval;
+    sys::Duration interval = connection.getBroker().getLinkHeartbeatInterval();
     uint16_t intervalSec = static_cast<uint16_t>(interval/sys::TIME_SEC);
     uint16_t hb = std::min(intervalSec, heartbeatMax);
     connection.setHeartbeat(hb);
@@ -421,6 +437,10 @@ void ConnectionHandler::Handler::tune(uint16_t channelMax,
 
 void ConnectionHandler::Handler::openOk(const framing::Array& knownHosts)
 {
+    if (serverMode) {
+        throw ConnectionForcedException("Invalid protocol sequence.");
+    }
+
     for (Array::ValueVector::const_iterator i = knownHosts.begin(); i != knownHosts.end(); ++i) {
         Url url((*i)->get<std::string>());
         connection.getKnownHosts().push_back(url);

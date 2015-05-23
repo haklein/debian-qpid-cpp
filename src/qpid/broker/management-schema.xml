@@ -83,7 +83,7 @@
     <property name="workerThreads"    type="uint16" access="RO" desc="Thread pool size"/>
     <property name="maxConns"         type="uint16" access="RO" desc="Maximum allowed connections"/>
     <property name="connBacklog"      type="uint16" access="RO" desc="Connection backlog limit for listening socket"/>
-    <property name="stagingThreshold" type="uint32" access="RO" desc="Broker stages messages over this size to disk"/>
+    <property name="stagingThreshold" type="uint32" access="RO" desc="Deprecated"/>
     <property name="mgmtPublish"      type="bool"   access="RO" desc="Broker's management agent sends unsolicited data on the publish interval"/>
     <property name="mgmtPubInterval"  type="uint16" access="RW" unit="second" min="1" desc="Interval for management broadcasts"/>
     <property name="version"          type="sstr"   access="RO" desc="Running software version"/>
@@ -105,12 +105,12 @@
     <statistic name="msgTxnDequeues"      type="count64" unit="message" desc="Total transactional messages dequeued from broker"/>
     <statistic name="byteTxnEnqueues"     type="count64" unit="octet"   desc="Total transactional bytes enqueued to broker"/>
     <statistic name="byteTxnDequeues"     type="count64" unit="octet"   desc="Total transactional bytes dequeued from broker"/>
-    <statistic name="msgFtdEnqueues"      type="count64" unit="message" desc="Total message bodies released from memory and flowed-to-disk on broker"/>
-    <statistic name="msgFtdDequeues"      type="count64" unit="message" desc="Total message bodies dequeued from the broker having been flowed-to-disk"/>
-    <statistic name="byteFtdEnqueues"     type="count64" unit="octet"   desc="Total bytes released from memory and flowed-to-disk on broker"/>
-    <statistic name="byteFtdDequeues"     type="count64" unit="octet"   desc="Total bytes dequeued from the broker having been flowed-to-disk"/>
-    <statistic name="msgFtdDepth"         type="count64" unit="message" desc="Current number of messages flowed-to-disk" assign="msgFtdEnqueues - msgFtdDequeues"/>
-    <statistic name="byteFtdDepth"        type="count64" unit="octet"   desc="Current number of bytes flowed-to-disk"    assign="byteFtdEnqueues - byteFtdDequeues"/>
+    <statistic name="msgFtdEnqueues"      type="count64" unit="message" desc="Deprecated"/>
+    <statistic name="msgFtdDequeues"      type="count64" unit="message" desc="Deprecated"/>
+    <statistic name="byteFtdEnqueues"     type="count64" unit="octet"   desc="Deprecated"/>
+    <statistic name="byteFtdDequeues"     type="count64" unit="octet"   desc="Deprecated"/>
+    <statistic name="msgFtdDepth"         type="count64" unit="message" desc="Deprecated"/>
+    <statistic name="byteFtdDepth"        type="count64" unit="octet"   desc="Deprecated"/>
     <statistic name="releases"            type="count64" unit="message" desc="Acquired messages reinserted into the queue"/>
     <statistic name="acquires"            type="count64" unit="message" desc="Messages acquired from the queue"/>
     <statistic name="discardsNoRoute"     type="count64" unit="message" desc="Messages discarded due to no-route from exchange"/>
@@ -194,6 +194,9 @@
         <arg name="targetQueue" dir="I" type="sstr"   desc="Redirect target queue. Blank disables redirect."/>
     </method>
 
+    <method name="shutdown" desc="Shutdown the broker">
+    </method>
+
   </class>
 
   <!--
@@ -251,14 +254,14 @@
     <statistic name="bytePersistEnqueues" type="count64"  unit="octet"       desc="Persistent messages enqueued"/>
     <statistic name="bytePersistDequeues" type="count64"  unit="octet"       desc="Persistent messages dequeued"/>
 
-    <!-- Flow-to-disk Statistics -->
+    <!-- Flow-to-disk Statistics, deprecated -->
 
-    <statistic name="msgFtdEnqueues"      type="count64"  unit="message"     desc="Total message bodies released from memory and flowed-to-disk on broker"/>
-    <statistic name="msgFtdDequeues"      type="count64"  unit="message"     desc="Total message bodies dequeued from the broker having been flowed-to-disk"/>
-    <statistic name="byteFtdEnqueues"     type="count64"  unit="octet"       desc="Total bytes released from memory and flowed-to-disk on broker"/>
-    <statistic name="byteFtdDequeues"     type="count64"  unit="octet"       desc="Total bytes dequeued from the broker having been flowed-to-disk"/>
-    <statistic name="msgFtdDepth"         type="count64"  unit="message"     desc="Current number of messages flowed-to-disk" assign="msgFtdEnqueues - msgFtdDequeues"/>
-    <statistic name="byteFtdDepth"        type="count64"  unit="octet"       desc="Current number of bytes flowed-to-disk"    assign="byteFtdEnqueues - byteFtdDequeues"/>
+    <statistic name="msgFtdEnqueues"      type="count64"  unit="message"     desc="Deprecated"/>
+    <statistic name="msgFtdDequeues"      type="count64"  unit="message"     desc="Deprecated"/>
+    <statistic name="byteFtdEnqueues"     type="count64"  unit="octet"       desc="Deprecated"/>
+    <statistic name="byteFtdDequeues"     type="count64"  unit="octet"       desc="Deprecated"/>
+    <statistic name="msgFtdDepth"         type="count64"  unit="message"     desc="Deprecated"/>
+    <statistic name="byteFtdDepth"        type="count64"  unit="octet"       desc="Deprecated"/>
 
     <!-- Acquire and Release Statistics - These do not affect msgDepth since msgDepth includes acquired-but-not-completed messages. -->
 
@@ -277,8 +280,8 @@
 
     <statistic name="consumerCount"       type="hilo32"   unit="consumer"    desc="Current consumers on queue"/>
     <statistic name="bindingCount"        type="hilo32"   unit="binding"     desc="Current bindings"/>
-    <statistic name="unackedMessages"     type="hilo32"   unit="message"     desc="Messages consumed but not yet acked"/>
-    <statistic name="messageLatency"      type="mmaTime"  unit="nanosecond"  desc="Broker latency through this queue"/>
+    <statistic name="unackedMessages"     type="hilo32"   unit="message"     desc="Deprecated"/>
+    <statistic name="messageLatency"      type="mmaTime"  unit="nanosecond"  desc="Deprecated"/>
     <statistic name="flowStopped"         type="bool"     desc="Flow control active."/>
     <statistic name="flowStoppedCount"    type="count32"  desc="Number of times flow control was activated for this queue"/>
 
@@ -313,7 +316,7 @@
     <property name="altExchange" type="objId" references="Exchange" access="RO" optional="y"/>
     <property name="arguments"   type="map"   access="RO" desc="Arguments supplied in exchange.declare"/>
 
-    <statistic name="producerCount" type="hilo32"  desc="Current producers on exchange"/>
+    <statistic name="producerCount" type="hilo32"  desc="Unused"/>
     <statistic name="bindingCount"  type="hilo32"  desc="Current bindings"/>
     <statistic name="msgReceives"   type="count64" desc="Total messages received"/>
     <statistic name="msgDrops"      type="count64" desc="Total messages dropped (no matching key)"/>
@@ -364,14 +367,14 @@
     <property name="vhostRef" type="objId"  references="Vhost" access="RC" index="y" parentRef="y"/>
     <property name="address"  type="sstr"   access="RC" index="y"/>
     <property name="incoming" type="bool"   access="RC"/>
-    <property name="SystemConnection"   type="bool"   access="RC" desc="Infrastructure/ Inter-system connection (Cluster, Federation, ...)"/>
-    <property name="userProxyAuth"      type="bool"   access="RO" desc="Authorization to proxy for users not on broker"/>
-    <property name="federationLink"     type="bool"   access="RO" desc="Is this a federation link"/>
+    <property name="SystemConnection"   type="bool"   access="RC" desc="Deprecated"/>
+    <property name="userProxyAuth"      type="bool"   access="RO" desc="Deprecated"/>
+    <property name="federationLink"     type="bool"   access="RO" desc="Deprecated"/>
     <property name="authIdentity"       type="sstr"   access="RO" desc="authId of connection if authentication enabled"/>
     <property name="remoteProcessName"  type="lstr"   access="RO" optional="y" desc="Name of executable running as remote client"/>
     <property name="remotePid"          type="uint32" access="RO" optional="y" desc="Process ID of remote client"/>
     <property name="remoteParentPid"    type="uint32" access="RO" optional="y" desc="Parent Process ID of remote client"/>
-    <property name="shadow"             type="bool"   access="RO" desc="True for shadow connections"/>
+    <property name="shadow"             type="bool"   access="RO" desc="Deprecated"/>
     <property name="saslMechanism"      type="sstr"   access="RO" desc="SASL mechanism"/>
     <property name="saslSsf"            type="uint16"   access="RO" desc="SASL security strength factor"/>
     <property name="remoteProperties"   type="map"    access="RO" desc="optional map of identifying information sent by the remote"/>
@@ -399,6 +402,7 @@
     <property name="name"           type="sstr"     access="RC" index="y"/>
     <property name="source"         type="sstr"     access="RC"/>
     <property name="target"         type="sstr"     access="RC"/>
+    <property name="domain"         type="sstr"     access="RC"/>
     <statistic name="transfers"     type="count64"  unit="message" desc="Messages transfered"/>
   </class>
   <!--
@@ -412,6 +416,7 @@
     <property name="name"           type="sstr"     access="RC" index="y"/>
     <property name="source"         type="sstr"     access="RC"/>
     <property name="target"         type="sstr"     access="RC"/>
+    <property name="domain"         type="sstr"     access="RC"/>
     <statistic name="transfers"     type="count64"  unit="message" desc="Messages transfered"/>
   </class>
   <!--
@@ -528,12 +533,13 @@
   <class name="Session">
     <property name="vhostRef"         type="objId"   references="Vhost" access="RC" index="y" parentRef="y"/>
     <property name="name"             type="sstr"    access="RC" index="y"/>
+    <property name="fullName"         type="lstr"    access="RO" optional="y"/>
     <property name="channelId"        type="uint16"  access="RO"/>
     <property name="connectionRef"    type="objId"   references="Connection" access="RO"/>
-    <property name="detachedLifespan" type="uint32"  access="RO" unit="second"/>
+    <property name="detachedLifespan" type="uint32"  access="RO" unit="second" desc="Deprecated"/>
     <property name="attached"         type="bool"    access="RO"/>
     <property name="expireTime"       type="absTime" access="RO" optional="y"/>
-    <property name="maxClientRate"    type="uint32"  access="RO" unit="msgs/sec" optional="y"/>
+    <property name="maxClientRate"    type="uint32"  access="RO" unit="msgs/sec" optional="y" desc="Deprecated"/>
 
     <statistic name="unackedMessages" type="uint64" unit="message" desc="Unacknowledged messages in the session"/>
 
@@ -542,7 +548,7 @@
     <statistic name="TxnRejects"   type="count64"  unit="transaction" desc="Total transactions rejected"/>
     <statistic name="TxnCount"     type="count32"  unit="transaction" desc="Current pending transactions"/>
 
-    <statistic name="clientCredit" type="count32" unit="message" desc="Client message credit"/>
+    <statistic name="clientCredit" type="count32" unit="message" desc="Deprecated"/>
 
     <statistic name="framesOutstanding" type="count32" desc="Deprecated"/>
 
@@ -569,8 +575,8 @@
     access="RO" to get accessor methods defined.  RC or RW don't do
     it.  Probably this is documented someplace, but I couldn't find
     it. -jrd -->
-    <property name="objectNum" type="uint64" access="RO"/>
-    <property name="bootSequence" type="uint16" access="RO"/>
+    <property name="objectNum" type="uint64" access="RO" desc="Deprecated"/>
+    <property name="bootSequence" type="uint16" access="RO" desc="Deprecated"/>
   </class>
 
   <eventArguments>

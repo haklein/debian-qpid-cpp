@@ -35,13 +35,13 @@ using sys::Mutex;
 using boost::bind;
 
 RemoteBackup::RemoteBackup(
-    const BrokerInfo& info, broker::Connection* c
-) : brokerInfo(info), replicationTest(NONE), started(false), connection(c), reportedReady(false)
+    const BrokerInfo& info, broker::Connection* c, const LogPrefix& lp
+) : logPrefix(lp), brokerInfo(info), replicationTest(NONE),
+    started(false), connection(c), reportedReady(false)
 {
     std::ostringstream oss;
     oss << "Remote backup at " << info << ": ";
     logPrefix = oss.str();
-    QPID_LOG(debug, logPrefix << (c? "Connected" : "Expected"));
 }
 
 RemoteBackup::~RemoteBackup() {
@@ -70,7 +70,7 @@ void RemoteBackup::catchupQueue(const QueuePtr& q, bool createGuard) {
         QPID_LOG(debug, logPrefix << "Catch-up queue"
                  << (createGuard ? " and guard" : "") << ": " << q->getName());
         catchupQueues.insert(q);
-        if (createGuard) guards[q].reset(new QueueGuard(*q, brokerInfo));
+        if (createGuard) guards[q].reset(new QueueGuard(*q, brokerInfo, logPrefix.prePrefix));
     }
 }
 
@@ -84,35 +84,14 @@ RemoteBackup::GuardPtr RemoteBackup::guard(const QueuePtr& q) {
     return guard;
 }
 
-namespace {
-typedef std::set<boost::shared_ptr<broker::Queue> > QS;
-struct QueueSetPrinter {
-    const QS& qs;
-    std::string prefix;
-    QueueSetPrinter(const std::string& p, const QS& q) : qs(q), prefix(p) {}
-};
-std::ostream& operator<<(std::ostream& o, const QueueSetPrinter& qp) {
-    if (!qp.qs.empty()) o << qp.prefix;
-    for (QS::const_iterator i = qp.qs.begin(); i != qp.qs.end(); ++i)
-        o << (*i)->getName() << " ";
-    return o;
-}
-}
-
 void RemoteBackup::ready(const QueuePtr& q) {
     catchupQueues.erase(q);
-    if (catchupQueues.size()) {
-        QPID_LOG(debug, logPrefix << "Caught up on queue: " << q->getName() << ", "
-                 << catchupQueues.size() << " remain to catch up");
-    }
-    else
-        QPID_LOG(debug, logPrefix << "Caught up on queue: " << q->getName() );
 }
 
 // Called via BrokerObserver::queueCreate and from catchupQueue
 void RemoteBackup::queueCreate(const QueuePtr& q) {
     if (replicationTest.getLevel(*q) == ALL)
-        guards[q].reset(new QueueGuard(*q, brokerInfo));
+        guards[q].reset(new QueueGuard(*q, brokerInfo, logPrefix.prePrefix));
 }
 
 // Called via BrokerObserver
@@ -127,6 +106,7 @@ void RemoteBackup::queueDestroy(const QueuePtr& q) {
 
 bool RemoteBackup::reportReady() {
     if (!reportedReady && isReady()) {
+        if (catchupQueues.empty()) QPID_LOG(debug, logPrefix << "Caught up.");
         reportedReady = true;
         return true;
     }

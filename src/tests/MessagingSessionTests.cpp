@@ -46,7 +46,7 @@ QPID_AUTO_TEST_SUITE(MessagingSessionTests)
 using namespace qpid::messaging;
 using namespace qpid::types;
 using namespace qpid;
-using qpid::broker::Broker;
+using qpid::broker::BrokerOptions;
 using qpid::framing::Uuid;
 
 
@@ -935,7 +935,7 @@ QPID_AUTO_TEST_CASE(testAcknowledge)
 
 QPID_AUTO_TEST_CASE(testQmfCreateAndDelete)
 {
-    MessagingFixture fix(Broker::Options(), true/*enable management*/);
+    MessagingFixture fix(BrokerOptions(), true/*enable management*/);
     MethodInvoker control(fix.session);
     control.createQueue("my-queue");
     control.createExchange("my-exchange", "topic");
@@ -1430,6 +1430,64 @@ QPID_AUTO_TEST_CASE(testCloseAndMultipleConcurrentFetches)
     BOOST_CHECK_EQUAL(fetcher3.message.getContent(), message.getContent());
     runner.join();
     BOOST_CHECK(!fetcher.timedOut);
+}
+
+QPID_AUTO_TEST_CASE(testSessionCheckError)
+{
+    MessagingFixture fix;
+    Session session = fix.connection.createSession();
+    Sender sender = session.createSender("q; {create:always, node:{x-declare:{auto-delete:True, arguments:{qpid.max_count:1}}}}");
+    ScopedSuppressLogging sl;
+    for (uint i = 0; i < 2; ++i) {
+        sender.send(Message((boost::format("A_%1%") % (i+1)).str()));
+    }
+    try {
+        while (true) session.checkError();
+    } catch (const qpid::types::Exception&) {
+        //this is ok
+    } catch (const qpid::Exception&) {
+        BOOST_FAIL("Wrong exception type thrown");
+    }
+}
+
+QPID_AUTO_TEST_CASE(testImmediateNextReceiver)
+{
+    QueueFixture fix;
+    Sender sender = fix.session.createSender(fix.queue);
+    Message out("test message");
+    sender.send(out);
+    fix.session.createReceiver(fix.queue).setCapacity(1);
+    Receiver next;
+    qpid::sys::AbsTime start = qpid::sys::now();
+    try {
+        while (!fix.session.nextReceiver(next, qpid::messaging::Duration::IMMEDIATE)) {
+            qpid::sys::Duration running(start, qpid::sys::now());
+            if (running > 5*qpid::sys::TIME_SEC) {
+                throw qpid::types::Exception("Timed out spinning on nextReceiver(IMMEDIATE)");
+            }
+            qpid::sys::usleep(1); // for valgrind
+        }
+        Message in;
+        BOOST_CHECK(next.fetch(in, qpid::messaging::Duration::IMMEDIATE));
+        BOOST_CHECK_EQUAL(in.getContent(), out.getContent());
+        next.close();
+    } catch (const std::exception& e) {
+        BOOST_FAIL(e.what());
+    }
+}
+
+QPID_AUTO_TEST_CASE(testImmediateNextReceiverNoMessage)
+{
+    QueueFixture fix;
+    Receiver r = fix.session.createReceiver(fix.queue);
+    r.setCapacity(1);
+    Receiver next;
+    try {
+        BOOST_CHECK(!fix.session.nextReceiver(next, qpid::messaging::Duration::IMMEDIATE));
+        r.close();
+    } catch (const std::exception& e) {
+        BOOST_FAIL(e.what());
+    }
 }
 
 QPID_AUTO_TEST_SUITE_END()

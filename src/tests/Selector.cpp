@@ -151,8 +151,10 @@ void verifyTokeniserFail(TokeniseF t, const char* c) {
 QPID_AUTO_TEST_CASE(tokeniseSuccess)
 {
     verifyTokeniserSuccess(&tokenise, "", qb::T_EOS, "", "");
+    verifyTokeniserSuccess(&tokenise, " ", qb::T_EOS, "", "");
     verifyTokeniserSuccess(&tokenise, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
-    verifyTokeniserSuccess(&tokenise, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokenise, "\"null-123\"+blah", qb::T_IDENTIFIER, "null-123", "+blah");
+    verifyTokeniserSuccess(&tokenise, "\"This is an \"\"odd!\"\" identifier\"+blah", qb::T_IDENTIFIER, "This is an \"odd!\" identifier", "+blah");
     verifyTokeniserSuccess(&tokenise, "null+blah", qb::T_NULL, "null", "+blah");
     verifyTokeniserSuccess(&tokenise, "null+blah", qb::T_NULL, "null", "+blah");
     verifyTokeniserSuccess(&tokenise, "Is nOt null", qb::T_IS, "Is", " nOt null");
@@ -262,6 +264,7 @@ QPID_AUTO_TEST_CASE(parseStringFail)
     BOOST_CHECK_THROW(qb::Selector e("A not 234 escape"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A not like 'eclecti_' escape 'happy'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A not like 'eclecti_' escape happy"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A not like 'eclecti_' escape '%'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A BETWEEN AND 'true'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A NOT BETWEEN 34 OR 3.9"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A IN ()"), std::range_error);
@@ -303,6 +306,8 @@ QPID_AUTO_TEST_CASE(parseString)
     BOOST_CHECK_NO_THROW(qb::Selector e("(354.6)"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A is null and 'hello out there'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("17/4>4"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("17/4>+4"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("17/4>-4"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A IN ('hello', 'there', 1 , true, (1-17))"));
 }
 
@@ -340,6 +345,8 @@ QPID_AUTO_TEST_CASE(simpleEval)
     env.set("A", "Bye, bye cruel world");
     env.set("B", "hello kitty");
 
+    BOOST_CHECK(qb::Selector("").eval(env));
+    BOOST_CHECK(qb::Selector(" ").eval(env));
     BOOST_CHECK(qb::Selector("A is not null").eval(env));
     BOOST_CHECK(!qb::Selector("A is null").eval(env));
     BOOST_CHECK(!qb::Selector("A = C").eval(env));

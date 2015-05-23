@@ -31,6 +31,7 @@ namespace qpid {
 namespace broker {
 class Broker;
 class Message;
+class TxBuffer;
 namespace amqp {
 class Session;
 
@@ -41,7 +42,7 @@ class Incoming : public ManagedIncomingLink
     virtual ~Incoming();
     virtual bool doWork();//do anything that requires output
     virtual bool haveWork();//called when handling input to see whether any output work is needed
-    virtual void detached();
+    virtual void detached(bool closed);
     virtual void readable(pn_delivery_t* delivery) = 0;
     void verify(const std::string& userid, const std::string& defaultRealm);
     void wakeup();
@@ -74,10 +75,10 @@ class DecodingIncoming : public Incoming
     DecodingIncoming(pn_link_t*, Broker& broker, Session& parent, const std::string& source, const std::string& target, const std::string& name);
     virtual ~DecodingIncoming();
     void readable(pn_delivery_t* delivery);
-    virtual void handle(qpid::broker::Message&) = 0;
+    virtual void deliver(boost::intrusive_ptr<qpid::broker::amqp::Message> received, pn_delivery_t* delivery);
+    virtual void handle(qpid::broker::Message&, qpid::broker::TxBuffer*) = 0;
   private:
-    boost::shared_ptr<Session> session;
-    boost::intrusive_ptr<ExpiryPolicy> expiryPolicy;
+    boost::shared_ptr<Session> sessionPtr;
     boost::intrusive_ptr<Message> partial;
 };
 

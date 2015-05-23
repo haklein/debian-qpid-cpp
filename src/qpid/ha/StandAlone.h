@@ -33,12 +33,8 @@ namespace ha {
 class StandAlone : public Role
 {
   public:
-    std::string getLogPrefix() const { return logPrefix; }
     Role* promote() { return 0; }
     void setBrokerUrl(const Url&) {}
-
-  private:
-    std::string logPrefix;
 };
 }} // namespace qpid::ha
 

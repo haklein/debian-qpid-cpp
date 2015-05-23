@@ -19,10 +19,14 @@
 #include "Settings.h"
 #include "qpid/Plugin.h"
 #include "qpid/Options.h"
+#include "qpid/OptionsTemplates.h"
 #include "qpid/broker/Broker.h"
 #include <boost/bind.hpp>
 
 namespace qpid {
+
+template po::value_semantic* create_value(ha::Enum<ha::ReplicateLevel>& val, const std::string& arg);
+
 namespace ha {
 
 using namespace std;
@@ -72,7 +76,7 @@ struct HaPlugin : public Plugin {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         if (broker && (settings.cluster || settings.queueReplication)) {
             if (!broker->getManagementAgent()) {
-                QPID_LOG(warning, "HA plugin disabled because management is disabled");
+                QPID_LOG(warning, "Cannot start HA: management is disabled");
                 if (settings.cluster)
                     throw Exception("Cannot start HA: management is disabled");
             } else {

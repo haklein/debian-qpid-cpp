@@ -54,7 +54,7 @@ qpid::sys::Mutex TxnCtxt::globalSerialiser;
 MessageStoreImpl::MessageStoreImpl(qpid::broker::Broker* broker_, const char* envpath_) :
                                    defaultEfpPartitionNumber(0),
                                    defaultEfpFileSize_kib(0),
-                                   truncateFlag(false),
+                                   overwriteBeforeReturnFlag(false),
                                    wCachePgSizeSblks(0),
                                    wCacheNumPages(0),
                                    tplWCachePgSizeSblks(0),
@@ -148,7 +148,7 @@ void MessageStoreImpl::initManagement ()
             mgmtObject = qmf::org::apache::qpid::linearstore::Store::shared_ptr (
                 new qmf::org::apache::qpid::linearstore::Store(agent, this, broker));
 
-            mgmtObject->set_location(storeDir);
+            mgmtObject->set_storeDir(storeDir);
             mgmtObject->set_tplIsInitialized(false);
             mgmtObject->set_tplDirectory(getTplBaseDir());
             mgmtObject->set_tplWritePageSize(tplWCachePgSizeSblks * QLS_SBLK_SIZE_BYTES);
@@ -174,7 +174,8 @@ bool MessageStoreImpl::init(const qpid::Options* options_)
     uint32_t tplJrnlWrCachePageSizeKib = chkJrnlWrPageCacheSize(opts->tplWCachePageSizeKib, "tpl-wcache-page-size");
 
     // Pass option values to init()
-    return init(opts->storeDir, efpPartition, efpFilePoolSize_kib, opts->truncateFlag, jrnlWrCachePageSizeKib, tplJrnlWrCachePageSizeKib);
+    return init(opts->storeDir, efpPartition, efpFilePoolSize_kib, opts->truncateFlag, jrnlWrCachePageSizeKib,
+                tplJrnlWrCachePageSizeKib, opts->overwriteBeforeReturnFlag);
 }
 
 // These params, taken from options, are assumed to be correct and verified
@@ -183,11 +184,13 @@ bool MessageStoreImpl::init(const std::string& storeDir_,
                            qpid::linearstore::journal::efpDataSize_kib_t efpFileSize_kib_,
                            const bool truncateFlag_,
                            uint32_t wCachePageSizeKib_,
-                           uint32_t tplWCachePageSizeKib_)
+                           uint32_t tplWCachePageSizeKib_,
+                           const bool overwriteBeforeReturnFlag_)
 {
     if (isInit) return true;
 
     // Set geometry members (converting to correct units where req'd)
+    overwriteBeforeReturnFlag = overwriteBeforeReturnFlag_;
     defaultEfpPartitionNumber = efpPartition_;
     defaultEfpFileSize_kib = efpFileSize_kib_;
     wCachePgSizeSblks = wCachePageSizeKib_ / QLS_SBLK_SIZE_KIB; // convert from KiB to number sblks
@@ -198,8 +201,7 @@ bool MessageStoreImpl::init(const std::string& storeDir_,
 
     if (truncateFlag_)
         truncateInit();
-    else
-        init();
+    init(truncateFlag_);
 
     QLS_LOG(notice, "Store module initialized; store-dir=" << storeDir_);
     QLS_LOG(info,   "> Default EFP partition: " << defaultEfpPartitionNumber);
@@ -210,11 +212,12 @@ bool MessageStoreImpl::init(const std::string& storeDir_,
     QLS_LOG(info,   "> TPL number of write cache pages: " << tplWCacheNumPages);
     QLS_LOG(info,   "> EFP partition: " << defaultEfpPartitionNumber);
     QLS_LOG(info,   "> EFP file size pool: " << defaultEfpFileSize_kib << " (KiB)");
+    QLS_LOG(info,   "> Overwrite before return to EFP: " << (overwriteBeforeReturnFlag?"True":"False"));
 
     return isInit;
 }
 
-void MessageStoreImpl::init()
+void MessageStoreImpl::init(const bool truncateFlag)
 {
     const int retryMax = 3;
     int bdbRetryCnt = 0;
@@ -291,6 +294,8 @@ void MessageStoreImpl::init()
     efpMgr.reset(new qpid::linearstore::journal::EmptyFilePoolManager(getStoreTopLevelDir(),
                                                           defaultEfpPartitionNumber,
                                                           defaultEfpFileSize_kib,
+                                                          overwriteBeforeReturnFlag,
+                                                          truncateFlag,
                                                           jrnlLog));
     efpMgr->findEfpPartitions();
 }
@@ -332,13 +337,12 @@ void MessageStoreImpl::truncateInit()
         isInit = false;
     }
 
-    // TODO: Linearstore: harvest all discareded journal files into the empy file pool(s).
-
     qpid::linearstore::journal::jdir::delete_dir(getBdbBaseDir());
+
+    // TODO: Linearstore: harvest all discarded journal files into the empty file pool(s).
     qpid::linearstore::journal::jdir::delete_dir(getJrnlBaseDir());
     qpid::linearstore::journal::jdir::delete_dir(getTplBaseDir());
-    QLS_LOG(notice, "Store directory " << getStoreTopLevelDir() << " was truncated.");
-    init();
+    QLS_LOG(info, "Store directory " << getStoreTopLevelDir() << " was truncated.");
 }
 
 void MessageStoreImpl::chkTplStoreInit()
@@ -402,7 +406,7 @@ void MessageStoreImpl::create(qpid::broker::PersistableQueue& queue_,
 
     if (queue_.getName().size() == 0)
     {
-        QLS_LOG(error, "Cannot create store for empty (null) queue name - ignoring and attempting to continue.");
+        QLS_LOG(error, "Cannot create store for empty (null) queue name - queue create ignored.");
         return;
     }
 
@@ -445,15 +449,15 @@ qpid::linearstore::journal::EmptyFilePool*
 MessageStoreImpl::getEmptyFilePool(const qpid::framing::FieldTable& args_) {
     qpid::framing::FieldTable::ValuePtr value;
     qpid::linearstore::journal::efpPartitionNumber_t localEfpPartition = defaultEfpPartitionNumber;
-    value = args_.get("qpid.efp_partition");
+    value = args_.get("qpid.efp_partition_num");
     if (value.get() != 0 && !value->empty() && value->convertsTo<int>()) {
-        localEfpPartition = chkEfpPartition((uint32_t)value->get<int>(), "qpid.efp_partition");
+        localEfpPartition = chkEfpPartition((uint32_t)value->get<int>(), "qpid.efp_partition_num");
     }
 
     qpid::linearstore::journal::efpDataSize_kib_t localEfpFileSizeKib = defaultEfpFileSize_kib;
-    value = args_.get("qpid.efp_file_size");
+    value = args_.get("qpid.efp_pool_file_size");
     if (value.get() != 0 && !value->empty() && value->convertsTo<int>()) {
-        localEfpFileSizeKib = chkEfpFileSizeKiB((uint32_t)value->get<int>(),"qpid.efp_file_size" );
+        localEfpFileSizeKib = chkEfpFileSizeKiB((uint32_t)value->get<int>(), "qpid.efp_pool_file_size");
     }
     return getEmptyFilePool(localEfpPartition, localEfpFileSizeKib);
 }
@@ -921,7 +925,7 @@ void MessageStoreImpl::recoverMessages(TxnCtxt& /*txn*/,
                 // become optional depending on that information.
                 msg->setRedelivered();
                 // Reset the TTL for the recovered message
-                msg->computeExpiration(broker->getExpiryPolicy());
+                msg->computeExpiration();
 
                 uint32_t contentOffset = headerSize + preambleLength;
                 uint64_t contentSize = dbuffSize - contentOffset;
@@ -1484,21 +1488,21 @@ std::string MessageStoreImpl::getStoreTopLevelDir() {
 std::string MessageStoreImpl::getJrnlBaseDir()
 {
     std::ostringstream dir;
-    dir << storeDir << "/" << storeTopLevelDir << "/jrnl/" ;
+    dir << storeDir << "/" << storeTopLevelDir << "/jrnl2/" ;
     return dir.str();
 }
 
 std::string MessageStoreImpl::getBdbBaseDir()
 {
     std::ostringstream dir;
-    dir << storeDir << "/" << storeTopLevelDir << "/dat/" ;
+    dir << storeDir << "/" << storeTopLevelDir << "/dat2/" ;
     return dir.str();
 }
 
 std::string MessageStoreImpl::getTplBaseDir()
 {
     std::ostringstream dir;
-    dir << storeDir << "/" << storeTopLevelDir << "/tpl/" ;
+    dir << storeDir << "/" << storeTopLevelDir << "/tpl2/" ;
     return dir.str();
 }
 
@@ -1522,7 +1526,8 @@ MessageStoreImpl::StoreOptions::StoreOptions(const std::string& name_) :
                                              wCachePageSizeKib(defWCachePageSizeKib),
                                              tplWCachePageSizeKib(defTplWCachePageSizeKib),
                                              efpPartition(defEfpPartition),
-                                             efpFileSizeKib(defEfpFileSizeKib)
+                                             efpFileSizeKib(defEfpFileSizeKib),
+                                             overwriteBeforeReturnFlag(defOverwriteBeforeReturnFlag)
 {
     addOptions()
         ("store-dir", qpid::optValue(storeDir, "DIR"),
@@ -1543,6 +1548,11 @@ MessageStoreImpl::StoreOptions::StoreOptions(const std::string& name_) :
                 "Empty File Pool partition to use for finding empty journal files")
         ("efp-file-size", qpid::optValue(efpFileSizeKib, "N"),
                 "Empty File Pool file size in KiB to use for journal files. Must be a multiple of 4 KiB.")
+        ("overwrite-before-return", qpid::optValue(overwriteBeforeReturnFlag, "yes|no"),
+                "If yes|true|1, will overwrite each store file with zeros before returning "
+                "it to the Empty File Pool. When not in use (the default), then old message data remains "
+                "in the file, but is overwritten on next use. This option should only be used where security "
+                "considerations justify it as it makes the store somewhat slower.")
         ;
 }
 

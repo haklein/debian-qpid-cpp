@@ -50,11 +50,11 @@ export QPID_TESTS_PY=$QPID_TESTS/src/py
 export QPID_TOOLS=$top_srcdir/../tools
 export QMF_LIB=$top_srcdir/../extras/qmf/src/py
 export PYTHON_COMMANDS=$QPID_TOOLS/src/py
-export PYTHONPATH=$srcdir:$PYTHON_DIR:$PYTHON_COMMANDS:$QPID_TESTS_PY:$QMF_LIB:$PYTHONPATH
+export PYTHONPATH_SWIG=$pythonswigdir:$pythonswiglibdir
+export PYTHONPATH=$srcdir:$PYTHON_DIR:$PYTHON_COMMANDS:$QPID_TESTS_PY:$QMF_LIB:$PYTHONPATH_SWIG:$PYTHONPATH
 export QPID_CONFIG_EXEC=$PYTHON_COMMANDS/qpid-config
 export QPID_ROUTE_EXEC=$PYTHON_COMMANDS/qpid-route
 export QPID_HA_EXEC=$PYTHON_COMMANDS/qpid-ha
-export PYTHONPATH_SWIG=$pythonswigdir:$pythonswiglibdir
 export PYTHONSWIGMODULE=$pythonswigdir/qpid_messaging.py
 # Executables
 export QPIDD_EXEC=$top_builddir/src/qpidd
@@ -74,7 +74,8 @@ export TEST_STORE_LIB=$testmoduledir/test_store.so
 exportmodule() { test -f $moduledir/$2 && eval "export $1=$moduledir/$2"; }
 exportmodule HA_LIB ha.so
 exportmodule XML_LIB xml.so
-exportmodule STORE_LIB legacystore.so
+test "$STORE_LIB" || exportmodule STORE_LIB linearstore.so
+test "$STORE_LIB" || exportmodule STORE_LIB legacystore.so
 exportmodule AMQP_LIB amqp.so
 
 # Qpid options
@@ -94,3 +95,6 @@ test -z "$BOOST_TEST_CATCH_SYSTEM_ERRORS" && export BOOST_TEST_CATCH_SYSTEM_ERRO
 
 # Source this for useful common testing functions
 export QPID_TEST_COMMON=$srcdir/test_env_common.sh
+
+# Proton configuration
+export QPID_PROTON_VERSION=@Proton_VERSION@

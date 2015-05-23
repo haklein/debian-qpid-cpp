@@ -122,10 +122,10 @@ public:
                                  bool& external,
                                  data_tok* const dtokp,
                                  bool ignore_pending_txns);
+    void recoveryComplete();
     void setLinearFileControllerJournals(lfcAddJournalFileFn fnPtr,
                                          LinearFileController* lfcPtr);
-    std::string toString(const std::string& jid);
-    std::string toLog(const std::string& jid, const int indent);
+    std::string toString(const std::string& jid, const uint16_t indent) const;
 protected:
     void analyzeJournalFileHeaders(efpIdentity_t& efpIdentity);
     void checkFileStreamOk(bool checkEof);
@@ -147,7 +147,7 @@ protected:
     void readJournalData(char* target, const std::streamsize size);
     void removeEmptyFiles(EmptyFilePool* emptyFilePoolPtr);
 
-    static void readJournalFileHeader(const std::string& journalFileName,
+    static bool readJournalFileHeader(const std::string& journalFileName,
                                       ::file_hdr_t& fileHeaderRef,
                                       std::string& queueName);
 };

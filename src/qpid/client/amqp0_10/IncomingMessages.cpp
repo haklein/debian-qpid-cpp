@@ -34,6 +34,7 @@
 #include "qpid/framing/MessageProperties.h"
 #include "qpid/framing/MessageTransferBody.h"
 #include "qpid/framing/enum.h"
+#include <algorithm>
 
 namespace qpid {
 namespace client {
@@ -126,18 +127,33 @@ void IncomingMessages::setSession(qpid::client::AsyncSession s)
     acceptTracker.reset();
 }
 
+namespace {
+qpid::sys::Duration get_duration(qpid::sys::Duration timeout, qpid::sys::AbsTime deadline)
+{
+    if (timeout == qpid::sys::TIME_INFINITE) {
+        return qpid::sys::TIME_INFINITE;
+    } else {
+        return std::max(qpid::sys::Duration(0), qpid::sys::Duration(AbsTime::now(), deadline));
+    }
+}
+}
+
 bool IncomingMessages::get(Handler& handler, qpid::sys::Duration timeout)
 {
     sys::Mutex::ScopedLock l(lock);
     AbsTime deadline(AbsTime::now(), timeout);
     do {
         //search through received list for any transfer of interest:
-        for (FrameSetQueue::iterator i = received.begin(); i != received.end(); i++)
+        for (FrameSetQueue::iterator i = received.begin(); i != received.end();)
         {
             MessageTransfer transfer(*i, *this);
-            if (handler.accept(transfer)) {
+            if (transfer.checkExpired()) {
+                i = received.erase(i);
+            } else if (handler.accept(transfer)) {
                 received.erase(i);
                 return true;
+            } else {
+                ++i;
             }
         }
         if (inUse) {
@@ -148,8 +164,13 @@ bool IncomingMessages::get(Handler& handler, qpid::sys::Duration timeout)
             ScopedRelease release(inUse, lock);
             sys::Mutex::ScopedUnlock l(lock);
             //wait for suitable new message to arrive
-            if (process(&handler, timeout == qpid::sys::TIME_INFINITE ? qpid::sys::TIME_INFINITE : qpid::sys::Duration(AbsTime::now(), deadline))) {
+            switch (process(&handler, get_duration(timeout, deadline))) {
+              case OK:
                 return true;
+              case CLOSED:
+                return false;
+              case EMPTY:
+                break;
             }
         }
         if (handler.isClosed()) throw qpid::messaging::ReceiverError("Receiver has been closed");
@@ -171,7 +192,7 @@ bool IncomingMessages::getNextDestination(std::string& destination, qpid::sys::D
 {
     sys::Mutex::ScopedLock l(lock);
     AbsTime deadline(AbsTime::now(), timeout);
-    while (received.empty() && AbsTime::now() < deadline) {
+    while (received.empty()) {
         if (inUse) {
             //someone is already waiting on the sessions incoming queue
             lock.wait(deadline);
@@ -180,8 +201,9 @@ bool IncomingMessages::getNextDestination(std::string& destination, qpid::sys::D
             ScopedRelease release(inUse, lock);
             sys::Mutex::ScopedUnlock l(lock);
             //wait for an incoming message
-            wait(timeout == qpid::sys::TIME_INFINITE ? qpid::sys::TIME_INFINITE : qpid::sys::Duration(AbsTime::now(), deadline));
+            wait(get_duration(timeout, deadline));
         }
+        if (!(AbsTime::now() < deadline)) break;
     }
     if (!received.empty()) {
         destination = received.front()->as<MessageTransferBody>()->getDestination();
@@ -216,7 +238,7 @@ void IncomingMessages::releaseAll()
     }
     //then pump out any available messages from incoming queue...
     GetAny handler;
-    while (process(&handler, 0)) ;
+    while (process(&handler, 0) == OK) ;
     //now release all messages
     sys::Mutex::ScopedLock l(lock);
     acceptTracker.release(session);
@@ -225,7 +247,7 @@ void IncomingMessages::releaseAll()
 void IncomingMessages::releasePending(const std::string& destination)
 {
     //first pump all available messages from incoming to received...
-    while (process(0, 0)) ;
+    while (process(0, 0) == OK) ;
 
     //now remove all messages for this destination from received list, recording their ids...
     sys::Mutex::ScopedLock l(lock);
@@ -252,7 +274,7 @@ bool IncomingMessages::pop(FrameSet::shared_ptr& content, qpid::sys::Duration ti
  * that are not accepted by the handler are pushed onto received queue
  * for later retrieval.
  */
-bool IncomingMessages::process(Handler* handler, qpid::sys::Duration duration)
+IncomingMessages::ProcessState IncomingMessages::process(Handler* handler, qpid::sys::Duration duration)
 {
     AbsTime deadline(AbsTime::now(), duration);
     FrameSet::shared_ptr content;
@@ -260,10 +282,12 @@ bool IncomingMessages::process(Handler* handler, qpid::sys::Duration duration)
         for (Duration timeout = duration; pop(content, timeout); timeout = Duration(AbsTime::now(), deadline)) {
             if (content->isA<MessageTransferBody>()) {
                 MessageTransfer transfer(content, *this);
-                if (handler && handler->accept(transfer)) {
+                if (transfer.checkExpired()) {
+                    QPID_LOG(debug, "Expired received transfer: " << *content->getMethod());
+                } else if (handler && handler->accept(transfer)) {
                     QPID_LOG(debug, "Delivered " << *content->getMethod() << " "
                              << *content->getHeaders());
-                    return true;
+                    return OK;
                 } else {
                     //received message for another destination, keep for later
                     QPID_LOG(debug, "Pushed " << *content->getMethod() << " to received queue");
@@ -276,8 +300,8 @@ bool IncomingMessages::process(Handler* handler, qpid::sys::Duration duration)
             }
         }
     }
-    catch (const qpid::ClosedException&) {} // Just return false if queue closed.
-    return false;
+    catch (const qpid::ClosedException&) { return CLOSED; }
+    return EMPTY;
 }
 
 bool IncomingMessages::wait(qpid::sys::Duration duration)
@@ -312,7 +336,7 @@ uint32_t IncomingMessages::pendingAccept(const std::string& destination)
 uint32_t IncomingMessages::available()
 {
     //first pump all available messages from incoming to received...
-    while (process(0, 0)) {}
+    while (process(0, 0) == OK) {}
     //return the count of received messages
     sys::Mutex::ScopedLock l(lock);
     return received.size();
@@ -321,7 +345,7 @@ uint32_t IncomingMessages::available()
 uint32_t IncomingMessages::available(const std::string& destination)
 {
     //first pump all available messages from incoming to received...
-    while (process(0, 0)) {}
+    while (process(0, 0) == OK) {}
 
     //count all messages for this destination from received list
     sys::Mutex::ScopedLock l(lock);
@@ -359,6 +383,16 @@ void IncomingMessages::MessageTransfer::retrieve(qpid::messaging::Message* messa
     parent.retrieve(content, message);
 }
 
+bool IncomingMessages::MessageTransfer::checkExpired()
+{
+    if (content->hasExpired()) {
+        retrieve(0);
+        parent.accept(content->getId(), false);
+        return true;
+    } else {
+        return false;
+    }
+}
 
 namespace {
 //TODO: unify conversion to and from 0-10 message that is currently

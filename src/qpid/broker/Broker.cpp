@@ -22,6 +22,7 @@
 #include "qpid/broker/Broker.h"
 
 #include "qpid/broker/AclModule.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/Connection.h"
 #include "qpid/broker/DirectExchange.h"
 #include "qpid/broker/FanOutExchange.h"
@@ -31,10 +32,8 @@
 #include "qpid/broker/NullMessageStore.h"
 #include "qpid/broker/RecoveryManagerImpl.h"
 #include "qpid/broker/SaslAuthenticator.h"
-#include "qpid/broker/SecureConnectionFactory.h"
 #include "qpid/broker/TopicExchange.h"
 #include "qpid/broker/Link.h"
-#include "qpid/broker/ExpiryPolicy.h"
 #include "qpid/broker/PersistableObject.h"
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/broker/QueueSettings.h"
@@ -67,7 +66,6 @@
 #include "qpid/log/Logger.h"
 #include "qpid/log/Options.h"
 #include "qpid/log/Statement.h"
-#include "qpid/log/posix/SinkOptions.h"
 #include "qpid/framing/AMQFrame.h"
 #include "qpid/framing/FieldTable.h"
 #include "qpid/framing/ProtocolInitiation.h"
@@ -91,6 +89,7 @@
 
 #include <iostream>
 #include <memory>
+#include <set>
 
 using qpid::sys::TransportAcceptor;
 using qpid::sys::TransportConnector;
@@ -121,7 +120,7 @@ const std::string amq_match("amq.match");
 const std::string qpid_management("qpid.management");
 const std::string knownHostsNone("none");
 
-Broker::Options::Options(const std::string& name) :
+BrokerOptions::BrokerOptions(const std::string& name) :
     qpid::Options(name),
     noDataDir(0),
     port(DEFAULT_PORT),
@@ -169,6 +168,7 @@ Broker::Options::Options(const std::string& name) :
         ("port,p", optValue(port,"PORT"), "Tells the broker to listen on PORT")
         ("interface", optValue(listenInterfaces, "<interface name>|<interface address>"), "Which network interfaces to use to listen for incoming connections")
         ("listen-disable", optValue(listenDisabled, "<transport name>"), "Transports to disable listening")
+        ("protocols", optValue(protocols, "<protocol name+version>"), "Which protocol versions to allow")
         ("worker-threads", optValue(workerThreads, "N"), "Sets the broker thread pool size")
         ("connection-backlog", optValue(connectionBacklog, "N"), "Sets the connection backlog limit for the server socket")
         ("mgmt-enable,m", optValue(enableMgmt,"yes|no"), "Enable Management")
@@ -191,7 +191,7 @@ Broker::Options::Options(const std::string& name) :
         ("default-message-group", optValue(defaultMsgGroup, "GROUP-IDENTIFER"), "Group identifier to assign to messages delivered to a message group queue that do not contain an identifier.")
         ("enable-timestamp", optValue(timestampRcvMsgs, "yes|no"), "Add current time to each received message.")
         ("link-maintenance-interval", optValue(linkMaintenanceInterval, "SECONDS"),
-         "Interval to check link health and re-connect  if need be")
+         "Interval to check federation link health and re-connect if need be")
         ("link-heartbeat-interval", optValue(linkHeartbeatInterval, "SECONDS"),
          "Heartbeat interval for a federation link")
         ("dtx-default-timeout", optValue(dtxDefaultTimeout, "SECONDS"), "Default timeout for DTX transaction before aborting it")
@@ -210,33 +210,40 @@ framing::FieldTable noReplicateArgs() {
 }
 }
 
-Broker::Broker(const Broker::Options& conf) :
+Broker::LogPrefix::LogPrefix() :
+    std::string(Msg() << "Broker (pid=" << sys::SystemInfo::getProcessId() << ") ") {
+    QPID_LOG(notice, *this << "start-up");
+}
+
+Broker::LogPrefix::~LogPrefix() { QPID_LOG(notice, *this << "shut-down"); }
+
+Broker::Broker(const BrokerOptions& conf) :
     poller(new Poller),
     timer(new qpid::sys::Timer),
     config(conf),
     managementAgent(conf.enableMgmt ? new ManagementAgent(conf.qmf1Support,
                                                           conf.qmf2Support)
                                     : 0),
-    disabledListeningTransports(config.listenDisabled.begin(), config.listenDisabled.end()),
+    disabledListeningTransports(conf.listenDisabled.begin(), conf.listenDisabled.end()),
     store(new NullMessageStore),
     acl(0),
     dataDir(conf.noDataDir ? std::string() : conf.dataDir),
     pagingDir(!conf.pagingDir.empty() ? conf.pagingDir :
-              dataDir.isEnabled() ? dataDir.getPath() + Options::DEFAULT_PAGED_QUEUE_DIR :
+              dataDir.isEnabled() ? dataDir.getPath() + BrokerOptions::DEFAULT_PAGED_QUEUE_DIR :
               std::string() ),
     queues(this),
     exchanges(this),
     links(this),
-    factory(new SecureConnectionFactory(*this)),
-    dtxManager(*timer.get(), getOptions().dtxDefaultTimeout),
+    dtxManager(*timer.get(), conf.dtxDefaultTimeout),
     sessionManager(
         qpid::SessionState::Configuration(
             conf.replayFlushLimit*1024, // convert kb to bytes.
             conf.replayHardLimit*1024),
         *this),
-    queueCleaner(queues, timer.get()),
+    queueCleaner(queues, poller, timer.get()),
     recoveryInProgress(false),
-    expiryPolicy(new ExpiryPolicy),
+    protocolRegistry(std::set<std::string>(conf.protocols.begin(), conf.protocols.end()), this),
+    timestampRcvMsgs(conf.timestampRcvMsgs),
     getKnownBrokers(boost::bind(&Broker::getKnownBrokersImpl, this))
 {
     if (!dataDir.isEnabled()) {
@@ -385,10 +392,12 @@ Broker::Broker(const Broker::Options& conf) :
         knownBrokers.push_back(Url(conf.knownHosts));
     }
 
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        QPID_LOG(critical, logPrefix << "start-up failed: " << e.what());
         finalize();
         throw;
     }
+    QPID_LOG(info, logPrefix << "initialized");
 }
 
 void Broker::declareStandardExchange(const std::string& name, const std::string& type)
@@ -403,15 +412,79 @@ void Broker::declareStandardExchange(const std::string& name, const std::string&
     }
 }
 
+bool Broker::isAuthenticating() const
+{
+    return config.auth;
+}
+
+bool Broker::requireEncrypted() const
+{
+    return config.requireEncrypted;
+}
+
+std::string Broker::getRealm() const
+{
+    return config.realm;
+}
+
+bool Broker::getTcpNoDelay() const
+{
+    return config.tcpNoDelay;
+}
+
+uint32_t Broker::getMaxNegotiateTime() const
+{
+    return config.maxNegotiateTime;
+}
+
+uint16_t Broker::getPortOption() const
+{
+    return config.port;
+}
+
+const std::vector<std::string>& Broker::getListenInterfaces() const
+{
+    return config.listenInterfaces;
+}
+
+int Broker::getConnectionBacklog() const
+{
+    return config.connectionBacklog;
+}
+
+sys::Duration Broker::getLinkMaintenanceInterval() const
+{
+    return config.linkMaintenanceInterval;
+}
+
+sys::Duration Broker::getLinkHeartbeatInterval() const
+{
+    return config.linkHeartbeatInterval;
+}
+
+uint32_t Broker::getDtxMaxTimeout() const
+{
+    return config.dtxMaxTimeout;
+}
+
+uint16_t Broker::getQueueThresholdEventRatio() const
+{
+    return config.queueThresholdEventRatio;
+}
+
+uint Broker::getQueueLimit() const
+{
+    return config.queueLimit;
+}
 
 boost::intrusive_ptr<Broker> Broker::create(int16_t port)
 {
-    Options config;
+    BrokerOptions config;
     config.port=port;
     return create(config);
 }
 
-boost::intrusive_ptr<Broker> Broker::create(const Options& opts)
+boost::intrusive_ptr<Broker> Broker::create(const BrokerOptions& opts)
 {
     return boost::intrusive_ptr<Broker>(new Broker(opts));
 }
@@ -436,7 +509,7 @@ void Broker::setStore () {
 
 void Broker::run() {
     if (config.workerThreads > 0) {
-        QPID_LOG(notice, "Broker running");
+        QPID_LOG(info, logPrefix << "running");
         Dispatcher d(poller);
         int numIOThreads = config.workerThreads;
         std::vector<Thread> t(numIOThreads-1);
@@ -452,6 +525,7 @@ void Broker::run() {
         for (int i=0; i<numIOThreads-1; ++i) {
             t[i].join();
         }
+        QPID_LOG(info, logPrefix << "stopped");
     } else {
         throw Exception((boost::format("Invalid value for worker-threads: %1%") % config.workerThreads).str());
     }
@@ -465,6 +539,7 @@ void Broker::shutdown() {
 }
 
 Broker::~Broker() {
+    QPID_LOG(info, logPrefix << "shutting down");
     if (mgmtObject != 0)
         mgmtObject->debugStats("destroying");
     shutdown();
@@ -473,7 +548,6 @@ Broker::~Broker() {
         SaslAuthenticator::fini();
     timer->stop();
     managementAgent.reset();
-    QPID_LOG(notice, "Shut down");
 }
 
 ManagementObject::shared_ptr Broker::GetManagementObject(void) const
@@ -544,7 +618,8 @@ Manageable::status_t Broker::ManagementMethod (uint32_t methodId,
         _qmf::ArgsBrokerQueueMoveMessages& moveArgs=
             dynamic_cast<_qmf::ArgsBrokerQueueMoveMessages&>(args);
         QPID_LOG (debug, "Broker::queueMoveMessages()");
-        if (queueMoveMessages(moveArgs.i_srcQueue, moveArgs.i_destQueue, moveArgs.i_qty, moveArgs.i_filter) >= 0)
+        if (queueMoveMessages(moveArgs.i_srcQueue, moveArgs.i_destQueue, moveArgs.i_qty,
+                              moveArgs.i_filter, getCurrentPublisher()) >=0)
             status = Manageable::STATUS_OK;
         else
             return Manageable::STATUS_PARAMETER_INVALID;
@@ -612,8 +687,13 @@ Manageable::status_t Broker::ManagementMethod (uint32_t methodId,
         string srcQueue(dynamic_cast<_qmf::ArgsBrokerQueueRedirect&>(args).i_sourceQueue);
         string tgtQueue(dynamic_cast<_qmf::ArgsBrokerQueueRedirect&>(args).i_targetQueue);
         QPID_LOG (debug, "Broker::queueRedirect source queue:" << srcQueue << " to target queue " << tgtQueue);
-        status =  queueRedirect(srcQueue, tgtQueue);
+        status =  queueRedirect(srcQueue, tgtQueue, getCurrentPublisher());
         break;
+    }
+    case _qmf::Broker::METHOD_SHUTDOWN :
+    {
+        QPID_LOG (info, "Broker received shutdown command");
+        shutdown();
     }
     default:
         QPID_LOG (debug, "Broker ManagementMethod not implemented: id=" << methodId << "]");
@@ -1033,7 +1113,7 @@ Manageable::status_t Broker::getTimestampConfig(bool& receive,
     if (acl && !acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_BROKER, name, NULL))  {
         throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied broker timestamp get request from " << userId));
     }
-    receive = config.timestampRcvMsgs;
+    receive = timestampRcvMsgs;
     return Manageable::STATUS_OK;
 }
 
@@ -1045,8 +1125,8 @@ Manageable::status_t Broker::setTimestampConfig(const bool receive,
     if (acl && !acl->authorise(userId, acl::ACT_UPDATE, acl::OBJ_BROKER, name, NULL)) {
         throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied broker timestamp set request from " << userId));
     }
-    config.timestampRcvMsgs = receive;
-    QPID_LOG(notice, "Receive message timestamping is " << ((config.timestampRcvMsgs) ? "ENABLED." : "DISABLED."));
+    timestampRcvMsgs = receive;
+    QPID_LOG(notice, "Receive message timestamping is " << ((timestampRcvMsgs) ? "ENABLED." : "DISABLED."));
     return Manageable::STATUS_OK;
 }
 
@@ -1088,7 +1168,8 @@ bool Broker::getLogHiresTimestamp()
 
 
 Manageable::status_t Broker::queueRedirect(const std::string& srcQueue,
-                                           const std::string& tgtQueue)
+                                           const std::string& tgtQueue,
+                                           const Connection* context)
 {
     Queue::shared_ptr srcQ(queues.find(srcQueue));
     if (!srcQ) {
@@ -1136,6 +1217,13 @@ Manageable::status_t Broker::queueRedirect(const std::string& srcQueue,
             return Manageable::STATUS_USER;
         }
 
+        if (acl) {
+            std::map<acl::Property, std::string> params;
+            params.insert(make_pair(acl::PROP_QUEUENAME, tgtQ->getName()));
+            if (!acl->authorise((context)?context->getUserId():"", acl::ACT_REDIRECT, acl::OBJ_QUEUE, srcQ->getName(), &params))
+                throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied redirect request from " << ((context)?context->getUserId():"(uknown)")));
+        }
+
         // Start the backup overflow partnership
         srcQ->setRedirectPeer(tgtQ, true);
         tgtQ->setRedirectPeer(srcQ, false);
@@ -1165,6 +1253,13 @@ Manageable::status_t Broker::queueRedirect(const std::string& srcQueue,
             QPID_LOG(error, "Queue redirect source queue: "
                 << srcQueue << " is not a redirect source");
             return Manageable::STATUS_USER;
+        }
+
+        if (acl) {
+            std::map<acl::Property, std::string> params;
+            params.insert(make_pair(acl::PROP_QUEUENAME, tgtQ->getName()));
+            if (!acl->authorise((context)?context->getUserId():"", acl::ACT_REDIRECT, acl::OBJ_QUEUE, srcQ->getName(), &params))
+                throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied redirect request from " << ((context)?context->getUserId():"(uknown)")));
         }
 
         queueRedirectDestroy(srcQ, tgtQ, true);
@@ -1200,7 +1295,6 @@ void Broker::queueRedirectDestroy(Queue::shared_ptr srcQ,
     }
 }
 
-
 const Broker::TransportInfo& Broker::getTransportInfo(const std::string& name) const {
     static TransportInfo nullTransportInfo;
     TransportMap::const_iterator i
@@ -1227,13 +1321,14 @@ void Broker::disableListening(std::string transport) {
 
 void Broker::registerTransport(const std::string& name, boost::shared_ptr<TransportAcceptor> a, boost::shared_ptr<TransportConnector> c, uint16_t p) {
     transportMap[name] = TransportInfo(a, c, p);
+    Url::addProtocol(name);
 }
 
 void Broker::accept() {
     unsigned accepting = 0;
     for (TransportMap::const_iterator i = transportMap.begin(); i != transportMap.end(); i++) {
         if (i->second.acceptor) {
-            i->second.acceptor->accept(poller, factory.get());
+            i->second.acceptor->accept(poller, &protocolRegistry);
             ++accepting;
         }
     }
@@ -1247,7 +1342,7 @@ void Broker::connect(
     const std::string& host, const std::string& port, const std::string& transport,
     boost::function2<void, int, std::string> failed)
 {
-    connect(name, host, port, transport, factory.get(), failed);
+    connect(name, host, port, transport, &protocolRegistry, failed);
 }
 
 void Broker::connect(
@@ -1264,7 +1359,8 @@ int32_t Broker::queueMoveMessages(
      const std::string& srcQueue,
      const std::string& destQueue,
      uint32_t  qty,
-     const Variant::Map& filter)
+     const Variant::Map& filter,
+     const Connection* context)
 {
     Queue::shared_ptr src_queue = queues.find(srcQueue);
     if (!src_queue)
@@ -1272,6 +1368,13 @@ int32_t Broker::queueMoveMessages(
     Queue::shared_ptr dest_queue = queues.find(destQueue);
     if (!dest_queue)
         return -1;
+
+    if (acl) {
+        std::map<acl::Property, std::string> params;
+        params.insert(make_pair(acl::PROP_QUEUENAME, dest_queue->getName()));
+        if (!acl->authorise((context)?context->getUserId():"", acl::ACT_MOVE, acl::OBJ_QUEUE, src_queue->getName(), &params))
+            throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied move request from " << ((context)?context->getUserId():"(uknown)")));
+    }
 
     return (int32_t) src_queue->move(dest_queue, qty, &filter);
 }
@@ -1292,12 +1395,13 @@ const std::string Broker::TCP_TRANSPORT("tcp");
 
 std::pair<boost::shared_ptr<Queue>, bool> Broker::createQueue(
     const std::string& name,
-    const QueueSettings& settings,
+    const QueueSettings& constSettings,
     const OwnershipToken* owner,
     const std::string& alternateExchange,
     const std::string& userId,
     const std::string& connectionId)
 {
+    QueueSettings settings(constSettings); // So we can modify them
     if (acl) {
         std::map<acl::Property, std::string> params;
         params.insert(make_pair(acl::PROP_ALTERNATE, alternateExchange));
@@ -1334,6 +1438,10 @@ std::pair<boost::shared_ptr<Queue>, bool> Broker::createQueue(
         alternate = exchanges.get(alternateExchange);
         if (!alternate) throw framing::NotFoundException(QPID_MSG("Alternate exchange does not exist: " << alternateExchange));
     }
+
+    // Identify queues that won't survive a failover: exclusive, auto-delete with no delay.
+    if (owner && settings.autodelete && !settings.autoDeleteDelay)
+        settings.isTemporary = true;
 
     std::pair<Queue::shared_ptr, bool> result =
         queues.declare(name, settings, alternate, false/*recovering*/,

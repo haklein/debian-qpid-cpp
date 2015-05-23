@@ -36,6 +36,7 @@
 #include "qpid/messaging/Sender.h"
 #include "qpid/messaging/Receiver.h"
 #include "qpid/messaging/Session.h"
+#include "qpid/framing/enum.h"
 #include <boost/format.hpp>
 #include <boost/function.hpp>
 #include <boost/intrusive_ptr.hpp>
@@ -43,7 +44,9 @@
 using qpid::messaging::KeyError;
 using qpid::messaging::NoMessageAvailable;
 using qpid::messaging::MessagingException;
+using qpid::messaging::TransactionError;
 using qpid::messaging::TransactionAborted;
+using qpid::messaging::TransactionUnknown;
 using qpid::messaging::SessionError;
 using qpid::messaging::MessageImplAccess;
 using qpid::messaging::Sender;
@@ -56,13 +59,38 @@ namespace amqp0_10 {
 typedef qpid::sys::Mutex::ScopedLock ScopedLock;
 typedef qpid::sys::Mutex::ScopedUnlock ScopedUnlock;
 
-SessionImpl::SessionImpl(ConnectionImpl& c, bool t) : connection(&c), transactional(t) {}
+SessionImpl::SessionImpl(ConnectionImpl& c, bool t) :
+    connection(&c), transactional(t), committing(false) {}
+
+bool SessionImpl::isTransactional() const
+{
+    return transactional;
+}
 
 void SessionImpl::checkError()
 {
     ScopedLock l(lock);
+    txError.raise();
     qpid::client::SessionBase_0_10Access s(session);
-    s.get()->assertOpen();
+    try {
+        s.get()->assertOpen();
+    } catch (const qpid::TransportFailure&) {
+        throw qpid::messaging::TransportFailure(std::string());
+    } catch (const qpid::framing::ResourceLimitExceededException& e) {
+        throw qpid::messaging::TargetCapacityExceeded(e.what());
+    } catch (const qpid::framing::UnauthorizedAccessException& e) {
+        throw qpid::messaging::UnauthorizedAccess(e.what());
+    } catch (const qpid::framing::NotFoundException& e) {
+        throw qpid::messaging::NotFound(e.what());
+    } catch (const qpid::framing::ResourceDeletedException& e) {
+        throw qpid::messaging::NotFound(e.what());
+    } catch (const qpid::SessionException& e) {
+        throw qpid::messaging::SessionError(e.what());
+    } catch (const qpid::ConnectionException& e) {
+        throw qpid::messaging::ConnectionError(e.what());
+    } catch (const qpid::Exception& e) {
+        throw qpid::messaging::MessagingException(e.what());
+    }
 }
 
 bool SessionImpl::hasError()
@@ -78,11 +106,28 @@ void SessionImpl::sync(bool block)
     else execute<NonBlockingSync>();
 }
 
+namespace {
+struct ScopedSet {
+    bool& flag;
+    ScopedSet(bool& f) : flag(f) { flag = true; }
+    ~ScopedSet() { flag = false; }
+};
+}
+
 void SessionImpl::commit()
 {
-    if (!execute<Commit>()) {
-        throw TransactionAborted("Transaction aborted due to transport failure");
+    try {
+        checkError();
+        ScopedSet s(committing);
+        execute<Commit>();
     }
+    catch (const TransactionError&) {
+        assert(txError);        // Must be set by thrower of TransactionError
+    }
+    catch (const std::exception& e) {
+        txError = new TransactionAborted(Msg() << "Transaction aborted: " << e.what());
+    }
+    checkError();
 }
 
 void SessionImpl::rollback()
@@ -171,13 +216,13 @@ template <class T> void getFreeKey(std::string& key, T& map)
     key = name;
 }
 
-
 void SessionImpl::setSession(qpid::client::Session s)
 {
-    ScopedLock l(lock);
     session = s;
     incoming.setSession(session);
-    if (transactional) session.txSelect();
+    if (transactional) {
+        session.txSelect();
+    }
     for (Receivers::iterator i = receivers.begin(); i != receivers.end(); ++i) {
         getImplPtr<Receiver, ReceiverImpl>(i->second)->init(session, resolver);
     }
@@ -233,7 +278,7 @@ Sender SessionImpl::createSenderImpl(const qpid::messaging::Address& address)
     ScopedLock l(lock);
     std::string name = address.getName();
     getFreeKey(name, senders);
-    Sender sender(new SenderImpl(*this, name, address));
+    Sender sender(new SenderImpl(*this, name, address, connection->getAutoReconnect()));
     getImplPtr<Sender, SenderImpl>(sender)->init(session, resolver);
     senders[name] = sender;
     return sender;
@@ -345,6 +390,7 @@ bool SessionImpl::get(ReceiverImpl& receiver, qpid::messaging::Message& message,
 bool SessionImpl::nextReceiver(qpid::messaging::Receiver& receiver, qpid::messaging::Duration timeout)
 {
     while (true) {
+        txError.raise();
         try {
             std::string destination;
             if (incoming.getNextDestination(destination, adjust(timeout))) {
@@ -364,10 +410,8 @@ bool SessionImpl::nextReceiver(qpid::messaging::Receiver& receiver, qpid::messag
         } catch (const qpid::framing::ResourceLimitExceededException& e) {
             if (backoff()) return false;
             else throw qpid::messaging::TargetCapacityExceeded(e.what());
-        } catch (const qpid::framing::UnauthorizedAccessException& e) {
-            throw qpid::messaging::UnauthorizedAccess(e.what());
         } catch (const qpid::SessionException& e) {
-            throw qpid::messaging::SessionError(e.what());
+            rethrow(e);
         } catch (const qpid::ClosedException&) {
             throw qpid::messaging::SessionClosed();
         } catch (const qpid::ConnectionException& e) {
@@ -527,6 +571,13 @@ void SessionImpl::senderCancelled(const std::string& name)
 
 void SessionImpl::reconnect()
 {
+    if (transactional) {
+        if (committing)
+            txError = new TransactionUnknown("Transaction outcome unknown: transport failure");
+        else
+            txError = new TransactionAborted("Transaction aborted: transport failure");
+        txError.raise();
+    }
     connection->reopen();
 }
 
@@ -538,6 +589,18 @@ bool SessionImpl::backoff()
 qpid::messaging::Connection SessionImpl::getConnection() const
 {
     return qpid::messaging::Connection(connection.get());
+}
+
+void SessionImpl::rethrow(const qpid::SessionException& e) {
+    switch (e.code) {
+      case framing::execution::ERROR_CODE_NOT_ALLOWED:
+      case framing::execution::ERROR_CODE_UNAUTHORIZED_ACCESS: throw messaging::UnauthorizedAccess(e.what());
+
+      case framing::execution::ERROR_CODE_NOT_FOUND:
+      case framing::execution::ERROR_CODE_RESOURCE_DELETED: throw messaging::NotFound(e.what());
+
+      default: throw SessionError(e.what());
+    }
 }
 
 }}} // namespace qpid::client::amqp0_10

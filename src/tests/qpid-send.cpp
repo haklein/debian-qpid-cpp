@@ -166,7 +166,7 @@ struct Options : public qpid::Options
             qpid::log::Logger::instance().configure(log);
             if (help) {
                 std::cout << *this << std::endl << std::endl
-                          << "Drains messages from the specified address" << std::endl;
+                          << "Sends messages to the specified address" << std::endl;
                 return false;
             } else {
                 return true;
@@ -409,7 +409,7 @@ int main(int argc, char ** argv)
 
                 if (opts.timestamp)
                     msg.getProperties()[TS] = int64_t(
-                        qpid::sys::Duration(qpid::sys::EPOCH, qpid::sys::now()));
+                        qpid::sys::Duration::FromEpoch());
                 sender.send(msg);
                 reporter.message(msg);
 

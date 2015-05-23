@@ -21,6 +21,7 @@
 
 #include "qpid/broker/Queue.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/Connection.h"
 #include "qpid/broker/AclModule.h"
 #include "qpid/broker/QueueCursor.h"
 #include "qpid/broker/QueueDepth.h"
@@ -35,6 +36,7 @@
 #include "qpid/broker/QueueRegistry.h"
 #include "qpid/broker/Selector.h"
 #include "qpid/broker/TransactionObserver.h"
+#include "qpid/broker/TxDequeue.h"
 
 //TODO: get rid of this
 #include "qpid/broker/amqp_0_10/MessageTransfer.h"
@@ -53,6 +55,8 @@
 #include "qmf/org/apache/qpid/broker/ArgsQueuePurge.h"
 #include "qmf/org/apache/qpid/broker/ArgsQueueReroute.h"
 #include "qmf/org/apache/qpid/broker/EventQueueDelete.h"
+#include "qmf/org/apache/qpid/broker/EventSubscribe.h"
+#include "qmf/org/apache/qpid/broker/EventUnsubscribe.h"
 
 #include <iostream>
 #include <algorithm>
@@ -71,6 +75,7 @@ using qpid::management::ManagementAgent;
 using qpid::management::ManagementObject;
 using qpid::management::Manageable;
 using qpid::management::Args;
+using qpid::management::getCurrentPublisher;
 using std::string;
 using std::for_each;
 using std::mem_fun;
@@ -128,7 +133,7 @@ inline void mgntDeqStats(const Message& msg,
     }
 }
 
-QueueSettings merge(const QueueSettings& inputs, const Broker::Options& globalOptions)
+QueueSettings merge(const QueueSettings& inputs, const Broker& broker)
 {
     QueueSettings settings(inputs);
     settings.maxDepth = QueueDepth();
@@ -139,8 +144,8 @@ QueueSettings merge(const QueueSettings& inputs, const Broker::Options& globalOp
         if (inputs.maxDepth.getSize()) {
             settings.maxDepth.setSize(inputs.maxDepth.getSize());
         }
-    } else if (globalOptions.queueLimit) {
-        settings.maxDepth.setSize(globalOptions.queueLimit);
+    } else if (broker.getQueueLimit()) {
+        settings.maxDepth.setSize(broker.getQueueLimit());
     }
     return settings;
 }
@@ -193,7 +198,7 @@ Queue::Queue(const string& _name, const QueueSettings& _settings,
     exclusive(0),
     messages(new MessageDeque()),
     persistenceId(0),
-    settings(b ? merge(_settings, b->getOptions()) : _settings),
+    settings(b ? merge(_settings, *b) : _settings),
     eventMode(0),
     observers(name, messageLock),
     broker(b),
@@ -411,7 +416,7 @@ bool Queue::getNextMessage(Message& m, Consumer::shared_ptr& c)
         QueueCursor cursor = c->getCursor(); // Save current position.
         Message* msg = messages->next(*c);   // Advances c.
         if (msg) {
-            if (msg->hasExpired()) {
+            if (msg->getExpiration() < sys::AbsTime::now()) {
                 QPID_LOG(debug, "Message expired from queue '" << name << "'");
                 observeDequeue(*msg, locker, settings.autodelete ? &autodelete : 0);
                 //ERROR: don't hold lock across call to store!!
@@ -468,6 +473,7 @@ bool Queue::getNextMessage(Message& m, Consumer::shared_ptr& c)
             }
         } else {
             QPID_LOG(debug, "No messages to dispatch on queue '" << name << "'");
+            c->stopped();
             listeners.addListener(c);
             break;
         }
@@ -519,7 +525,7 @@ void Queue::markInUse(bool controlling)
     else users.addOther();
 }
 
-void Queue::releaseFromUse(bool controlling)
+void Queue::releaseFromUse(bool controlling, bool doDelete)
 {
     bool trydelete;
     if (controlling) {
@@ -531,11 +537,14 @@ void Queue::releaseFromUse(bool controlling)
         users.removeOther();
         trydelete = isUnused(locker);
     }
-    if (trydelete) scheduleAutoDelete();
+    if (trydelete && doDelete) scheduleAutoDelete();
 }
 
-void Queue::consume(Consumer::shared_ptr c, bool requestExclusive)
+void Queue::consume(Consumer::shared_ptr c, bool requestExclusive,
+                    const framing::FieldTable& arguments,
+                    const std::string& connectionId, const std::string& userId)
 {
+    boost::intrusive_ptr<qpid::sys::TimerTask> t;
     {
         Mutex::ScopedLock locker(messageLock);
         if (c->preAcquires()) {
@@ -564,21 +573,31 @@ void Queue::consume(Consumer::shared_ptr c, bool requestExclusive)
         if(c->isCounted()) {
             //reset auto deletion timer if necessary
             if (settings.autoDeleteDelay && autoDeleteTask) {
-                autoDeleteTask->cancel();
+                t = autoDeleteTask;
             }
 
             observeConsumerAdd(*c, locker);
         }
     }
+    if (t) t->cancel();
     if (mgmtObject != 0 && c->isCounted()) {
         mgmtObject->inc_consumerCount();
     }
+    if (broker) {
+        ManagementAgent* agent = broker->getManagementAgent();
+        if (agent) {
+            agent->raiseEvent(
+                _qmf::EventSubscribe(connectionId, userId, name,
+                                     c->getTag(), requestExclusive, ManagementAgent::toMap(arguments)));
+        }
+    }
 }
 
-void Queue::cancel(Consumer::shared_ptr c)
+void Queue::cancel(Consumer::shared_ptr c, const std::string& connectionId, const std::string& userId)
 {
     removeListener(c);
     if(c->isCounted())
+
     {
         bool unused;
         {
@@ -595,10 +614,19 @@ void Queue::cancel(Consumer::shared_ptr c)
         if (mgmtObject != 0) {
             mgmtObject->dec_consumerCount();
         }
-        if (unused && settings.autodelete) {
-            scheduleAutoDelete();
-        }
+        if (unused && settings.autodelete) scheduleAutoDelete();
     }
+    if (broker) {
+        ManagementAgent* agent = broker->getManagementAgent();
+        if (agent) agent->raiseEvent(_qmf::EventUnsubscribe(connectionId, userId, c->getTag()));
+    }
+}
+
+namespace{
+bool hasExpired(const Message& m, AbsTime now)
+{
+    return m.getExpiration() < now;
+}
 }
 
 /**
@@ -612,16 +640,15 @@ void Queue::purgeExpired(sys::Duration lapse) {
     dequeueSincePurge -= count;
     int seconds = int64_t(lapse)/qpid::sys::TIME_SEC;
     if (seconds == 0 || count / seconds < 1) {
-        uint32_t count = remove(0, boost::bind(&Message::hasExpired, _1), 0, CONSUMER, settings.autodelete);
+        sys::AbsTime time = sys::AbsTime::now();
+        uint32_t count = remove(0, boost::bind(&hasExpired, _1, time), 0, CONSUMER, settings.autodelete);
         QPID_LOG(debug, "Purged " << count << " expired messages from " << getName());
         //
         // Report the count of discarded-by-ttl messages
         //
         if (mgmtObject && count) {
-            mgmtObject->inc_acquires(count);
             mgmtObject->inc_discardsTtl(count);
             if (brokerMgmtObject) {
-                brokerMgmtObject->inc_acquires(count);
                 brokerMgmtObject->inc_discardsTtl(count);
             }
         }
@@ -934,6 +961,24 @@ void Queue::dequeueFromStore(boost::intrusive_ptr<PersistableMessage> msg)
     }
 }
 
+void Queue::dequeue(const QueueCursor& cursor, TxBuffer* txn)
+{
+    if (txn) {
+        TxOp::shared_ptr op;
+        {
+            Mutex::ScopedLock locker(messageLock);
+            Message* msg = messages->find(cursor);
+            if (msg) {
+                op = TxOp::shared_ptr(new TxDequeue(cursor, shared_from_this(), msg->getSequence(), msg->getReplicationId()));
+            }
+        }
+        if (op) txn->enlist(op);
+    } else {
+        dequeue(0, cursor);
+    }
+}
+
+
 void Queue::dequeue(TransactionContext* ctxt, const QueueCursor& cursor)
 {
     ScopedUse u(barrier);
@@ -1102,10 +1147,10 @@ void Queue::destroyed()
         store->destroy(*this);
         store = 0;//ensure we make no more calls to the store for this queue
     }
-    if (autoDeleteTask) autoDeleteTask = boost::intrusive_ptr<TimerTask>();
     notifyDeleted();
     {
         Mutex::ScopedLock l(messageLock);
+        if (autoDeleteTask) autoDeleteTask = boost::intrusive_ptr<TimerTask>();
         observers.destroy(l);
     }
     if (mgmtObject != 0) {
@@ -1160,6 +1205,7 @@ void Queue::encode(Buffer& buffer) const
     buffer.put(encodableSettings);
     buffer.putShortString(alternateExchange.get() ? alternateExchange->getName() : std::string(""));
     buffer.putShortString(userId);
+    buffer.putInt8(isAutoDelete());
 }
 
 uint32_t Queue::encodedSize() const
@@ -1167,6 +1213,7 @@ uint32_t Queue::encodedSize() const
     return name.size() + 1/*short string size octet*/
         + (alternateExchange.get() ? alternateExchange->getName().size() : 0) + 1 /* short string */
         + userId.size() + 1 /* short string */
+        + 1 /* autodelete flag */
         + encodableSettings.encodedSize();
 }
 
@@ -1180,23 +1227,39 @@ Queue::shared_ptr Queue::restore( QueueRegistry& queues, Buffer& buffer )
 {
     string name;
     string _userId;
-    buffer.getShortString(name);
     FieldTable ft;
-    buffer.get(ft);
     boost::shared_ptr<Exchange> alternate;
-    QueueSettings settings(true, false);
-    settings.populate(ft, settings.storeSettings);
-    std::pair<Queue::shared_ptr, bool> result = queues.declare(name, settings, alternate, true);
-    if (buffer.available()) {
-        string altExch;
-        buffer.getShortString(altExch);
-        result.first->alternateExchangeName.assign(altExch);
-    }
+    QueueSettings settings(true, false); // settings.autodelete might be overwritten
+    string altExch;
+    bool has_userId = false;
+    bool has_altExch = false;
 
+    buffer.getShortString(name);
+    buffer.get(ft);
+    settings.populate(ft, settings.storeSettings);
+    //get alternate exchange
+    if (buffer.available()) {
+        buffer.getShortString(altExch);
+        has_altExch = true;
+    }
     //get userId of queue's creator; ACL counters for userId are done after ACL plugin is initialized
     if (buffer.available()) {
         buffer.getShortString(_userId);
+        has_userId = true;
+    }
+    //get autodelete flag
+    if (buffer.available()) {
+        settings.autodelete = buffer.getInt8();
+    }
+
+    std::pair<Queue::shared_ptr, bool> result = queues.declare(name, settings, alternate, true);
+    if (has_altExch)
+        result.first->alternateExchangeName.assign(altExch);
+    if (has_userId)
         result.first->setOwningUser(_userId);
+
+    if (result.first->getSettings().autoDeleteDelay) {
+        result.first->scheduleAutoDelete();
     }
 
     return result.first;
@@ -1237,10 +1300,10 @@ struct AutoDeleteTask : qpid::sys::TimerTask
     }
 };
 
-void Queue::scheduleAutoDelete()
+void Queue::scheduleAutoDelete(bool immediate)
 {
     if (canAutoDelete()) {
-        if (settings.autoDeleteDelay) {
+        if (!immediate && settings.autoDeleteDelay) {
             AbsTime time(now(), Duration(settings.autoDeleteDelay * TIME_SEC));
             autoDeleteTask = boost::intrusive_ptr<qpid::sys::TimerTask>(new AutoDeleteTask(shared_from_this(), time));
             broker->getTimer().add(autoDeleteTask);
@@ -1253,7 +1316,17 @@ void Queue::scheduleAutoDelete()
 
 void Queue::tryAutoDelete()
 {
-    if (broker->getQueues().destroyIf(name, boost::bind(boost::mem_fn(&Queue::canAutoDelete), shared_from_this()))) {
+    bool proceed(false);
+    {
+        Mutex::ScopedLock locker(messageLock);
+        if (!deleted && checkAutoDelete(locker)) {
+            proceed = true;
+            deleted = true;
+        }
+    }
+
+    if (proceed) {
+        broker->getQueues().destroy(name);
         if (broker->getAcl())
             broker->getAcl()->recordDestroyQueue(name);
 
@@ -1270,7 +1343,7 @@ bool Queue::isExclusiveOwner(const OwnershipToken* const o) const
     return o == owner;
 }
 
-void Queue::releaseExclusiveOwnership()
+void Queue::releaseExclusiveOwnership(bool immediateExpiry)
 {
     bool unused;
     {
@@ -1282,7 +1355,7 @@ void Queue::releaseExclusiveOwnership()
         unused = !users.isUsed();
     }
     if (unused && settings.autodelete) {
-        scheduleAutoDelete();
+        scheduleAutoDelete(immediateExpiry);
     }
 }
 
@@ -1336,39 +1409,6 @@ void Queue::countRejected() const
     }
 }
 
-void Queue::countFlowedToDisk(uint64_t size) const
-{
-    if (mgmtObject) {
-        _qmf::Queue::PerThreadStats *qStats = mgmtObject->getStatistics();
-        qStats->msgFtdEnqueues += 1;
-        qStats->byteFtdEnqueues += size;
-        mgmtObject->statisticsUpdated();
-        if (brokerMgmtObject) {
-            _qmf::Broker::PerThreadStats *bStats = brokerMgmtObject->getStatistics();
-            bStats->msgFtdEnqueues += 1;
-            bStats->byteFtdEnqueues += size;
-            brokerMgmtObject->statisticsUpdated();
-        }
-    }
-}
-
-void Queue::countLoadedFromDisk(uint64_t size) const
-{
-    if (mgmtObject) {
-        _qmf::Queue::PerThreadStats *qStats = mgmtObject->getStatistics();
-        qStats->msgFtdDequeues += 1;
-        qStats->byteFtdDequeues += size;
-        mgmtObject->statisticsUpdated();
-        if (brokerMgmtObject) {
-            _qmf::Broker::PerThreadStats *bStats = brokerMgmtObject->getStatistics();
-            bStats->msgFtdDequeues += 1;
-            bStats->byteFtdDequeues += size;
-            brokerMgmtObject->statisticsUpdated();
-        }
-    }
-}
-
-
 ManagementObject::shared_ptr Queue::GetManagementObject(void) const
 {
     return mgmtObject;
@@ -1377,12 +1417,17 @@ ManagementObject::shared_ptr Queue::GetManagementObject(void) const
 Manageable::status_t Queue::ManagementMethod (uint32_t methodId, Args& args, string& etext)
 {
     Manageable::status_t status = Manageable::STATUS_UNKNOWN_METHOD;
+    AclModule* acl = broker->getAcl();
+    std::string _userId = (getCurrentPublisher()?getCurrentPublisher()->getUserId():"");
 
     QPID_LOG (debug, "Queue::ManagementMethod [id=" << methodId << "]");
 
     switch (methodId) {
     case _qmf::Queue::METHOD_PURGE :
         {
+            if ((acl)&&(!(acl->authorise(_userId, acl::ACT_PURGE, acl::OBJ_QUEUE, name, NULL)))) {
+                throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied purge request from " << _userId));
+            }
             _qmf::ArgsQueuePurge& purgeArgs = (_qmf::ArgsQueuePurge&) args;
             purge(purgeArgs.i_request, boost::shared_ptr<Exchange>(), &purgeArgs.i_filter);
             status = Manageable::STATUS_OK;
@@ -1407,6 +1452,14 @@ Manageable::status_t Queue::ManagementMethod (uint32_t methodId, Args& args, str
                     status = Manageable::STATUS_PARAMETER_INVALID;
                     etext = "Exchange not found";
                     break;
+                }
+            }
+
+            if (acl) {
+                std::map<acl::Property, std::string> params;
+                params.insert(make_pair(acl::PROP_EXCHANGENAME, dest->getName()));
+                if (!acl->authorise(_userId, acl::ACT_REROUTE, acl::OBJ_QUEUE, name, &params)) {
+                    throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied reroute request from " << _userId));
                 }
             }
 
@@ -1511,7 +1564,7 @@ void Queue::flush()
 bool Queue::bind(boost::shared_ptr<Exchange> exchange, const std::string& key,
                  const qpid::framing::FieldTable& arguments)
 {
-    if (exchange->bind(shared_from_this(), key, &arguments)) {
+    if (!isDeleted() && exchange->bind(shared_from_this(), key, &arguments)) {
         bound(exchange->getName(), key, arguments);
         if (exchange->isDurable() && isDurable()) {
             store->bind(*exchange, *this, key, arguments);

@@ -22,7 +22,7 @@
 find_package(Proton 0.5)
 
 set (amqp_default ${amqp_force})
-set (maximum_version 0.7)
+set (maximum_version 0.9)
 if (Proton_FOUND)
     if (Proton_VERSION GREATER ${maximum_version})
         message(WARNING "Qpid proton ${Proton_VERSION} is not a tested version and might not be compatible, ${maximum_version} is highest tested; build may not work")
@@ -33,6 +33,13 @@ if (Proton_FOUND)
     if (NOT Proton_VERSION EQUAL 0.5)
         set (HAVE_PROTON_TRACER 1)
     endif (NOT Proton_VERSION EQUAL 0.5)
+    if (Proton_VERSION GREATER 0.7)
+        set (USE_PROTON_TRANSPORT_CONDITION 1)
+        set (HAVE_PROTON_EVENTS 1)
+    endif (Proton_VERSION GREATER 0.7)
+    if (Proton_VERSION GREATER 0.8)
+        set (NO_PROTON_DELIVERY_TAG_T 1)
+    endif (Proton_VERSION GREATER 0.8)
 else ()
     message(STATUS "Qpid proton not found, amqp 1.0 support not enabled")
 endif ()
@@ -101,10 +108,9 @@ if (BUILD_AMQP)
     include_directories(${Proton_INCLUDE_DIRS})
 
     add_library (amqp MODULE ${amqp_SOURCES})
-    target_link_libraries (amqp qpidtypes qpidbroker qpidcommon ${Proton_LIBRARIES} ${Boost_PROGRAM_OPTIONS_LIBRARY})
+    target_link_libraries (amqp qpidtypes qpidbroker qpidcommon ${Proton_LIBRARIES})
     set_target_properties (amqp PROPERTIES
                            PREFIX ""
-                           LINK_FLAGS "${CATCH_UNDEFINED}"
                            COMPILE_DEFINITIONS _IN_QPID_BROKER)
 
     install (TARGETS amqp
@@ -120,6 +126,8 @@ if (BUILD_AMQP)
          qpid/messaging/amqp/ConnectionHandle.cpp
          qpid/messaging/amqp/DriverImpl.h
          qpid/messaging/amqp/DriverImpl.cpp
+         qpid/messaging/amqp/PnData.h
+         qpid/messaging/amqp/PnData.cpp
          qpid/messaging/amqp/ReceiverContext.h
          qpid/messaging/amqp/ReceiverContext.cpp
          qpid/messaging/amqp/ReceiverHandle.h

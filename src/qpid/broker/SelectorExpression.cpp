@@ -37,48 +37,50 @@
 
 /*
  * Syntax for JMS style selector expressions (informal):
+ * This is a mixture of regular expression and EBNF formalism
  *
- * Alpha ::= "a".."z" | "A".."Z"
- * Digit ::= "0".."9"
+ * The top level term is SelectExpression
+ *
+ * // Lexical elements
+ *
+ * Alpha ::= [a-zA-Z]
+ * Digit ::= [0-9]
  * IdentifierInitial ::= Alpha | "_" | "$"
  * IdentifierPart ::= IdentifierInitial | Digit | "."
  * Identifier ::= IdentifierInitial IdentifierPart*
  * Constraint : Identifier NOT IN ("NULL", "TRUE", "FALSE", "NOT", "AND", "OR", "BETWEEN", "LIKE", "IN", "IS") // Case insensitive
  *
- * LiteralString ::= ("'" ~[']* "'")+ // Repeats to cope with embedded single quote
+ * LiteralString ::= ("'" [^']* "'")+ // Repeats to cope with embedded single quote
  *
  * LiteralExactNumeric ::= Digit+
- * Exponent ::= ['+'|'-'] LiteralExactNumeric
- * LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" Exponent ] ) |
- *                          ( "." Digit+ [ "E" Exponent ] ) |
+ * Exponent ::= ('+'|'-')? LiteralExactNumeric
+ * LiteralApproxNumeric ::= ( Digit "." Digit* ( "E" Exponent )? ) |
+ *                          ( "." Digit+ ( "E" Exponent )? ) |
  *                          ( Digit+ "E" Exponent )
  * LiteralBool ::= "TRUE" | "FALSE"
  *
  * Literal ::= LiteralBool | LiteralString | LiteralApproxNumeric | LiteralExactNumeric
  *
  * EqOps ::= "=" | "<>"
- *
  * ComparisonOps ::= EqOps | ">" | ">=" | "<" | "<="
+ * AddOps ::= "+" | "-"
+ * MultiplyOps ::= "*" | "/"
  *
- * BoolExpression ::= OrExpression
+ * // Expression Syntax
+ *
+ * SelectExpression ::= OrExpression? // An empty expression is equivalent to "true"
  *
  * OrExpression ::= AndExpression  ( "OR" AndExpression )*
  *
  * AndExpression :: = ComparisonExpression ( "AND" ComparisonExpression )*
  *
- * ComparisonExpression ::= AddExpression "IS" "NULL" |
- *                          AddExpression "IS" "NOT" "NULL" |
- *                          AddExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
- *                          AddExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
- *                          AddExpression "BETWEEN" AddExpression "AND" AddExpression |
- *                          AddExpression "NOT" "BETWEEN" AddExpression "AND" AddExpression |
+ * ComparisonExpression ::= AddExpression "IS" "NOT"? "NULL" |
+ *                          AddExpression "NOT"? "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
+ *                          AddExpression "NOT"? "BETWEEN" AddExpression "AND" AddExpression |
+ *                          AddExpression "NOT"? "IN" "(" PrimaryExpression ("," PrimaryExpression)* ")" |
  *                          AddExpression ComparisonOps AddExpression |
  *                          "NOT" ComparisonExpression |
  *                          AddExpression
- *
- * AddOps ::= "+" | "-"
- *
- * MultiplyOps ::= "*" | "-"
  *
  * AddExpression :: = MultiplyExpression (  AddOps MultiplyExpression )*
  *
@@ -728,6 +730,16 @@ friend TopExpression* TopExpression::parse(const string&);
 
 string error;
 
+Expression* selectorExpression(Tokeniser& tokeniser)
+{
+    if ( tokeniser.nextToken().type==T_EOS ) {
+        return (new Literal(true));
+    }
+    tokeniser.returnTokens();
+    std::auto_ptr<Expression> e(orExpression(tokeniser));
+    return e.release();
+}
+
 Expression* orExpression(Tokeniser& tokeniser)
 {
     std::auto_ptr<Expression> e(andExpression(tokeniser));
@@ -773,6 +785,9 @@ BoolExpression* specialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expressio
             }
             if (e.val.size()>1) {
                 throwParseError(tokeniser, "single character string required after ESCAPE");
+            }
+            if (e.val=="%" || e.val=="_") {
+                throwParseError(tokeniser, "'%' and '_' are not allowed as ESCAPE characters");
             }
             return new LikeExpression(e1.release(), t.val, e.val);
         } else {
@@ -950,10 +965,10 @@ Expression* unaryArithExpression(Tokeniser& tokeniser)
         return new UnaryArithExpression(&negate, e.release());
     }
     default:
+        tokeniser.returnTokens();
         break;
     }
 
-    tokeniser.returnTokens();
     std::auto_ptr<Expression> e(primaryExpression(tokeniser));
     return e.release();
 }
@@ -988,7 +1003,7 @@ TopExpression* TopExpression::parse(const string& exp)
     string::const_iterator e = exp.end();
     Tokeniser tokeniser(s,e);
     Parse parse;
-    std::auto_ptr<Expression> b(parse.orExpression(tokeniser));
+    std::auto_ptr<Expression> b(parse.selectorExpression(tokeniser));
     if (!b.get()) {
         throwParseError(tokeniser, parse.error);
     }

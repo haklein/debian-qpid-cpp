@@ -137,6 +137,15 @@ struct QPID_MESSAGING_CLASS_EXTERN SendError : public SenderError
 };
 
 /**
+ * Thrown on a synchronous send to indicate that the message being
+ * sent was rejected.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN MessageRejected : public SendError
+{
+    QPID_MESSAGING_EXTERN MessageRejected(const std::string&);
+};
+
+/**
  * Thrown to indicate that the sender attempted to send a message that
  * would result in the target node on the peer exceeding a
  * preconfigured capacity.
@@ -144,6 +153,16 @@ struct QPID_MESSAGING_CLASS_EXTERN SendError : public SenderError
 struct QPID_MESSAGING_CLASS_EXTERN TargetCapacityExceeded : public SendError
 {
     QPID_MESSAGING_EXTERN TargetCapacityExceeded(const std::string&);
+};
+
+/**
+ * Thrown to indicate that the locally configured sender capacity has
+ * been reached, and thus no further messages can be put on the replay
+ * buffer.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN OutOfCapacity : public SendError
+{
+    QPID_MESSAGING_EXTERN OutOfCapacity(const std::string&);
 };
 
 struct QPID_MESSAGING_CLASS_EXTERN SessionError : public MessagingException
@@ -161,18 +180,30 @@ struct QPID_MESSAGING_CLASS_EXTERN SessionClosed : public SessionError
   QPID_MESSAGING_EXTERN SessionClosed();
 };
 
+/** Base class for transactional errors */
 struct QPID_MESSAGING_CLASS_EXTERN TransactionError : public SessionError
 {
     QPID_MESSAGING_EXTERN TransactionError(const std::string&);
 };
 
 /**
- * Thrown on Session::commit() if reconnection results in the
- * transaction being automatically aborted.
+ * The transaction was automatically rolled back.  This could be due to an error
+ * on the broker, such as a store failure, or a connection failure during the
+ * transaction
  */
 struct QPID_MESSAGING_CLASS_EXTERN TransactionAborted : public TransactionError
 {
     QPID_MESSAGING_EXTERN TransactionAborted(const std::string&);
+};
+
+/**
+ * The outcome of the transaction on the broker, commit or roll-back, is not
+ * known. This occurs when the connection fails after we sent the commit but
+ * before we received a result.
+ */
+struct QPID_MESSAGING_CLASS_EXTERN TransactionUnknown : public TransactionError
+{
+    QPID_MESSAGING_EXTERN TransactionUnknown(const std::string&);
 };
 
 /**
@@ -187,6 +218,11 @@ struct QPID_MESSAGING_CLASS_EXTERN UnauthorizedAccess : public SessionError
 struct QPID_MESSAGING_CLASS_EXTERN ConnectionError : public MessagingException
 {
     QPID_MESSAGING_EXTERN ConnectionError(const std::string&);
+};
+
+struct QPID_MESSAGING_CLASS_EXTERN AuthenticationFailure : public ConnectionError
+{
+    QPID_MESSAGING_EXTERN AuthenticationFailure(const std::string&);
 };
 
 /**

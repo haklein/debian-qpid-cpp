@@ -24,6 +24,7 @@
 
 #include "types.h"
 #include "ReplicationTest.h"
+#include "LogPrefix.h"
 #include "qpid/broker/SessionState.h"
 #include "qpid/broker/TransactionObserver.h"
 #include "qpid/log/Statement.h"
@@ -99,16 +100,17 @@ class PrimaryTxObserver : public broker::TransactionObserver,
     PrimaryTxObserver(Primary&, HaBroker&, const boost::intrusive_ptr<broker::TxBuffer>&);
     void initialize();
 
+    void skip(sys::Mutex::ScopedLock&);
     void checkState(State expect, const std::string& msg);
     void end(sys::Mutex::ScopedLock&);
     void txPrepareOkEvent(const std::string& data);
     void txPrepareFailEvent(const std::string& data);
     bool completed(const types::Uuid& id, sys::Mutex::ScopedLock&);
-    bool error(const types::Uuid& id, const char* msg, sys::Mutex::ScopedLock& l);
+    bool error(const types::Uuid& id, const std::string& msg, sys::Mutex::ScopedLock& l);
 
     sys::Monitor lock;
     State state;
-    std::string logPrefix;
+    LogPrefix2 logPrefix;
     Primary& primary;
     HaBroker& haBroker;
     broker::Broker& broker;
@@ -120,7 +122,7 @@ class PrimaryTxObserver : public broker::TransactionObserver,
     types::Uuid id;
     std::string exchangeName;
     QueuePtr txQueue;
-    QueueIdsMap enqueues;
+    QueueIdsMap enqueues, dequeues;
     UuidSet backups;            // All backups of transaction.
     UuidSet incomplete;         // Incomplete backups (not yet responded to prepare)
     bool empty;                 // True if the transaction is empty - no enqueues/dequeues.

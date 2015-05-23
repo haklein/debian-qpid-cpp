@@ -83,7 +83,7 @@ SemanticState::SemanticState(SessionState& ss)
     : session(ss),
       tagGenerator("sgen"),
       dtxSelected(false),
-      authMsg(getSession().getBroker().getOptions().auth && !getSession().getConnection().isUserProxyAuth()),
+      authMsg(getSession().getBroker().isAuthenticating() && !getSession().getConnection().isFederationLink()),
       userID(getSession().getConnection().getUserId()),
       closeComplete(false),
       connectionId(getSession().getConnection().getMgmtId())
@@ -141,7 +141,7 @@ void SemanticState::consume(const string& tag,
         c = ConsumerImpl::shared_ptr(
             new ConsumerImpl(this, name, queue, ackRequired, acquire ? CONSUMER : BROWSER, exclusive, tag,
                              resumeId, resumeTtl, arguments));
-    queue->consume(c, exclusive);//may throw exception
+    queue->consume(c, exclusive, arguments, connectionId, userID);//may throw exception
     consumers[tag] = c;
 }
 
@@ -198,7 +198,9 @@ void SemanticState::commit(MessageStore* const store)
     txBuffer->startCommit(store);
     AsyncCommandCallback callback(
         session,
-        boost::bind(&TxBuffer::endCommit, txBuffer, store));
+        boost::bind(&TxBuffer::endCommit, txBuffer, store),
+        true                    // This is a sync point
+    );
     txBuffer->end(callback);
 }
 
@@ -323,7 +325,7 @@ SemanticStateConsumerImpl::SemanticStateConsumerImpl(SemanticState* _parent,
                                           const framing::FieldTable& _arguments
 
 ) :
-Consumer(_name, type),
+    Consumer(_name, type, _tag),
     parent(_parent),
     queue(_queue),
     ackExpected(ack),
@@ -331,7 +333,6 @@ Consumer(_name, type),
     blocked(true),
     exclusive(_exclusive),
     resumeId(_resumeId),
-    tag(_tag),
     selector(returnSelector(_arguments.getAsString(APACHE_SELECTOR))),
     resumeTtl(_resumeTtl),
     arguments(_arguments),
@@ -398,7 +399,6 @@ bool SemanticStateConsumerImpl::deliver(const QueueCursor& cursor, const Message
     }
     if (acquire && !ackExpected) {  // auto acquire && auto accept
         queue->dequeue(0 /*ctxt*/, cursor);
-        record.setEnded();
     }
     if (mgmtObject) { mgmtObject->inc_delivered(); }
     return true;
@@ -472,7 +472,7 @@ void SemanticState::cancel(ConsumerImpl::shared_ptr c)
     disable(c);
     Queue::shared_ptr queue = c->getQueue();
     if(queue) {
-        queue->cancel(c);
+        queue->cancel(c, connectionId, userID);
     }
     c->cancel();
 }
@@ -483,8 +483,6 @@ TxBuffer* SemanticState::getTxBuffer()
 }
 
 void SemanticState::route(Message& msg, Deliverable& strategy) {
-    msg.computeExpiration(getSession().getBroker().getExpiryPolicy());
-
     std::string exchangeName = qpid::broker::amqp_0_10::MessageTransfer::get(msg).getExchangeName();
     if (!cacheExchange || cacheExchange->getName() != exchangeName || cacheExchange->isDestroyed())
         cacheExchange = session.getBroker().getExchanges().get(exchangeName);

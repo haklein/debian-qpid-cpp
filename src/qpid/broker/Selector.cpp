@@ -92,7 +92,9 @@ const Value MessageSelectorEnv::specialValue(const string& id) const
     if ( id=="delivery_mode" ) {
         v = msg.getEncoding().isPersistent() ? PERSISTENT : NON_PERSISTENT;
     } else if ( id=="redelivered" ) {
-        v = msg.getDeliveryCount()>0 ? true : false;
+        // Although redelivered is defined to be true delivery-count>0 if it is 0 now
+        // it will be 1 by the time the message is delivered
+        v = msg.getDeliveryCount()>=0 ? true : false;
     } else if ( id=="priority" ) {
         v = int64_t(msg.getPriority());
     } else if ( id=="correlation_id" ) {
@@ -115,7 +117,7 @@ const Value MessageSelectorEnv::specialValue(const string& id) const
         qpid::sys::AbsTime expiry = msg.getExpiration();
         // Java property has value of 0 for no expiry
         v = (expiry==qpid::sys::FAR_FUTURE) ? 0
-            : qpid::sys::Duration(qpid::sys::AbsTime::Epoch(), expiry) / qpid::sys::TIME_MSEC;
+            : qpid::sys::Duration(qpid::sys::AbsTime::epoch(), expiry) / qpid::sys::TIME_MSEC;
     } else if ( id=="creation_time" ) {
         // Use the time put on queue (if it is enabled) as 0-10 has no standard way to get message
         // creation time and we're not paying attention to the 1.0 creation time yet.
@@ -227,13 +229,8 @@ bool Selector::filter(const Message& msg)
     return eval(env);
 }
 
-namespace {
-const boost::shared_ptr<Selector> NULL_SELECTOR = boost::shared_ptr<Selector>();
-}
-
 boost::shared_ptr<Selector> returnSelector(const string& e)
 {
-    if (e.empty()) return NULL_SELECTOR;
     return boost::shared_ptr<Selector>(new Selector(e));
 }
 

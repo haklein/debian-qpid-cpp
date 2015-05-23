@@ -69,10 +69,13 @@ void SessionState::addManagementObject() {
     if (parent != 0) {
         ManagementAgent* agent = getBroker().getManagementAgent();
         if (agent != 0) {
-            mgmtObject = _qmf::Session::shared_ptr(new _qmf::Session
-                (agent, this, parent, getId().getName()));
+            std::string name(getId().str());
+            std::string fullName(name);
+            if (name.length() >= std::numeric_limits<uint8_t>::max())
+                name.resize(std::numeric_limits<uint8_t>::max()-1);
+            mgmtObject = _qmf::Session::shared_ptr(new _qmf::Session                           (agent, this, parent, name));
+            mgmtObject->set_fullName (fullName);
             mgmtObject->set_attached (0);
-            mgmtObject->set_detachedLifespan (0);
             mgmtObject->clr_expireTime();
             agent->addObject(mgmtObject);
         }
@@ -219,13 +222,15 @@ void SessionState::handleContent(AMQFrame& frame)
         DeliverableMessage deliverable(Message(msg, msg), semanticState.getTxBuffer());
         if (broker.isTimestamping())
             msg->setTimestamp();
-        deliverable.getMessage().setPublisher(getConnection());
+        msg->setPublisher(&(getConnection()));
+        msg->computeExpiration();
 
 
         IncompleteIngressMsgXfer xfer(this, msg);
         msg->getIngressCompletion().begin();
-        semanticState.route(deliverable.getMessage(), deliverable);
+        // This call should come before routing, because it calcs required credit.
         msgBuilder.end();
+        semanticState.route(deliverable.getMessage(), deliverable);
         msg->getIngressCompletion().end(xfer);  // allows msg to complete xfer
     }
 }
@@ -261,11 +266,14 @@ void SessionState::completeCommand(SequenceNumber id,
     // Are there any outstanding Execution.Sync commands pending the
     // completion of this cmd?  If so, complete them.
     while (!pendingExecutionSyncs.empty() &&
-           receiverGetIncomplete().front() >= pendingExecutionSyncs.front()) {
-        const SequenceNumber id = pendingExecutionSyncs.front();
+           (receiverGetIncomplete().empty() ||
+            receiverGetIncomplete().front() >= pendingExecutionSyncs.front()))
+    {
+        const SequenceNumber syncId = pendingExecutionSyncs.front();
         pendingExecutionSyncs.pop();
-        QPID_LOG(debug, getId() << ": delayed execution.sync " << id << " is completed.");
-        receiverCompleted(id);
+        QPID_LOG(debug, getId() << ": delayed execution.sync " << syncId << " is completed.");
+        if (receiverGetIncomplete().contains(syncId))
+            receiverCompleted(syncId);
         callSendCompletion = true;   // likely peer is pending for this completion.
     }
 
@@ -343,15 +351,24 @@ void SessionState::setTimeout(uint32_t) { }
 // Current received command is an execution.sync command.
 // Complete this command only when all preceding commands have completed.
 // (called via the invoker() in handleCommand() above)
-void SessionState::addPendingExecutionSync()
-{
-    SequenceNumber syncCommandId = currentCommand.getId();
-    if (receiverGetIncomplete().front() < syncCommandId) {
+bool SessionState::addPendingExecutionSync() {
+    SequenceNumber id = currentCommand.getId();
+    if (addPendingExecutionSync(id)) {
         currentCommand.setCompleteSync(false);
-        pendingExecutionSyncs.push(syncCommandId);
-        asyncCommandCompleter->flushPendingMessages();
-        QPID_LOG(debug, getId() << ": delaying completion of execution.sync " << syncCommandId);
+        QPID_LOG(debug, getId() << ": delaying completion of execution.sync " << id);
+        return true;
     }
+    return false;
+}
+
+bool SessionState::addPendingExecutionSync(SequenceNumber id)
+{
+    if (receiverGetIncomplete().front() < id) {
+        pendingExecutionSyncs.push(id);
+        asyncCommandCompleter->flushPendingMessages();
+        return true;
+    }
+    return false;
 }
 
 /** factory for creating a reference-counted IncompleteIngressMsgXfer object

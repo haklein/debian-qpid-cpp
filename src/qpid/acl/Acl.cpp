@@ -69,7 +69,7 @@ Acl::Acl (AclValues& av, Broker& b): aclValues(av), broker(&b), transferAcl(fals
 
     agent = broker->getManagementAgent();
 
-    if (agent != 0){
+    if (agent != 0) {
         _qmf::Package  packageInit(agent);
         mgmtObject = _qmf::Acl::shared_ptr(new _qmf::Acl (agent, this, broker));
         agent->addObject (mgmtObject);
@@ -100,7 +100,9 @@ void Acl::reportConnectLimit(const std::string user, const std::string addr)
     if (mgmtObject!=0)
         mgmtObject->inc_connectionDenyCount();
 
-    agent->raiseEvent(_qmf::EventConnectionDeny(user, addr));
+    if (agent != 0) {
+        agent->raiseEvent(_qmf::EventConnectionDeny(user, addr));
+    }
 }
 
 
@@ -109,7 +111,9 @@ void Acl::reportQueueLimit(const std::string user, const std::string queueName)
     if (mgmtObject!=0)
         mgmtObject->inc_queueQuotaDenyCount();
 
-    agent->raiseEvent(_qmf::EventQueueQuotaDeny(user, queueName));
+    if (agent != 0) {
+        agent->raiseEvent(_qmf::EventQueueQuotaDeny(user, queueName));
+    }
 }
 
 
@@ -166,7 +170,12 @@ bool Acl::approveConnection(const qpid::broker::Connection& conn)
 
     (void) dataLocal->getConnQuotaForUser(userName, &connectionLimit);
 
-    return connectionCounter->approveConnection(conn, dataLocal->enforcingConnectionQuotas(), connectionLimit);
+    return connectionCounter->approveConnection(
+        conn,
+        userName,
+        dataLocal->enforcingConnectionQuotas(),
+        connectionLimit,
+        dataLocal);
 }
 
 bool Acl::approveCreateQueue(const std::string& userId, const std::string& queueName)
@@ -208,9 +217,11 @@ bool Acl::result(
             << " action:" << AclHelper::getActionStr(action)
             << " ObjectType:" << AclHelper::getObjectTypeStr(objType)
             << " Name:" << name );
-        agent->raiseEvent(_qmf::EventAllow(id,  AclHelper::getActionStr(action),
-                          AclHelper::getObjectTypeStr(objType),
-                          name, types::Variant::Map()));
+        if (agent != 0) {
+            agent->raiseEvent(_qmf::EventAllow(id,  AclHelper::getActionStr(action),
+                              AclHelper::getObjectTypeStr(objType),
+                              name, types::Variant::Map()));
+        }
         // FALLTHROUGH
     case ALLOW:
         result = true;
@@ -221,9 +232,11 @@ bool Acl::result(
             << " action:" << AclHelper::getActionStr(action)
             << " ObjectType:" << AclHelper::getObjectTypeStr(objType)
             << " Name:" << name);
-        agent->raiseEvent(_qmf::EventDeny(id, AclHelper::getActionStr(action),
-                                          AclHelper::getObjectTypeStr(objType),
-                                          name, types::Variant::Map()));
+        if (agent != 0) {
+            agent->raiseEvent(_qmf::EventDeny(id, AclHelper::getActionStr(action),
+                                              AclHelper::getObjectTypeStr(objType),
+                                              name, types::Variant::Map()));
+        }
         // FALLTHROUGH
     case DENY:
         if (mgmtObject!=0)
@@ -248,7 +261,9 @@ bool Acl::readAclFile(std::string& aclFile, std::string& errorText) {
     boost::shared_ptr<AclData> d(new AclData);
     AclReader ar(aclValues.aclMaxConnectPerUser, aclValues.aclMaxQueuesPerUser);
     if (ar.read(aclFile, d)){
-        agent->raiseEvent(_qmf::EventFileLoadFailed("", ar.getError()));
+        if (agent != 0) {
+            agent->raiseEvent(_qmf::EventFileLoadFailed("", ar.getError()));
+        }
         errorText = ar.getError();
         QPID_LOG(error,ar.getError());
         return false;
@@ -276,14 +291,17 @@ bool Acl::readAclFile(std::string& aclFile, std::string& errorText) {
         QPID_LOG(debug, "ACL: Queue quotas are Enabled.");
     }
 
+    QPID_LOG(debug, "ACL: Default connection mode : "
+        << AclHelper::getAclResultStr(d->connectionMode()));
+
     data->aclSource = aclFile;
     if (mgmtObject!=0){
         mgmtObject->set_transferAcl(transferAcl?1:0);
         mgmtObject->set_policyFile(aclFile);
-        sys::AbsTime now = sys::AbsTime::now();
-        int64_t ns = sys::Duration(sys::EPOCH, now);
-        mgmtObject->set_lastAclLoad(ns);
-        agent->raiseEvent(_qmf::EventFileLoaded(""));
+        mgmtObject->set_lastAclLoad(Duration::FromEpoch());
+        if (agent != 0) {
+            agent->raiseEvent(_qmf::EventFileLoaded(""));
+        }
     }
     return true;
 }
@@ -298,6 +316,7 @@ void Acl::loadEmptyAclRuleset() {
     boost::shared_ptr<AclData> d(new AclData);
     d->decisionMode = ALLOW;
     d->aclSource = "";
+    d->connectionDecisionMode = ALLOW;
     {
         Mutex::ScopedLock locker(dataLock);
         data = d;
@@ -305,10 +324,10 @@ void Acl::loadEmptyAclRuleset() {
     if (mgmtObject!=0){
         mgmtObject->set_transferAcl(transferAcl?1:0);
         mgmtObject->set_policyFile("");
-        sys::AbsTime now = sys::AbsTime::now();
-        int64_t ns = sys::Duration(sys::EPOCH, now);
-        mgmtObject->set_lastAclLoad(ns);
-        agent->raiseEvent(_qmf::EventFileLoaded(""));
+        mgmtObject->set_lastAclLoad(Duration::FromEpoch());
+        if (agent != 0) {
+            agent->raiseEvent(_qmf::EventFileLoaded(""));
+        }
     }
 }
 
@@ -338,13 +357,23 @@ Manageable::status_t Acl::lookup(qpid::management::Args& args, std::string& text
             Mutex::ScopedLock locker(dataLock);
             dataLocal = data;  //rcu copy
         }
-        AclResult aclResult = dataLocal->lookup(
-            ioArgs.i_userId,
-            action,
-            objType,
-            ioArgs.i_objectName,
-            &propertyMap);
-
+        AclResult aclResult;
+        // CREATE CONNECTION does not use lookup()
+        if (action == ACT_CREATE && objType == OBJ_CONNECTION) {
+            std::string host = propertyMap[acl::PROP_HOST];
+            std::string logString;
+            aclResult = dataLocal->isAllowedConnection(
+                ioArgs.i_userId,
+                host,
+                logString);
+        } else {
+            aclResult = dataLocal->lookup(
+                ioArgs.i_userId,
+                action,
+                objType,
+                ioArgs.i_objectName,
+                &propertyMap);
+        }
         ioArgs.o_result = AclHelper::getAclResultStr(aclResult);
         result = STATUS_OK;
 

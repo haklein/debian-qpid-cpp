@@ -24,21 +24,22 @@
 
 #include "qpid/RefCounted.h"
 #include "qpid/client/Future.h"
+#include "qpid/client/ClientImportExport.h"
 #include <boost/shared_ptr.hpp>
 
 namespace qpid {
 namespace client {
 
 ///@internal
-class CompletionImpl : public RefCounted
+class QPID_CLIENT_CLASS_EXTERN CompletionImpl : public RefCounted
 {
 public:
-    CompletionImpl() {}
-    CompletionImpl(Future f, boost::shared_ptr<SessionImpl> s) : future(f), session(s) {}
+    QPID_CLIENT_EXTERN CompletionImpl();
+    QPID_CLIENT_EXTERN CompletionImpl(Future f, boost::shared_ptr<SessionImpl> s);
 
-    bool isComplete() { return future.isComplete(*session); }
-    void wait() { future.wait(*session); }
-    std::string getResult() { return future.getResult(*session); }
+    QPID_CLIENT_EXTERN bool isComplete() { return future.isComplete(*session); }
+    QPID_CLIENT_EXTERN void wait() { future.wait(*session); }
+    QPID_CLIENT_EXTERN std::string getResult() { return future.getResult(*session); }
 
 protected:
     Future future;

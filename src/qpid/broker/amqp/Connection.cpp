@@ -29,12 +29,17 @@
 #include "qpid/framing/ProtocolInitiation.h"
 #include "qpid/framing/ProtocolVersion.h"
 #include "qpid/log/Statement.h"
+#include "qpid/sys/Time.h"
+#include "qpid/sys/Timer.h"
 #include "qpid/sys/OutputControl.h"
 #include "config.h"
 #include <sstream>
 extern "C" {
 #include <proton/engine.h>
 #include <proton/error.h>
+#ifdef HAVE_PROTON_EVENTS
+#include <proton/event.h>
+#endif
 }
 
 namespace qpid {
@@ -59,6 +64,29 @@ void set_tracer(pn_transport_t*, void*)
 {
 }
 #endif
+
+#ifdef USE_PROTON_TRANSPORT_CONDITION
+std::string get_error(pn_connection_t* connection, pn_transport_t* transport)
+{
+    std::stringstream text;
+    pn_error_t* cerror = pn_connection_error(connection);
+    if (cerror) text << "connection error " << pn_error_text(cerror) << " [" << cerror << "]";
+    pn_condition_t* tcondition = pn_transport_condition(transport);
+    if (pn_condition_is_set(tcondition)) text << "transport error: " << pn_condition_get_name(tcondition) << ", " << pn_condition_get_description(tcondition);
+    return text.str();
+}
+#else
+std::string get_error(pn_connection_t* connection, pn_transport_t* transport)
+{
+    std::stringstream text;
+    pn_error_t* cerror = pn_connection_error(connection);
+    if (cerror) text << "connection error " << pn_error_text(cerror) << " [" << cerror << "]";
+    pn_error_t* terror = pn_transport_error(transport);
+    if (terror) text << "transport error " << pn_error_text(terror) << " [" << terror << "]";
+    return text.str();
+}
+#endif
+
 }
 
 void Connection::trace(const char* message) const
@@ -66,12 +94,40 @@ void Connection::trace(const char* message) const
     QPID_LOG_CAT(trace, protocol, "[" << id << "]: " << message);
 }
 
-Connection::Connection(qpid::sys::OutputControl& o, const std::string& i, BrokerContext& b, bool saslInUse)
-    : BrokerContext(b), ManagedConnection(getBroker(), i),
+namespace {
+struct ConnectionTickerTask : public qpid::sys::TimerTask
+{
+    qpid::sys::Timer& timer;
+    Connection& connection;
+    ConnectionTickerTask(uint64_t interval, qpid::sys::Timer& t, Connection& c) :
+        TimerTask(qpid::sys::Duration(interval*qpid::sys::TIME_MSEC), "ConnectionTicker"),
+        timer(t),
+        connection(c)
+    {}
+
+    void fire() {
+        // Setup next firing
+        setupNextFire();
+        timer.add(this);
+
+        // Send Ticker
+        connection.requestIO();
+    }
+};
+}
+
+Connection::Connection(qpid::sys::OutputControl& o, const std::string& i, BrokerContext& b, bool saslInUse, bool brokerInitiated)
+    : BrokerContext(b), ManagedConnection(getBroker(), i, brokerInitiated),
       connection(pn_connection()),
       transport(pn_transport()),
-      out(o), id(i), haveOutput(true), closeInitiated(false), closeRequested(false)
+      collector(0),
+      out(o), id(i), haveOutput(true), closeInitiated(false), closeRequested(false), ioRequested(false)
 {
+#ifdef HAVE_PROTON_EVENTS
+    collector = pn_collector();
+    pn_connection_collect(connection, collector);
+#endif
+
     if (pn_transport_bind(transport, connection)) {
         //error
         QPID_LOG(error, "Failed to bind transport to connection: " << getError());
@@ -99,12 +155,21 @@ Connection::Connection(qpid::sys::OutputControl& o, const std::string& i, Broker
     }
 }
 
+void Connection::requestIO()
+{
+    ioRequested = true;
+    out.activateOutput();
+}
 
 Connection::~Connection()
 {
+    if (ticker) ticker->cancel();
     getBroker().getConnectionObservers().closed(*this);
-    pn_transport_free(transport);
     pn_connection_free(connection);
+    pn_transport_free(transport);
+#ifdef HAVE_PROTON_EVENTS
+    pn_collector_free(collector);
+#endif
 }
 
 pn_transport_t* Connection::getTransport()
@@ -115,13 +180,24 @@ size_t Connection::decode(const char* buffer, size_t size)
 {
     QPID_LOG(trace, id << " decode(" << size << ")");
     if (size == 0) return 0;
-    //TODO: Fix pn_engine_input() to take const buffer
+
     ssize_t n = pn_transport_input(transport, const_cast<char*>(buffer), size);
     if (n > 0 || n == PN_EOS) {
-        //If engine returns EOS, have no way of knowing how many bytes
-        //it processed, but can assume none need to be reprocessed so
-        //consider them all read:
-        if (n == PN_EOS) n = size;
+        // PN_EOS either means we received a Close (which also means we've
+        // consumed all the input), OR some Very Bad Thing happened and this
+        // connection is toast.
+        if (n == PN_EOS)
+        {
+            std::string error;
+            if (checkTransportError(error)) {
+                // "He's dead, Jim."
+                QPID_LOG_CAT(error, network, id << " connection failed: " << error);
+                out.abort();
+                return 0;
+            } else {
+                n = size;   // assume all consumed
+            }
+        }
         QPID_LOG_CAT(debug, network, id << " decoded " << n << " bytes from " << size);
         try {
             process();
@@ -138,14 +214,18 @@ size_t Connection::decode(const char* buffer, size_t size)
             pn_condition_set_description(error, e.what());
             close();
         }
-        pn_transport_tick(transport, 0);
+        pn_transport_tick(transport, qpid::sys::Duration::FromEpoch() / qpid::sys::TIME_MSEC);
         if (!haveOutput) {
             haveOutput = true;
             out.activateOutput();
         }
         return n;
     } else if (n == PN_ERR) {
-        throw Exception(qpid::amqp::error_conditions::DECODE_ERROR, QPID_MSG("Error on input: " << getError()));
+        std::string error;
+        checkTransportError(error);
+        QPID_LOG_CAT(error, network, id << " connection error: " << error);
+        out.abort();
+        return 0;
     } else {
         return 0;
     }
@@ -153,19 +233,65 @@ size_t Connection::decode(const char* buffer, size_t size)
 
 size_t Connection::encode(char* buffer, size_t size)
 {
-    QPID_LOG(trace, "encode(" << size << ")")
+    QPID_LOG(trace, "encode(" << size << ")");
+    doOutput(size);
     ssize_t n = pn_transport_output(transport, buffer, size);
     if (n > 0) {
         QPID_LOG_CAT(debug, network, id << " encoded " << n << " bytes from " << size)
         haveOutput = true;
         return n;
+    } else if (n == PN_EOS) {
+        haveOutput = false;
+        // Normal close, or error?
+        std::string error;
+        if (checkTransportError(error)) {
+            QPID_LOG_CAT(error, network, id << " connection failed: " << error);
+            out.abort();
+        }
+        return 0;
     } else if (n == PN_ERR) {
-        throw Exception(qpid::amqp::error_conditions::INTERNAL_ERROR, QPID_MSG("Error on output: " << getError()));
+        std::string error;
+        checkTransportError(error);
+        QPID_LOG_CAT(error, network, id << " connection error: " << error);
+        out.abort();
+        return 0;
     } else {
         haveOutput = false;
         return 0;
     }
 }
+
+void Connection::doOutput(size_t capacity)
+{
+    ssize_t n = 0;
+    do {
+        if (dispatch()) {
+            processDeliveries();
+            ssize_t next = pn_transport_pending(transport);
+            if (n == next) break;
+            n = next;
+        } else break;
+    } while (n > 0 && n < (ssize_t) capacity);
+}
+
+bool Connection::dispatch()
+{
+    bool result = false;
+    for (Sessions::iterator i = sessions.begin();i != sessions.end();) {
+        if (i->second->endedByManagement()) {
+            pn_session_close(i->first);
+            i->second->close();
+            sessions.erase(i++);
+            result = true;
+            QPID_LOG_CAT(debug, model, id << " session ended by management");
+        } else {
+            if (i->second->dispatch()) result = true;
+            ++i;
+        }
+    }
+    return result;
+}
+
 bool Connection::canEncode()
 {
     if (!closeInitiated) {
@@ -174,18 +300,7 @@ bool Connection::canEncode()
             return true;
         }
         try {
-            for (Sessions::iterator i = sessions.begin();i != sessions.end();) {
-                if (i->second->endedByManagement()) {
-                    pn_session_close(i->first);
-                    i->second->close();
-                    sessions.erase(i++);
-                    haveOutput = true;
-                    QPID_LOG_CAT(debug, model, id << " session ended by management");
-                } else {
-                    if (i->second->dispatch()) haveOutput = true;
-                    ++i;
-                }
-            }
+            if (dispatch()) haveOutput = true;
             process();
         } catch (const Exception& e) {
             QPID_LOG(error, id << ": " << e.what());
@@ -205,8 +320,8 @@ bool Connection::canEncode()
     } else {
         QPID_LOG(info, "Connection " << id << " has been closed locally");
     }
-    //TODO: proper handling of time in and out of tick
-    pn_transport_tick(transport, 0);
+    if (ioRequested.valueCompareAndSwap(true, false)) haveOutput = true;
+    pn_transport_tick(transport, qpid::sys::Duration::FromEpoch() / qpid::sys::TIME_MSEC);
     QPID_LOG_CAT(trace, network, id << " canEncode(): " << haveOutput)
     return haveOutput;
 }
@@ -216,6 +331,26 @@ void Connection::open()
     readPeerProperties();
 
     pn_connection_set_container(connection, getBroker().getFederationTag().c_str());
+    uint32_t timeout = pn_transport_get_remote_idle_timeout(transport);
+    if (timeout) {
+        // if idle generate empty frames at 1/2 the timeout interval as keepalives:
+        ticker = boost::intrusive_ptr<qpid::sys::TimerTask>(new ConnectionTickerTask((timeout+1)/2,
+                                                                                     getBroker().getTimer(),
+                                                                                     *this));
+        getBroker().getTimer().add(ticker);
+
+        // Note: in version 0-10 of the protocol, idle timeout applies to both
+        // ends.  AMQP 1.0 changes that - it's now asymmetric: each end can
+        // configure/disable it independently.  For backward compatibility, by
+        // default mimic the old behavior and set our local timeout.
+        // Use 2x the remote's timeout, as per the spec the remote should
+        // advertise 1/2 its actual timeout threshold
+        pn_transport_set_idle_timeout(transport, timeout * 2);
+        QPID_LOG_CAT(debug, network, id << " AMQP 1.0 idle-timeout set:"
+                     << " local=" << pn_transport_get_idle_timeout(transport)
+                     << " remote=" << pn_transport_get_remote_idle_timeout(transport));
+    }
+
     pn_connection_open(connection);
     out.connectionEstablished();
     opened();
@@ -231,6 +366,7 @@ void Connection::readPeerProperties()
 
 void Connection::closed()
 {
+    if (ticker) ticker->cancel();
     for (Sessions::iterator i = sessions.begin(); i != sessions.end(); ++i) {
         i->second->close();
     }
@@ -252,123 +388,87 @@ framing::ProtocolVersion Connection::getVersion() const
 {
     return qpid::framing::ProtocolVersion(1,0);
 }
-namespace {
-pn_state_t REQUIRES_OPEN = PN_LOCAL_UNINIT | PN_REMOTE_ACTIVE;
-pn_state_t REQUIRES_CLOSE = PN_LOCAL_ACTIVE | PN_REMOTE_CLOSED;
-}
 
 void Connection::process()
 {
     QPID_LOG(trace, id << " process()");
+#ifdef HAVE_PROTON_EVENTS
+    pn_event_t *event = pn_collector_peek(collector);
+    while (event) {
+        switch (pn_event_type(event)) {
+        case PN_CONNECTION_REMOTE_OPEN:
+            doConnectionRemoteOpen();
+            break;
+        case PN_CONNECTION_REMOTE_CLOSE:
+            doConnectionRemoteClose();
+            break;
+        case PN_SESSION_REMOTE_OPEN:
+            doSessionRemoteOpen(pn_event_session(event));
+            break;
+        case PN_SESSION_REMOTE_CLOSE:
+            doSessionRemoteClose(pn_event_session(event));
+            break;
+        case PN_LINK_REMOTE_OPEN:
+            doLinkRemoteOpen(pn_event_link(event));
+            break;
+        case PN_LINK_REMOTE_CLOSE:
+            doLinkRemoteClose(pn_event_link(event));
+            break;
+        case PN_DELIVERY:
+            doDeliveryUpdated(pn_event_delivery(event));
+            break;
+        default:
+            break;
+        }
+        pn_collector_pop(collector);
+        event = pn_collector_peek(collector);
+    }
+
+#else   // !HAVE_PROTON_EVENTS
+
+    const pn_state_t REQUIRES_OPEN = PN_LOCAL_UNINIT | PN_REMOTE_ACTIVE;
+    const pn_state_t REQUIRES_CLOSE = PN_LOCAL_ACTIVE | PN_REMOTE_CLOSED;
+
     if ((pn_connection_state(connection) & REQUIRES_OPEN) == REQUIRES_OPEN) {
-        QPID_LOG_CAT(debug, model, id << " connection opened");
-        open();
-        setContainerId(pn_connection_remote_container(connection));
+        doConnectionRemoteOpen();
     }
 
     for (pn_session_t* s = pn_session_head(connection, REQUIRES_OPEN); s; s = pn_session_next(s, REQUIRES_OPEN)) {
-        QPID_LOG_CAT(debug, model, id << " session begun");
-        pn_session_open(s);
-        boost::shared_ptr<Session> ssn(new Session(s, *this, out));
-        sessions[s] = ssn;
+        doSessionRemoteOpen(s);
     }
     for (pn_link_t* l = pn_link_head(connection, REQUIRES_OPEN); l; l = pn_link_next(l, REQUIRES_OPEN)) {
-        pn_link_open(l);
-
-        Sessions::iterator session = sessions.find(pn_link_session(l));
-        if (session == sessions.end()) {
-            QPID_LOG(error, id << " Link attached on unknown session!");
-        } else {
-            try {
-                session->second->attach(l);
-                QPID_LOG_CAT(debug, protocol, id << " link " << l << " attached on " << pn_link_session(l));
-            } catch (const Exception& e) {
-                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
-                pn_condition_t* error = pn_link_condition(l);
-                pn_condition_set_name(error, e.symbol());
-                pn_condition_set_description(error, e.what());
-                pn_link_close(l);
-            } catch (const qpid::framing::UnauthorizedAccessException& e) {
-                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
-                pn_condition_t* error = pn_link_condition(l);
-                pn_condition_set_name(error, qpid::amqp::error_conditions::UNAUTHORIZED_ACCESS.c_str());
-                pn_condition_set_description(error, e.what());
-                pn_link_close(l);
-            } catch (const std::exception& e) {
-                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
-                pn_condition_t* error = pn_link_condition(l);
-                pn_condition_set_name(error, qpid::amqp::error_conditions::INTERNAL_ERROR.c_str());
-                pn_condition_set_description(error, e.what());
-                pn_link_close(l);
-            }
-        }
+        doLinkRemoteOpen(l);
     }
 
-    //handle deliveries
-    for (pn_delivery_t* delivery = pn_work_head(connection); delivery; delivery = pn_work_next(delivery)) {
-        pn_link_t* link = pn_delivery_link(delivery);
-        try {
-            if (pn_link_is_receiver(link)) {
-                Sessions::iterator i = sessions.find(pn_link_session(link));
-                if (i != sessions.end()) {
-                    i->second->readable(link, delivery);
-                } else {
-                    pn_delivery_update(delivery, PN_REJECTED);
-                }
-            } else { //i.e. SENDER
-                Sessions::iterator i = sessions.find(pn_link_session(link));
-                if (i != sessions.end()) {
-                    QPID_LOG(trace, id << " handling outgoing delivery for " << link << " on session " << pn_link_session(link));
-                    i->second->writable(link, delivery);
-                } else {
-                    QPID_LOG(error, id << " Got delivery for non-existent session: " << pn_link_session(link) << ", link: " << link);
-                }
-            }
-        } catch (const Exception& e) {
-            QPID_LOG_CAT(error, protocol, "Error processing deliveries: " << e.what());
-            pn_condition_t* error = pn_link_condition(link);
-            pn_condition_set_name(error, e.symbol());
-            pn_condition_set_description(error, e.what());
-            pn_link_close(link);
-        }
-    }
-
+    processDeliveries();
 
     for (pn_link_t* l = pn_link_head(connection, REQUIRES_CLOSE); l; l = pn_link_next(l, REQUIRES_CLOSE)) {
-        pn_link_close(l);
-        Sessions::iterator session = sessions.find(pn_link_session(l));
-        if (session == sessions.end()) {
-            QPID_LOG(error, id << " peer attempted to detach link on unknown session!");
-        } else {
-            session->second->detach(l);
-            QPID_LOG_CAT(debug, model, id << " link detached");
-        }
+        doLinkRemoteClose(l);
     }
     for (pn_session_t* s = pn_session_head(connection, REQUIRES_CLOSE); s; s = pn_session_next(s, REQUIRES_CLOSE)) {
-        pn_session_close(s);
-        Sessions::iterator i = sessions.find(s);
-        if (i != sessions.end()) {
-            i->second->close();
-            sessions.erase(i);
-            QPID_LOG_CAT(debug, model, id << " session ended");
-        } else {
-            QPID_LOG(error, id << " peer attempted to close unrecognised session");
-        }
+        doSessionRemoteClose(s);
     }
     if ((pn_connection_state(connection) & REQUIRES_CLOSE) == REQUIRES_CLOSE) {
-        QPID_LOG_CAT(debug, model, id << " connection closed");
-        pn_connection_close(connection);
+        doConnectionRemoteClose();
     }
+#endif  // !HAVE_PROTON_EVENTS
+}
+void Connection::processDeliveries()
+{
+#ifdef HAVE_PROTON_EVENTS
+    // with the event API, there's no way to selectively process only
+    // the delivery-related events.  We have to process all events:
+    process();
+#else
+    for (pn_delivery_t* delivery = pn_work_head(connection); delivery; delivery = pn_work_next(delivery)) {
+        doDeliveryUpdated(delivery);
+    }
+#endif
 }
 
 std::string Connection::getError()
 {
-    std::stringstream text;
-    pn_error_t* cerror = pn_connection_error(connection);
-    if (cerror) text << "connection error " << pn_error_text(cerror) << " [" << cerror << "]";
-    pn_error_t* terror = pn_transport_error(transport);
-    if (terror) text << "transport error " << pn_error_text(terror) << " [" << terror << "]";
-    return text.str();
+    return get_error(connection, transport);
 }
 
 void Connection::abort()
@@ -391,4 +491,150 @@ void Connection::closedByManagement()
     closeRequested = true;
     out.activateOutput();
 }
+
+// the peer has issued an Open performative
+void Connection::doConnectionRemoteOpen()
+{
+    // respond in kind if we haven't yet
+    if ((pn_connection_state(connection) & PN_LOCAL_UNINIT) == PN_LOCAL_UNINIT) {
+        QPID_LOG_CAT(debug, model, id << " connection opened");
+        open();
+        setContainerId(pn_connection_remote_container(connection));
+    }
+}
+
+// the peer has issued a Close performative
+void Connection::doConnectionRemoteClose()
+{
+    if ((pn_connection_state(connection) & PN_LOCAL_CLOSED) == 0) {
+        QPID_LOG_CAT(debug, model, id << " connection closed");
+        pn_connection_close(connection);
+    }
+}
+
+// the peer has issued a Begin performative
+void Connection::doSessionRemoteOpen(pn_session_t *session)
+{
+    if ((pn_session_state(session) & PN_LOCAL_UNINIT) == PN_LOCAL_UNINIT) {
+        QPID_LOG_CAT(debug, model, id << " session begun");
+        pn_session_open(session);
+        boost::shared_ptr<Session> ssn(new Session(session, *this, out));
+        sessions[session] = ssn;
+    }
+}
+
+// the peer has issued an End performative
+void Connection::doSessionRemoteClose(pn_session_t *session)
+{
+    if ((pn_session_state(session) & PN_LOCAL_CLOSED) == 0) {
+        pn_session_close(session);
+        Sessions::iterator i = sessions.find(session);
+        if (i != sessions.end()) {
+            i->second->close();
+            sessions.erase(i);
+            QPID_LOG_CAT(debug, model, id << " session ended");
+        } else {
+            QPID_LOG(error, id << " peer attempted to close unrecognised session");
+        }
+    }
+}
+
+// the peer has issued an Attach performative
+void Connection::doLinkRemoteOpen(pn_link_t *link)
+{
+    if ((pn_link_state(link) & PN_LOCAL_UNINIT) == PN_LOCAL_UNINIT) {
+        pn_link_open(link);
+        Sessions::iterator session = sessions.find(pn_link_session(link));
+        if (session == sessions.end()) {
+            QPID_LOG(error, id << " Link attached on unknown session!");
+        } else {
+            try {
+                session->second->attach(link);
+                QPID_LOG_CAT(debug, protocol, id << " link " << link << " attached on " << pn_link_session(link));
+            } catch (const Exception& e) {
+                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
+                pn_condition_t* error = pn_link_condition(link);
+                pn_condition_set_name(error, e.symbol());
+                pn_condition_set_description(error, e.what());
+                pn_link_close(link);
+            } catch (const qpid::framing::UnauthorizedAccessException& e) {
+                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
+                pn_condition_t* error = pn_link_condition(link);
+                pn_condition_set_name(error, qpid::amqp::error_conditions::UNAUTHORIZED_ACCESS.c_str());
+                pn_condition_set_description(error, e.what());
+                pn_link_close(link);
+            } catch (const std::exception& e) {
+                QPID_LOG_CAT(error, protocol, "Error on attach: " << e.what());
+                pn_condition_t* error = pn_link_condition(link);
+                pn_condition_set_name(error, qpid::amqp::error_conditions::INTERNAL_ERROR.c_str());
+                pn_condition_set_description(error, e.what());
+                pn_link_close(link);
+            }
+        }
+    }
+}
+
+// the peer has issued a Detach performative
+void Connection::doLinkRemoteClose(pn_link_t *link)
+{
+    if ((pn_link_state(link) & PN_LOCAL_CLOSED) == 0) {
+        pn_link_close(link);
+        Sessions::iterator session = sessions.find(pn_link_session(link));
+        if (session == sessions.end()) {
+            QPID_LOG(error, id << " peer attempted to detach link on unknown session!");
+        } else {
+            session->second->detach(link);
+            QPID_LOG_CAT(debug, model, id << " link detached");
+        }
+    }
+}
+
+// the status of the delivery has changed
+void Connection::doDeliveryUpdated(pn_delivery_t *delivery)
+{
+    pn_link_t* link = pn_delivery_link(delivery);
+    try {
+        if (pn_link_is_receiver(link)) {
+            Sessions::iterator i = sessions.find(pn_link_session(link));
+            if (i != sessions.end()) {
+                i->second->readable(link, delivery);
+            } else {
+                pn_delivery_update(delivery, PN_REJECTED);
+            }
+        } else { //i.e. SENDER
+            Sessions::iterator i = sessions.find(pn_link_session(link));
+            if (i != sessions.end()) {
+                QPID_LOG(trace, id << " handling outgoing delivery for " << link << " on session " << pn_link_session(link));
+                i->second->writable(link, delivery);
+            } else {
+                QPID_LOG(error, id << " Got delivery for non-existent session: " << pn_link_session(link) << ", link: " << link);
+            }
+        }
+    } catch (const Exception& e) {
+        QPID_LOG_CAT(error, protocol, "Error processing deliveries: " << e.what());
+        pn_condition_t* error = pn_link_condition(link);
+        pn_condition_set_name(error, e.symbol());
+        pn_condition_set_description(error, e.what());
+        pn_link_close(link);
+    }
+}
+
+// check for failures of the transport:
+bool Connection::checkTransportError(std::string& text)
+{
+    std::stringstream info;
+
+#ifdef USE_PROTON_TRANSPORT_CONDITION
+    pn_condition_t* tcondition = pn_transport_condition(transport);
+    if (pn_condition_is_set(tcondition))
+        info << "transport error: " << pn_condition_get_name(tcondition) << ", " << pn_condition_get_description(tcondition);
+#else
+    pn_error_t* terror = pn_transport_error(transport);
+    if (terror) info << "transport error " << pn_error_text(terror) << " [" << terror << "]";
+#endif
+
+    text = info.str();
+    return !text.empty();
+}
+
 }}} // namespace qpid::broker::amqp

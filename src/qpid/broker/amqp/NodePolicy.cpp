@@ -160,6 +160,8 @@ TopicPolicy::TopicPolicy(Broker& broker, const std::string& pattern, const qpid:
     : NodePolicy(TOPIC_POLICY, pattern, props), exchangeType(getProperty(EXCHANGE_TYPE, props)),
       autodelete(get(AUTO_DELETE, props, !durable))
 {
+    if (exchangeType.empty()) exchangeType = TOPIC;
+    broker.getExchanges().checkType(exchangeType);
     qpid::types::Variant::Map::const_iterator i = props.find(LIFETIME_POLICY);
     if (i != props.end()) {
         if (i->second == MANUAL) {
@@ -173,7 +175,6 @@ TopicPolicy::TopicPolicy(Broker& broker, const std::string& pattern, const qpid:
     topicSettings = filterForTopic(props);
     copy(QPID_IVE, props, exchangeSettings);
     copy(QPID_MSG_SEQUENCE, props, exchangeSettings);
-    if (exchangeType.empty()) exchangeType = TOPIC;
 
     qpid::management::ManagementAgent* agent = broker.getManagementAgent();
     if (agent != 0) {
@@ -195,7 +196,7 @@ std::pair<boost::shared_ptr<Queue>, boost::shared_ptr<Topic> > TopicPolicy::crea
     qpid::amqp_0_10::translate(exchangeSettings, args);
     boost::shared_ptr<Exchange> exchange = connection.getBroker().createExchange(name, exchangeType, isDurable(), autodelete, alternateExchange,
                                                                                  args, connection.getUserId(), connection.getId()).first;
-    result.second = connection.getTopics().createTopic(connection.getBroker(), name, exchange, topicSettings);
+    result.second = connection.getTopics().declare(connection.getBroker(), name, exchange, topicSettings);
     return result;
 }
 

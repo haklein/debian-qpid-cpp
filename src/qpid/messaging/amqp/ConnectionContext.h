@@ -25,6 +25,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <boost/intrusive_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include "qpid/Url.h"
 #include "qpid/messaging/ConnectionOptions.h"
@@ -47,6 +48,7 @@ class ProtocolVersion;
 namespace sys {
 class SecurityLayer;
 struct SecuritySettings;
+class TimerTask;
 }
 namespace messaging {
 class Duration;
@@ -78,6 +80,7 @@ class ConnectionContext : public qpid::sys::ConnectionCodec, public qpid::messag
     void attach(boost::shared_ptr<SessionContext>, boost::shared_ptr<ReceiverContext>);
     void detach(boost::shared_ptr<SessionContext>, boost::shared_ptr<SenderContext>);
     void detach(boost::shared_ptr<SessionContext>, boost::shared_ptr<ReceiverContext>);
+    void drain_and_release_messages(boost::shared_ptr<SessionContext>, boost::shared_ptr<ReceiverContext>);
     bool isClosed(boost::shared_ptr<SessionContext>, boost::shared_ptr<ReceiverContext>);
     void send(boost::shared_ptr<SessionContext>, boost::shared_ptr<SenderContext> ctxt, const qpid::messaging::Message& message, bool sync);
     bool fetch(boost::shared_ptr<SessionContext> ssn, boost::shared_ptr<ReceiverContext> lnk, qpid::messaging::Message& message, qpid::messaging::Duration timeout);
@@ -119,7 +122,7 @@ class ConnectionContext : public qpid::sys::ConnectionCodec, public qpid::messag
     void initSecurityLayer(qpid::sys::SecurityLayer&);
     void trace(const char*) const;
 
-  private:
+ private:
     typedef std::map<std::string, boost::shared_ptr<SessionContext> > SessionMap;
     class CodecAdapter : public qpid::sys::Codec
     {
@@ -153,6 +156,8 @@ class ConnectionContext : public qpid::sys::ConnectionCodec, public qpid::messag
     } state;
     std::auto_ptr<Sasl> sasl;
     CodecAdapter codecAdapter;
+    bool notifyOnWrite;
+    boost::intrusive_ptr<qpid::sys::TimerTask> ticker;
 
     void check();
     bool checkDisconnected();
@@ -189,6 +194,8 @@ class ConnectionContext : public qpid::sys::ConnectionCodec, public qpid::messag
     std::string getError();
     bool useSasl();
     void setProperties();
+    void configureConnection();
+    bool checkTransportError(std::string&);
 };
 
 }}} // namespace qpid::messaging::amqp

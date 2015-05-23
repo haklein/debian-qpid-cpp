@@ -27,6 +27,7 @@ from qpid.testlib import TestBase010
 from qmf.console import Session
 from qpid.datatypes import Message
 import qpid.messaging
+from qpidtoollibs import BrokerAgent
 
 class ACLFile:
     def __init__(self, policy='data_dir/policy.acl'):
@@ -40,7 +41,15 @@ class ACLFile:
 
 class ACLTests(TestBase010):
 
-    # For connection limit tests this function 
+    # required for testing QMF methods
+    def get_messaging_connection(self, user, passwd):
+        parms = {'username':user, 'password':passwd, 'sasl_mechanisms':'PLAIN'}
+        brokerurl="%s:%s" %(self.broker.host, self.broker.port)
+        connection = qpid.messaging.Connection(brokerurl, **parms)
+        connection.open()
+        return connection
+
+    # For connection limit tests this function
     #  throws if the connection won't start
     #  returns a connection that the caller can close if he likes.
     def get_connection(self, user, passwd):
@@ -796,10 +805,16 @@ class ACLTests(TestBase010):
         aclf.write('acl deny bob@QPID create queue name=q1 durable=true\n')
         aclf.write('acl deny bob@QPID create queue name=q2 exclusive=true policytype=ring\n')
         aclf.write('acl deny bob@QPID access queue name=q3\n')
-        aclf.write('acl deny bob@QPID purge queue name=q3\n')
         aclf.write('acl deny bob@QPID delete queue name=q4\n')
         aclf.write('acl deny bob@QPID create queue name=q5 maxqueuesize=1000 maxqueuecount=100\n')
         aclf.write('acl deny bob@QPID create queue name=q6 paging=true\n')
+        aclf.write('acl deny bob@QPID purge queue name=q7\n')
+        aclf.write('acl deny bob@QPID move queue name=q7\n')
+        aclf.write('acl deny bob@QPID move queue name=q8 queuename=q7\n')
+        aclf.write('acl deny bob@QPID redirect queue name=q7\n')
+        aclf.write('acl deny bob@QPID redirect queue name=q8 queuename=q7\n')
+        aclf.write('acl deny bob@QPID reroute queue name=q7\n')
+        aclf.write('acl deny bob@QPID reroute queue name=q8 exchangename=amq.fanout\n')
         aclf.write('acl allow all all')
         aclf.close()
 
@@ -881,18 +896,89 @@ class ACLTests(TestBase010):
             self.assertEqual(403,e.args[0].error_code)
             session = self.get_session('bob','bob')
 
+        # some queues needs to be created for testing purge / move / reroute / redirect
+        session.queue_declare(queue="q7")
+        session.queue_declare(queue="q8")
+        session.queue_declare(queue="q9")
         try:
-            session.queue_purge(queue="q3")
-            self.fail("ACL should deny queue purge request for q3");
+            session.queue_purge(queue="q7")
+            self.fail("ACL should deny queue purge request for q7");
         except qpid.session.SessionException, e:
             self.assertEqual(403,e.args[0].error_code)
             session = self.get_session('bob','bob')
 
         try:
-            session.queue_purge(queue="q4")
+            session.queue_purge(queue="q8")
         except qpid.session.SessionException, e:
             if (403 == e.args[0].error_code):
-                self.fail("ACL should allow queue purge request for q4");
+                self.fail("ACL should allow queue purge request for q8");
+
+        # as we use QMF methods, it is easier to use BrokerAgent from messaging.connection and not use session object as above
+        broker_agent = BrokerAgent(self.get_messaging_connection('bob','bob'))
+
+        try:
+            broker_agent.queueMoveMessages("q7", "q8", 0)
+            self.fail("ACL should deny queue move request from q7 to q8");
+        except Exception, e:
+            self.assertTrue("'error_code': 7" in e.args[0])
+            broker_agent = BrokerAgent(self.get_messaging_connection('bob','bob'))
+
+        try:
+            broker_agent.queueMoveMessages("q8", "q9", 0)
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue move request from q8 to q9");
+
+        try:
+            broker_agent.queueMoveMessages("q9", "q8", 0)
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue move request from q9 to q8");
+
+        try:
+            broker_agent.Redirect("q7", "q8")
+            self.fail("ACL should deny queue redirect request from q7 to q8");
+        except Exception, e:
+            self.assertTrue("'error_code': 7" in e.args[0])
+            broker_agent = BrokerAgent(self.get_messaging_connection('bob','bob'))
+
+        try:
+            broker_agent.Redirect("q8", "q9")
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue redirect request from q8 to q9");
+
+        try:
+            broker_agent.Redirect("q9", "q8")
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue redirect request from q9 to q8");
+
+        try:
+            broker_agent.getQueue('q7').reroute(0, False, "amq.fanout")
+            self.fail("ACL should deny queue reroute request from q7 to amq.fanout");
+        except Exception, e:
+            self.assertTrue("'error_code': 7" in e.args[0])
+            broker_agent = BrokerAgent(self.get_messaging_connection('bob','bob'))
+
+        try:
+            broker_agent.getQueue('q8').reroute(0, False, "amq.fanout")
+            self.fail("ACL should deny queue reroute request from q8 to amq.fanout");
+        except Exception, e:
+            self.assertTrue("'error_code': 7" in e.args[0])
+            broker_agent = BrokerAgent(self.get_messaging_connection('bob','bob'))
+
+        try:
+            broker_agent.getQueue('q8').reroute(0, False, "amq.direct")
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue reroute request from q8 to amq.direct");
+
+        try:
+            broker_agent.getQueue('q9').reroute(0, False, "amq.fanout")
+        except Exception, e:
+            if ("'error_code': 7" in e.args[0]):
+                self.fail("ACL should allow queue reroute request from q9 to amq.fanout");
 
         try:
             session.queue_delete(queue="q4")
@@ -1748,6 +1834,52 @@ class ACLTests(TestBase010):
             self.assertEqual(7,e.args[0]["error_code"])
             assert e.args[0]["error_text"].find("unauthorized-access") == 0
 
+    def test_qmf_query(self):
+        aclf = self.get_acl_file()
+        aclf.write('acl allow all access exchange\n')
+        aclf.write('acl allow all bind exchange\n')
+        aclf.write('acl allow all create queue\n')
+        aclf.write('acl allow all access queue\n')
+        aclf.write('acl allow all delete queue\n')
+        aclf.write('acl allow all consume queue\n')
+        aclf.write('acl allow all access method\n')
+        aclf.write('acl allow bob@QPID access query name=org.apache.qpid.broker:queue:q1\n')
+        aclf.write('acl allow bob@QPID access query schemaclass=exchange\n')
+        aclf.write('acl deny all all')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        bob = BrokerAdmin(self.config.broker, "bob", "bob")
+
+        try:
+            bob.query(object_name="org.apache.qpid.broker:queue:q1")
+        except Exception, e:
+            if ("unauthorized-access:" in e.args[0]):
+                self.fail("ACL should allow queue QMF query for q1");
+
+        try:
+            bob.query(object_name="org.apache.qpid.broker:queue:q2")
+            self.fail("ACL should deny queue QMF query for q2");
+        except Exception, e:
+            self.assertTrue("unauthorized-access:" in e.args[0])
+            bob = BrokerAdmin(self.config.broker, "bob", "bob")
+
+        try:
+            bob.query(class_name="binding")
+            self.fail("ACL should deny class binding QMF query");
+        except Exception, e:
+            self.assertTrue("unauthorized-access:" in e.args[0])
+            bob = BrokerAdmin(self.config.broker, "bob", "bob")
+
+        try:
+            bob.query(class_name="exchange")
+        except Exception, e:
+            if ("unauthorized-access:" in e.args[0]):
+                self.fail("ACL should allow class exchange QMF query");
+
 
    #=====================================
    # ACL consume tests
@@ -1983,6 +2115,7 @@ class ACLTests(TestBase010):
         aclf.write('acl allow all access method\n')
         # this should let bob access the timestamp configuration
         aclf.write('acl allow bob@QPID access broker\n')
+        aclf.write('acl allow bob@QPID update broker\n')
         aclf.write('acl allow admin@QPID all all\n')
         aclf.write('acl deny all all')
         aclf.close()
@@ -2107,7 +2240,7 @@ class ACLTests(TestBase010):
             self.LookupPublish(u, "company.topic", "private.audit.This", "allow-log")
 
         for u in uInTest:
-            for a in action_all:
+            for a in ['bind', 'unbind', 'access', 'publish']:
                 self.Lookup(u, a, "exchange", "company.topic", {"routingkey":"private.audit.This"}, "allow-log")
 
         for u in uOutTest:
@@ -3577,6 +3710,179 @@ class ACLTests(TestBase010):
             self.assertEqual(403,e.args[0].error_code)
             self.fail("ACL should allow exchange delete request for edae3h");
 
+    #=====================================
+    # 'create connection' tests
+    #=====================================
+#    def test_connect_mode_file_rejects_two_defaults(self):
+#        """
+#        Should reject a file with two connect mode statements
+#        """
+#        aclf = self.get_acl_file()
+#        aclf.write('acl allow all create connection host=all\n')
+#        aclf.write('acl allow all create connection host=all\n')
+#        aclf.close()
+#
+#        result = self.reload_acl()
+#        if (result):
+#            pass
+#        else:
+#            self.fail(result)
+
+    def test_connect_mode_accepts_host_spec_formats(self):
+        """
+        Should accept host specs of various forms
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow bob@QPID create connection host=all\n')
+        aclf.write('acl allow bob@QPID create connection host=1.1.1.1\n')
+        aclf.write('acl allow bob@QPID create connection host=1.1.1.1,2.2.2.2\n')
+        aclf.write('acl allow bob@QPID create connection host=localhost\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+    def test_connect_mode_allow_all_mode(self):
+        """
+        Should allow one 'all', 'all'
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow all create connection host=all\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+
+    def test_connect_mode_allow_all_localhost(self):
+        """
+        Should allow 'all' 'localhost'
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow all create connection host=localhost\n')
+        aclf.write('acl deny  all create connection host=all\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+
+    def test_connect_mode_global_deny(self):
+        """
+        Should allow 'all' 'localhost'
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow all create connection host=localhost\n')
+        aclf.write('acl deny  all create connection host=all\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"127.0.0.1"}, "allow")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"127.0.0.2"}, "deny")
+
+
+    def test_connect_mode_global_range(self):
+        """
+        Should allow 'all' 'localhost'
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow all create connection host=10.0.0.0,10.255.255.255\n')
+        aclf.write('acl allow all create connection host=localhost\n')
+        aclf.write('acl deny  all create connection host=all\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"0.0.0.0"},        "deny")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"9.255.255.255"},  "deny")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.0.0"},       "allow")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.255.255.255"}, "allow")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"11.0.0.0"},       "deny")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"255.255.255.255"},"deny")
+
+
+    def test_connect_mode_nested_ranges(self):
+        """
+        Tests nested ranges for single user
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl deny-log  bob@QPID create connection host=10.0.1.0,10.0.1.255\n')
+        aclf.write('acl allow-log bob@QPID create connection host=10.0.0.0,10.255.255.255\n')
+        aclf.write('acl deny-log  bob@QPID create connection host=all\n')
+        aclf.write('acl allow all create connection host=localhost\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"0.0.0.0"},        "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"9.255.255.255"},  "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.0.0"},       "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.0.255"},     "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.1.0"},       "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.1.255"},     "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.2.0"},       "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.255.255.255"}, "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"11.0.0.0"},       "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"255.255.255.255"},"deny-log")
+
+
+    def test_connect_mode_user_ranges(self):
+        """
+        Two user ranges should not interfere with each other
+        """
+        aclf = self.get_acl_file()
+        aclf.write('acl allow-log bob@QPID create connection host=10.0.0.0,10.255.255.255\n')
+        aclf.write('acl deny-log  bob@QPID create connection host=all\n')
+        aclf.write('acl allow-log cat@QPID create connection host=192.168.0.0,192.168.255.255\n')
+        aclf.write('acl deny-log  cat@QPID create connection host=all\n')
+        aclf.write('acl allow all create connection host=localhost\n')
+        aclf.write('acl allow all all\n')
+        aclf.close()
+
+        result = self.reload_acl()
+        if (result):
+            self.fail(result)
+
+        session = self.get_session('bob','bob')
+
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"0.0.0.0"},        "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"9.255.255.255"},  "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.0.0.0"},       "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"10.255.255.255"}, "allow-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"11.0.0.0"},       "deny-log")
+        self.Lookup("bob@QPID", "create", "connection", "", {"host":"255.255.255.255"},"deny-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"0.0.0.0"},        "deny-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"192.167.255.255"},"deny-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"192.168.0.0"},    "allow-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"192.168.255.255"},"allow-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"192.169.0.0"},    "deny-log")
+        self.Lookup("cat@QPID", "create", "connection", "", {"host":"255.255.255.255"},"deny-log")
 
 
 class BrokerAdmin:
@@ -3611,6 +3917,27 @@ class BrokerAdmin:
                 raise Exception(response.content['_values'])
             else: raise Exception("Invalid response received, unexpected opcode: %s" % response.properties['qmf.opcode'])
         else: raise Exception("Invalid response received, not a qmfv2 method: %s" % response.properties['x-amqp-0-10.app-id'])
+
+    def query(self, object_name=None, class_name=None):
+        content = { "_what": "OBJECT" }
+        if object_name is not None:
+	  content["_object_id"] = {"_object_name": object_name }
+        if class_name is not None:
+          content["_schema_id"] = {"_class_name": class_name }
+        request = qpid.messaging.Message(reply_to=self.reply_to, content=content)
+        request.properties["x-amqp-0-10.app-id"] = "qmf2"
+        request.properties["qmf.opcode"] = "_query_request"
+        self.sender.send(request)
+        response = self.receiver.fetch()
+        self.session.acknowledge()
+        if response.properties['x-amqp-0-10.app-id'] == 'qmf2':
+            if response.properties['qmf.opcode'] == '_query_response':
+                return
+            elif response.properties['qmf.opcode'] == '_exception':
+                raise Exception(response.content['_values'])
+            else: raise Exception("Invalid response received, unexpected opcode: %s" % response.properties['qmf.opcode'])
+        else: raise Exception("Invalid response received, not a qmfv2 method: %s" % response.properties['x-amqp-0-10.app-id'])
+
     def create_exchange(self, name, exchange_type=None, options={}):
         properties = options
         if exchange_type: properties["exchange_type"] = exchange_type

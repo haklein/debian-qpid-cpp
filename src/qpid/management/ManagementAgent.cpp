@@ -416,7 +416,7 @@ void ManagementAgent::raiseEvent(const ManagementEvent& event, severity_t severi
         outBuffer.putShortString(event.getPackageName());
         outBuffer.putShortString(event.getEventName());
         outBuffer.putBin128(event.getMd5Sum());
-        outBuffer.putLongLong(uint64_t(sys::Duration(sys::EPOCH, sys::now())));
+        outBuffer.putLongLong(sys::Duration::FromEpoch());
         outBuffer.putOctet(sev);
         string sBuf;
         event.encode(sBuf);
@@ -438,7 +438,7 @@ void ManagementAgent::raiseEvent(const ManagementEvent& event, severity_t severi
                                                event.getMd5Sum());
         event.mapEncode(values);
         map_["_values"] = values;
-        map_["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+        map_["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
         map_["_severity"] = sev;
 
         headers["method"] = "indication";
@@ -565,8 +565,8 @@ void ManagementAgent::sendBuffer(Buffer&  buf,
     dp->setRoutingKey(routingKey);
 
     transfer->getFrames().append(content);
+    transfer->setIsManagementMessage(true);
     Message msg(transfer, transfer);
-    msg.setIsManagementMessage(true);
     sendQueue->push(make_pair(exchange, msg));
     buf.reset();
 }
@@ -632,9 +632,9 @@ void ManagementAgent::sendBuffer(const string& data,
     }
     transfer->getFrames().append(content);
     transfer->computeRequiredCredit();
+    transfer->setIsManagementMessage(true);
+    transfer->computeExpiration();
     Message msg(transfer, transfer);
-    msg.setIsManagementMessage(true);
-    msg.computeExpiration(broker->getExpiryPolicy());
 
     sendQueue->push(make_pair(exchange, msg));
 }
@@ -1048,7 +1048,7 @@ void ManagementAgent::periodicProcessing (void)
         char                msgChars[qmfV1BufferSize];
         Buffer msgBuffer(msgChars, qmfV1BufferSize);
         encodeHeader(msgBuffer, 'h');
-        msgBuffer.putLongLong(uint64_t(sys::Duration(sys::EPOCH, sys::now())));
+        msgBuffer.putLongLong(sys::Duration::FromEpoch());
 
         routingKey = "console.heartbeat.1.0";
         sendBuffer(msgBuffer, mExchange, routingKey);
@@ -1070,7 +1070,7 @@ void ManagementAgent::periodicProcessing (void)
         headers["qmf.agent"] = name_address;
 
         map["_values"] = attrMap;
-        map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+        map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
         map["_values"].asMap()["_heartbeat_interval"] = interval;
         map["_values"].asMap()["_epoch"] = bootSequence;
 
@@ -1791,10 +1791,11 @@ void ManagementAgent::handleAttachRequest (Buffer& inBuffer, const string& reply
              " to=" << replyToKey << " seq=" << sequence);
 }
 
-void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey, uint32_t sequence)
+void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey, uint32_t sequence, const string& userId)
 {
     FieldTable           ft;
     FieldTable::ValuePtr value;
+    AclModule* acl = broker->getAcl();
 
     moveNewObjects();
 
@@ -1820,6 +1821,14 @@ void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey,
 
         if (object) {
             ResizableBuffer outBuffer (qmfV1BufferSize);
+	    if (acl != 0) {
+        	map<acl::Property, string> params;
+        	params[acl::PROP_SCHEMACLASS]   = object->getClassName();
+
+	        if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, object->getObjectId().getV2Key(), &params)) {
+                    throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object " << object->getObjectId().getV2Key() << " from " << userId));
+	        }
+	    }
 
             if (object->getConfigChanged() || object->getInstChanged())
                 object->setUpdateTime();
@@ -1842,6 +1851,15 @@ void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey,
 
     string className (value->get<string>());
     std::list<ManagementObject::shared_ptr> matches;
+
+    if (acl != 0) {
+        map<acl::Property, string> params;
+        params[acl::PROP_SCHEMACLASS]   = className;
+
+        if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, className /* class-wide query */, &params)) {
+            throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object class " << className << " from " << userId));
+        }
+    }
 
     if (className == "memory")
         qpid::sys::MemStat::loadMemInfo(memstat.get());
@@ -1903,13 +1921,14 @@ void ManagementAgent::handleGetQuery(Buffer& inBuffer, const string& replyToKey,
 }
 
 
-void ManagementAgent::handleGetQuery(const string& body, const string& rte, const string& rtk, const string& cid, bool viaLocal)
+void ManagementAgent::handleGetQuery(const string& body, const string& rte, const string& rtk, const string& cid, const std::string& userId, bool viaLocal)
 {
     moveNewObjects();
 
     Variant::Map inMap;
     Variant::Map::const_iterator i;
     Variant::Map headers;
+    AclModule* acl = broker->getAcl();
 
     MapCodec::decode(body, inMap);
     QPID_LOG(debug, "RECV GetQuery (v2): map=" << inMap << " seq=" << cid);
@@ -1982,6 +2001,14 @@ void ManagementAgent::handleGetQuery(const string& body, const string& rte, cons
                 object = iter->second;
         }
         if (object) {
+            if (acl != 0) {
+                map<acl::Property, string> params;
+                params[acl::PROP_SCHEMACLASS]   = object->getClassName();
+
+                if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, object->getObjectId().getV2Key(), &params)) {
+		    throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object " << object->getObjectId().getV2Key() << " from " << userId));
+                }
+            }
             if (object->getConfigChanged() || object->getInstChanged())
                 object->setUpdateTime();
 
@@ -2011,6 +2038,14 @@ void ManagementAgent::handleGetQuery(const string& body, const string& rte, cons
         }
     } else {
         // send class-based result.
+        if (acl != 0) {
+            map<acl::Property, string> params;
+            params[acl::PROP_SCHEMACLASS]   = className;
+
+            if (!acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_QUERY, className /* class-wide query */, &params)) {
+                throw framing::UnauthorizedAccessException(QPID_MSG("unauthorized-access: ACL denied QMF query of object class " << className << " from " << userId));
+            }
+        }
         Variant::List _list;
         Variant::List _subList;
         unsigned int objCount = 0;
@@ -2097,7 +2132,7 @@ void ManagementAgent::handleLocateRequest(const string&, const string& rte, cons
     headers["qmf.agent"] = name_address;
 
     map["_values"] = attrMap;
-    map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration(sys::EPOCH, sys::now()));
+    map["_values"].asMap()["_timestamp"] = uint64_t(sys::Duration::FromEpoch());
     map["_values"].asMap()["_heartbeat_interval"] = interval;
     map["_values"].asMap()["_epoch"] = bootSequence;
 
@@ -2218,7 +2253,6 @@ bool ManagementAgent::authorizeAgentMessage(Message& msg)
     }
 
     if (methodReq) {
-        // TODO: check method call against ACL list.
         map<acl::Property, string> params;
         AclModule* acl = broker->getAcl();
         if (acl == 0)
@@ -2312,7 +2346,7 @@ void ManagementAgent::dispatchAgentCommand(Message& msg, bool viaLocal)
             if (opcode == "_method_request")
                 return handleMethodRequest(body, rte, rtk, cid, context.getUserId(), viaLocal);
             else if (opcode == "_query_request")
-                return handleGetQuery(body, rte, rtk, cid, viaLocal);
+                return handleGetQuery(body, rte, rtk, cid, context.getUserId(), viaLocal);
             else if (opcode == "_agent_locate_request")
                 return handleLocateRequest(body, rte, rtk, cid);
         }
@@ -2334,7 +2368,7 @@ void ManagementAgent::dispatchAgentCommand(Message& msg, bool viaLocal)
         else if (opcode == 'S') handleSchemaRequest  (inBuffer, rte, rtk, sequence);
         else if (opcode == 's') handleSchemaResponse (inBuffer, rtk, sequence);
         else if (opcode == 'A') handleAttachRequest  (inBuffer, rtk, sequence, context.getObjectId());
-        else if (opcode == 'G') handleGetQuery       (inBuffer, rtk, sequence);
+        else if (opcode == 'G') handleGetQuery       (inBuffer, rtk, sequence, context.getMgmtId());
         else if (opcode == 'M') handleMethodRequest  (inBuffer, rtk, sequence, context.getMgmtId());
     }
 }

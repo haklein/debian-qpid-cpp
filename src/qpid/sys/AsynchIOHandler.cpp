@@ -36,17 +36,20 @@ namespace sys {
 struct ProtocolTimeoutTask : public sys::TimerTask {
     AsynchIOHandler& handler;
     std::string id;
+    Duration timeout;
 
-    ProtocolTimeoutTask(const std::string& i, const Duration& timeout, AsynchIOHandler& h) :
-        TimerTask(timeout, "ProtocolTimeout"),
+    ProtocolTimeoutTask(const std::string& i, const Duration& timeout_, AsynchIOHandler& h) :
+        TimerTask(timeout_, "ProtocolTimeout"),
         handler(h),
-        id(i)
+        id(i),
+        timeout(timeout_)
     {}
 
     void fire() {
         // If this fires it means that we didn't negotiate the connection in the timeout period
         // Schedule closing the connection for the io thread
-        QPID_LOG(error, "Connection " << id << " No protocol received closing");
+        QPID_LOG(error, "Connection " << id << " No protocol received after " << timeout
+                 << ", closing");
         handler.abort();
     }
 };
@@ -58,7 +61,8 @@ AsynchIOHandler::AsynchIOHandler(const std::string& id, ConnectionCodec::Factory
     codec(0),
     readError(false),
     isClient(isClient0),
-    nodict(nodict0)
+    nodict(nodict0),
+    headerSent(false)
 {}
 
 AsynchIOHandler::~AsynchIOHandler() {
@@ -67,6 +71,15 @@ AsynchIOHandler::~AsynchIOHandler() {
     if (timeoutTimerTask)
         timeoutTimerTask->cancel();
     delete codec;
+}
+
+namespace {
+    SecuritySettings getSecuritySettings(AsynchIO* aio, bool nodict)
+    {
+        SecuritySettings settings = aio->getSecuritySettings();
+        settings.nodict = nodict;
+        return settings;
+    }
 }
 
 void AsynchIOHandler::init(qpid::sys::AsynchIO* a, qpid::sys::Timer& timer, uint32_t maxTime) {
@@ -78,6 +91,10 @@ void AsynchIOHandler::init(qpid::sys::AsynchIO* a, qpid::sys::Timer& timer, uint
 
     // Give connection some buffers to use
     aio->createBuffers();
+
+    if (isClient) {
+        codec = factory->create(*this, identifier, getSecuritySettings(aio, nodict));
+    }
 }
 
 void AsynchIOHandler::write(const framing::ProtocolInitiation& data)
@@ -110,15 +127,6 @@ void AsynchIOHandler::activateOutput() {
     aio->notifyPendingWrite();
 }
 
-namespace {
-    SecuritySettings getSecuritySettings(AsynchIO* aio, bool nodict)
-    {
-        SecuritySettings settings = aio->getSecuritySettings();
-        settings.nodict = nodict;
-        return settings;
-    }
-}
-
 void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
     if (readError) {
         return;
@@ -145,7 +153,7 @@ void AsynchIOHandler::readbuff(AsynchIO& , AsynchIO::BufferBase* buff) {
                 if (!codec) {
                     //TODO: may still want to revise this...
                     //send valid version header & close connection.
-                    write(framing::ProtocolInitiation(framing::highestProtocolVersion));
+                    write(framing::ProtocolInitiation(factory->supportedVersion()));
                     readError = true;
                     aio->queueWriteClose();
                 } else {
@@ -198,9 +206,9 @@ void AsynchIOHandler::nobuffs(AsynchIO&) {
 }
 
 void AsynchIOHandler::idle(AsynchIO&){
-    if (isClient && codec == 0) {
-        codec = factory->create(*this, identifier, getSecuritySettings(aio, nodict));
+    if (isClient && !headerSent) {
         write(framing::ProtocolInitiation(codec->getVersion()));
+        headerSent = true;
         return;
     }
     if (codec == 0) return;

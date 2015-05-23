@@ -85,7 +85,7 @@ char* readPasswordFromFile(PK11SlotInfo*, PRBool retry, void*)
     if (!file) return 0;
 
     std::string password;
-    file >> password;
+    getline(file, password);
     return PL_strdup(password.c_str());
 }
 
@@ -106,6 +106,16 @@ void initNSS(const SslOptions& options, bool server)
     if (server) {
         //use defaults for all args, TODO: may want to make this configurable
         SSL_ConfigServerSessionIDCache(0, 0, 0, 0);
+    }
+
+    // disable SSLv2 and SSLv3 versions of the protocol - they are
+    // no longer considered secure
+    SSLVersionRange vrange;
+    const uint16_t tlsv1 = 0x0301;  // Protocol version for TLSv1.0
+    NSS_CHECK(SSL_VersionRangeGetDefault(ssl_variant_stream, &vrange));
+    if (vrange.min < tlsv1) {
+        vrange.min = tlsv1;
+        NSS_CHECK(SSL_VersionRangeSetDefault(ssl_variant_stream, &vrange));
     }
 }
 

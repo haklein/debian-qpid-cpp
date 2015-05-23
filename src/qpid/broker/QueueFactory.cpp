@@ -22,6 +22,7 @@
 #include "qpid/broker/Broker.h"
 #include "qpid/broker/QueueSettings.h"
 #include "qpid/broker/Queue.h"
+#include "qpid/broker/LossyLvq.h"
 #include "qpid/broker/LossyQueue.h"
 #include "qpid/broker/Lvq.h"
 #include "qpid/broker/Messages.h"
@@ -51,10 +52,17 @@ boost::shared_ptr<Queue> QueueFactory::create(const std::string& name, const Que
     boost::shared_ptr<QueueFlowLimit> flow_ptr(QueueFlowLimit::createLimit(name, settings));
 
     //1. determine Queue type (i.e. whether we are subclassing Queue)
-    // -> if 'ring' policy is in use then subclass
     boost::shared_ptr<Queue> queue;
     if (settings.dropMessagesAtLimit) {
-        queue = boost::shared_ptr<Queue>(new LossyQueue(name, settings, settings.durable ? store : 0, parent, broker));
+        // -> if 'ring' policy is in use then subclass
+        if (settings.lvqKey.size()) {
+            //combination of ring and lvq:
+            std::auto_ptr<MessageMap> map(new MessageMap(settings.lvqKey));
+            queue = boost::shared_ptr<Queue>(new LossyLvq(name, map, settings, settings.durable ? store : 0, parent, broker));
+        } else {
+            //simple ring:
+            queue = boost::shared_ptr<Queue>(new LossyQueue(name, settings, settings.durable ? store : 0, parent, broker));
+        }
     } else if (settings.selfDestructAtLimit) {
         queue = boost::shared_ptr<Queue>(new SelfDestructQueue(name, settings, settings.durable ? store : 0, parent, broker));
     } else if (settings.lvqKey.size()) {
@@ -82,7 +90,7 @@ boost::shared_ptr<Queue> QueueFactory::create(const std::string& name, const Que
             queue->messages = std::auto_ptr<Messages>(new PagedQueue(name, broker->getPagingDir().getPath(),
                                                                      settings.maxPages ? settings.maxPages : DEFAULT_MAX_PAGES,
                                                                      settings.pageFactor ? settings.pageFactor : DEFAULT_PAGE_FACTOR,
-                                                                     broker->getProtocolRegistry(), broker->getExpiryPolicy()));
+                                                                     broker->getProtocolRegistry()));
         }
     } else if (settings.lvqKey.empty()) {//LVQ already handled above
         queue->messages = std::auto_ptr<Messages>(new MessageDeque());
@@ -100,7 +108,7 @@ boost::shared_ptr<Queue> QueueFactory::create(const std::string& name, const Que
 
     //4. threshold event config
     if (broker && broker->getManagementAgent()) {
-        ThresholdAlerts::observe(*queue, *(broker->getManagementAgent()), settings, broker->getOptions().queueThresholdEventRatio);
+        ThresholdAlerts::observe(*queue, *(broker->getManagementAgent()), settings, broker->getQueueThresholdEventRatio());
     }
     //5. flow control config
     if (flow_ptr) {

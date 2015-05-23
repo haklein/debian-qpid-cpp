@@ -92,7 +92,7 @@ jcntl::initialize(EmptyFilePool* efpp,
     _jdir.clear_dir(); // Clear any existing journal files
     _linearFileController.initialize(_jdir.dirname(), efpp, 0ULL);
     _linearFileController.getNextJournalFile();
-    _wmgr.initialize(cbp, wcache_pgsize_sblks, wcache_num_pages, QLS_WMGR_MAXDTOKPP, QLS_WMGR_MAXWAITUS);
+    _wmgr.initialize(cbp, wcache_pgsize_sblks, wcache_num_pages, QLS_WMGR_MAXDTOKPP, QLS_WMGR_MAXWAITUS, 0);
     _init_flag = true;
 }
 
@@ -116,9 +116,10 @@ jcntl::recover(EmptyFilePoolManager* efpmp,
     // Verify journal dir and journal files
     _jdir.verify_dir();
     _recoveryManager.analyzeJournals(prep_txn_list_ptr, efpmp, &_emptyFilePoolPtr);
+    assert(_emptyFilePoolPtr != 0);
 
     highest_rid = _recoveryManager.getHighestRecordId();
-    _jrnl_log.log(/*LOG_DEBUG*/JournalLog::LOG_INFO, _jid, _recoveryManager.toLog(_jid, 5));
+    _jrnl_log.log(/*LOG_DEBUG*/JournalLog::LOG_INFO, _jid, _recoveryManager.toString(_jid, 5U));
     _linearFileController.initialize(_jdir.dirname(), _emptyFilePoolPtr, _recoveryManager.getHighestFileNumber());
     _recoveryManager.setLinearFileControllerJournals(&qpid::linearstore::journal::LinearFileController::addJournalFile, &_linearFileController);
     if (_recoveryManager.isLastFileFull()) {
@@ -136,6 +137,7 @@ jcntl::recover_complete()
 {
     if (!_readonly_flag)
         throw jexception(jerrno::JERR_JCNTL_NOTRECOVERED, "jcntl", "recover_complete");
+    _recoveryManager.recoveryComplete();
     _readonly_flag = false;
 }
 

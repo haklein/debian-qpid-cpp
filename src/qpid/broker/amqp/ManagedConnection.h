@@ -23,7 +23,6 @@
  */
 #include "qpid/management/Manageable.h"
 #include "qpid/broker/Connection.h"
-#include "qpid/broker/OwnershipToken.h"
 #include "qpid/types/Variant.h"
 #include "qmf/org/apache/qpid/broker/Connection.h"
 
@@ -36,10 +35,10 @@ namespace broker {
 class Broker;
 namespace amqp {
 
-class ManagedConnection : public qpid::management::Manageable, public OwnershipToken, public qpid::broker::Connection
+class ManagedConnection : public qpid::management::Manageable, public qpid::broker::Connection
 {
   public:
-    ManagedConnection(Broker& broker, const std::string id);
+    ManagedConnection(Broker& broker, const std::string id, bool brokerInitiated);
     virtual ~ManagedConnection();
     virtual void setUserId(const std::string&);
     std::string getId() const;
@@ -47,6 +46,8 @@ class ManagedConnection : public qpid::management::Manageable, public OwnershipT
     void setSaslSsf(int);
     void setContainerId(const std::string&);
     const std::string& getContainerId() const;
+    void setInterconnectDomain(const std::string&);
+    const std::string& getInterconnectDomain() const;
     void setPeerProperties(std::map<std::string, types::Variant>&);
     qpid::management::ManagementObject::shared_ptr GetManagementObject() const;
     bool isLocal(const OwnershipToken* t) const;
@@ -54,7 +55,6 @@ class ManagedConnection : public qpid::management::Manageable, public OwnershipT
     void outgoingMessageSent();
 
     //ConnectionIdentity
-    const OwnershipToken* getOwnership() const;
     const management::ObjectId getObjectId() const;
     const std::string& getUserId() const;
     const std::string& getMgmtId() const;
@@ -70,6 +70,7 @@ class ManagedConnection : public qpid::management::Manageable, public OwnershipT
     const std::string id;
     std::string userid;
     std::string containerid;
+    std::string domain;
     qmf::org::apache::qpid::broker::Connection::shared_ptr connection;
     qpid::management::ManagementAgent* agent;
     std::map<std::string, types::Variant> peerProperties;

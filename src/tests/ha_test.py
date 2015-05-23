@@ -20,12 +20,11 @@
 
 import os, signal, sys, time, imp, re, subprocess, glob, random, logging, shutil, math, unittest, random
 import traceback
-from qpid.messaging import Message, NotFound, ConnectionError, ReceiverError, Connection, Timeout, Disposition, REJECTED, Empty
-from qpid.datatypes import uuid4, UUID
 from brokertest import *
 from threading import Thread, Lock, Condition
 from logging import getLogger, WARN, ERROR, DEBUG, INFO
 from qpidtoollibs import BrokerAgent
+from qpid.harness import Skipped
 
 log = getLogger(__name__)
 
@@ -44,7 +43,7 @@ class LogLevel:
 class QmfAgent(object):
     """Access to a QMF broker agent."""
     def __init__(self, address, **kwargs):
-        self._connection = Connection.establish(
+        self._connection = qm.Connection.establish(
             address, client_properties={"qpid.ha-admin":1}, **kwargs)
         self._agent = BrokerAgent(self._connection)
 
@@ -105,9 +104,9 @@ class HaPort:
         self.port = self.socket.getsockname()[1]
         self.fileno = self.socket.fileno()
         self.stopped = False
-        test.cleanup_stop(self) # Stop during test.tearDown
+        test.teardown_add(self) # Stop during test.tearDown
 
-    def stop(self):             # Called in tearDown
+    def teardown(self):             # Called in tearDown
         if not self.stopped:
             self.stopped = True
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -131,14 +130,13 @@ class HaBroker(Broker):
         args += ["--load-module", BrokerTest.ha_lib,
                  # Non-standard settings for faster tests.
                  "--link-maintenance-interval=0.1",
-                 # Heartbeat and negotiate time are needed so that a broker wont
-                 # stall on an address that doesn't currently have a broker running.
-                 "--link-heartbeat-interval=%s"%(HaBroker.heartbeat),
-                 "--max-negotiate-time=1000",
                  "--ha-cluster=%s"%ha_cluster]
         # Add default --log-enable arguments unless args already has --log arguments.
         if not [l for l in args if l.startswith("--log")]:
             args += ["--log-enable=info+", "--log-enable=debug+:ha::"]
+        if not [h for h in args if h.startswith("--link-heartbeat-interval")]:
+            args += ["--link-heartbeat-interval=%s"%(HaBroker.heartbeat)]
+
         if ha_replicate is not None:
             args += [ "--ha-replicate=%s"%ha_replicate ]
         if brokers_url: args += [ "--ha-brokers-url", brokers_url ]
@@ -153,19 +151,26 @@ acl allow all all
         if not "--acl-file" in args:
             args += [ "--acl-file", acl, ]
         args += ["--socket-fd=%s"%ha_port.fileno, "--listen-disable=tcp"]
-        Broker.__init__(self, test, args, port=ha_port.port, **kwargs)
-        self.qpid_ha_path=os.path.join(os.getenv("PYTHON_COMMANDS"), "qpid-ha")
-        assert os.path.exists(self.qpid_ha_path)
-        self.qpid_config_path=os.path.join(os.getenv("PYTHON_COMMANDS"), "qpid-config")
-        assert os.path.exists(self.qpid_config_path)
-        self.qpid_ha_script=import_script(self.qpid_ha_path)
         self._agent = None
         self.client_credentials = client_credentials
         self.ha_port = ha_port
+        Broker.__init__(self, test, args, port=ha_port.port, **kwargs)
+
+    # Do some static setup to locate the qpid-config and qpid-ha tools.
+    @property
+    def qpid_ha_script(self):
+        if not hasattr(self, "_qpid_ha_script"):
+            qpid_ha_exec = os.getenv("QPID_HA_EXEC")
+            if not qpid_ha_exec or not os.path.isfile(qpid_ha_exec):
+                raise Skipped("qpid-ha not available")
+            self._qpid_ha_script = import_script(qpid_ha_exec)
+        return self._qpid_ha_script
 
     def __repr__(self): return "<HaBroker:%s:%d>"%(self.log, self.port())
 
     def qpid_ha(self, args):
+        if not self.qpid_ha_script:
+            raise Skipped("qpid-ha not available")
         try:
             cred = self.client_credentials
             url = self.host_port()
@@ -176,10 +181,9 @@ acl allow all all
         except Exception, e:
             raise Exception("Error in qpid_ha -b %s %s: %s"%(url, args,e))
 
-    def promote(self): self.ready(); self.qpid_ha(["promote"])
-    def set_public_url(self, url): self.qpid_ha(["set", "--public-url", url])
-    def set_brokers_url(self, url): self.qpid_ha(["set", "--brokers-url", url]);
+    def promote(self): self.ready(); self.qpid_ha(["promote", "--cluster-manager"])
     def replicate(self, from_broker, queue): self.qpid_ha(["replicate", from_broker, queue])
+    @property
     def agent(self):
         if not self._agent:
             cred = self.client_credentials
@@ -190,39 +194,43 @@ acl allow all all
         return self._agent
 
     def qmf(self):
-        hb = self.agent().getHaBroker()
+        hb = self.agent.getHaBroker()
         hb.update()
         return hb
 
     def ha_status(self): return self.qmf().status
 
-    def wait_status(self, status, timeout=5):
+    def wait_status(self, status, timeout=10):
+
         def try_get_status():
             self._status = "<unknown>"
-            # Ignore ConnectionError, the broker may not be up yet.
             try:
                 self._status = self.ha_status()
-                return self._status == status;
-            except ConnectionError: return False
+            except qm.ConnectionError, e:
+                # Record the error but don't raise, the broker may not be up yet.
+                self._status = "%s: %s" % (type(e).__name__, e)
+            return self._status == status;
         assert retry(try_get_status, timeout=timeout), "%s expected=%r, actual=%r"%(
             self, status, self._status)
 
-    def wait_queue(self, queue, timeout=1):
+    def wait_queue(self, queue, timeout=10, msg="wait_queue"):
         """ Wait for queue to be visible via QMF"""
-        agent = self.agent()
-        assert retry(lambda: agent.getQueue(queue) is not None, timeout=timeout)
+        agent = self.agent
+        assert retry(lambda: agent.getQueue(queue) is not None, timeout=timeout), \
+            "%s queue %s not present" % (msg, queue)
 
-    def wait_no_queue(self, queue, timeout=1):
+    def wait_no_queue(self, queue, timeout=10, msg="wait_no_queue"):
         """ Wait for queue to be invisible via QMF"""
-        agent = self.agent()
-        assert retry(lambda: agent.getQueue(queue) is None, timeout=timeout)
+        agent = self.agent
+        assert retry(lambda: agent.getQueue(queue) is None, timeout=timeout), "%s: queue %s still present"%(msg,queue)
 
-    # TODO aconway 2012-05-01: do direct python call to qpid-config code.
     def qpid_config(self, args):
+        qpid_config_exec = os.getenv("QPID_CONFIG_EXEC")
+        if not qpid_config_exec or not os.path.isfile(qpid_config_exec):
+            raise Skipped("qpid-config not available")
         assert subprocess.call(
-            [self.qpid_config_path, "--broker", self.host_port()]+args,
-            stdout=1, stderr=subprocess.STDOUT
-            ) == 0
+            [qpid_config_exec, "--broker", self.host_port()]+args, stdout=1, stderr=subprocess.STDOUT
+        ) == 0, "qpid-config failed"
 
     def config_replicate(self, from_broker, queue):
         self.qpid_config(["add", "queue", "--start-replica", from_broker, queue])
@@ -242,11 +250,11 @@ acl allow all all
 
     def wait_address(self, address):
         """Wait for address to become valid on the broker."""
-        bs = self.connect_admin().session()
-        try: wait_address(bs, address)
-        finally: bs.connection.close()
+        c = self.connect_admin()
+        try: wait_address(c, address)
+        finally: c.close()
 
-    def wait_backup(self, address): self.wait_address(address)
+    wait_backup = wait_address
 
     def browse(self, queue, timeout=0, transform=lambda m: m.content):
         c = self.connect_admin()
@@ -254,31 +262,25 @@ acl allow all all
             return browse(c.session(), queue, timeout, transform)
         finally: c.close()
 
-    def assert_browse(self, queue, expected, **kwargs):
-        """Verify queue contents by browsing."""
-        bs = self.connect().session()
-        try:
-            wait_address(bs, queue)
-            assert_browse_retry(bs, queue, expected, **kwargs)
-        finally: bs.connection.close()
-
     def assert_browse_backup(self, queue, expected, **kwargs):
         """Combines wait_backup and assert_browse_retry."""
-        bs = self.connect_admin().session()
+        c = self.connect_admin()
         try:
-            wait_address(bs, queue)
-            assert_browse_retry(bs, queue, expected, **kwargs)
-        finally: bs.connection.close()
+            wait_address(c, queue)
+            assert_browse_retry(c.session(), queue, expected, **kwargs)
+        finally: c.close()
+
+    assert_browse = assert_browse_backup
 
     def assert_connect_fail(self):
         try:
             self.connect()
-            self.test.fail("Expected ConnectionError")
-        except ConnectionError: pass
+            self.test.fail("Expected qm.ConnectionError")
+        except qm.ConnectionError: pass
 
     def try_connect(self):
         try: return self.connect()
-        except ConnectionError: return None
+        except qm.ConnectionError: return None
 
     def ready(self, *args, **kwargs):
         if not 'client_properties' in kwargs: kwargs['client_properties'] = {}
@@ -286,7 +288,7 @@ acl allow all all
         return Broker.ready(self, *args, **kwargs)
 
     def kill(self, final=True):
-        if final: self.ha_port.stop()
+        if final: self.ha_port.teardown()
         self._agent = None
         return Broker.kill(self)
 
@@ -332,7 +334,7 @@ class HaCluster(object):
         ha_port = self._ports[i]
         b = HaBroker(ha_port.test, ha_port, brokers_url=self.url, name=name,
                      args=args, **self.kwargs)
-        b.ready(timeout=5)
+        b.ready(timeout=10)
         return b
 
     def start(self):
@@ -342,7 +344,6 @@ class HaCluster(object):
         if i == len(self._ports): # Adding new broker after cluster init
             self._ports.append(HaPort(self.test))
             self._set_url()
-            self._update_urls()
         b = self._ha_broker(i, self.next_name())
         self._brokers.append(b)
         return b
@@ -350,14 +351,11 @@ class HaCluster(object):
     def _set_url(self):
         self.url = ",".join("127.0.0.1:%s"%(p.port) for p in self._ports)
 
-    def _update_urls(self):
-        for b in self:
-            b.set_brokers_url(self.url)
-            b.set_public_url(self.url)
-
-    def connect(self, i):
+    def connect(self, i, **kwargs):
         """Connect with reconnect_urls"""
-        return self[i].connect(reconnect=True, reconnect_urls=self.url.split(","))
+        c = self[i].connect(reconnect=True, reconnect_urls=self.url.split(","), **kwargs)
+        self.test.teardown_add(c)    # Clean up
+        return c
 
     def kill(self, i, promote_next=True, final=True):
         """Kill broker i, promote broker i+1"""
@@ -389,18 +387,17 @@ class HaCluster(object):
     def __iter__(self): return self._brokers.__iter__()
 
 
-def wait_address(session, address):
+def wait_address(connection, address):
     """Wait for an address to become valid."""
-    def check():
-        try: session.sender(address); return True
-        except NotFound: return False
-    assert retry(check), "Timed out waiting for address %s"%(address)
+    assert retry(lambda: valid_address(connection, address)), "Timed out waiting for address %s"%(address)
 
-def valid_address(session, address):
+def valid_address(connection, address):
     """Test if an address is valid"""
     try:
-        session.receiver(address)
+        s = connection.session().receiver(address)
+        s.session.close()
         return True
-    except NotFound: return False
+    except qm.NotFound:
+        return False
 
 

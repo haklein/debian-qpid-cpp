@@ -47,8 +47,8 @@ class QueueGuard::QueueObserver : public broker::QueueObserver
 
 
 
-QueueGuard::QueueGuard(broker::Queue& q, const BrokerInfo& info)
-    : cancelled(false), queue(q)
+QueueGuard::QueueGuard(broker::Queue& q, const BrokerInfo& info, const LogPrefix& lp)
+    : cancelled(false), logPrefix(lp), queue(q)
 {
     std::ostringstream os;
     os << "Guard of " << queue.getName() << " at ";
@@ -61,7 +61,9 @@ QueueGuard::QueueGuard(broker::Queue& q, const BrokerInfo& info)
     QueuePosition front, back;
     q.getRange(front, back, broker::REPLICATOR);
     first = back + 1;
-    QPID_LOG(debug, logPrefix << "First guarded position " << first);
+    QPID_LOG(debug, logPrefix << "Guarded: front " << front
+             << ", back " << back
+             << ", guarded " << first);
 }
 
 QueueGuard::~QueueGuard() { cancel(); }
@@ -72,7 +74,7 @@ void QueueGuard::enqueued(const Message& m) {
     ReplicationId id = m.getReplicationId();
     Mutex::ScopedLock l(lock);
     if (cancelled) return;  // Don't record enqueues after we are cancelled.
-    QPID_LOG(trace, logPrefix << "Delayed completion of " << LogMessageId(queue, m));
+    QPID_LOG(trace, logPrefix << "Delayed completion of " << logMessageId(queue, m));
     delayed[id] = m.getIngressCompletion();
     m.getIngressCompletion()->startCompleter();
 }
@@ -80,7 +82,7 @@ void QueueGuard::enqueued(const Message& m) {
 // NOTE: Called with message lock held.
 void QueueGuard::dequeued(const Message& m) {
     ReplicationId id = m.getReplicationId();
-    QPID_LOG(trace, logPrefix << "Dequeued "  << LogMessageId(queue, m));
+    QPID_LOG(trace, logPrefix << "Dequeued "  << logMessageId(queue, m));
     Mutex::ScopedLock l(lock);
     complete(id, l);
 }

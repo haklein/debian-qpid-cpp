@@ -115,6 +115,8 @@ sub get {
     } else {
         $message = $impl->get;
     }
+
+    return new qpid::messaging::Message(undef, $message);
 }
 
 =pod
@@ -294,6 +296,26 @@ sub get_session {
     my $impl = $self->{_impl};
 
     return $impl->{_session};
+}
+
+=pod
+
+Returns the address for this receiver.
+
+=over
+
+=item $address = $receiver->get_address
+
+=back
+
+=cut
+
+sub get_address {
+    my ($self) = @_;
+    my $impl = $self->{_impl};
+    my $address = $impl->getAddress;
+
+    return new qpid::messaging::Address($address);
 }
 
 =pod

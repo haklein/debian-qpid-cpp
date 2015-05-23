@@ -44,16 +44,20 @@ NoMessageAvailable::NoMessageAvailable() : FetchError("No message to fetch") {}
 
 SenderError::SenderError(const std::string& msg) : LinkError(msg) {}
 SendError::SendError(const std::string& msg) : SenderError(msg) {}
+MessageRejected::MessageRejected(const std::string& msg) : SendError(msg) {}
 TargetCapacityExceeded::TargetCapacityExceeded(const std::string& msg) : SendError(msg) {}
+OutOfCapacity::OutOfCapacity(const std::string& msg) : SendError(msg) {}
 
 SessionError::SessionError(const std::string& msg) : MessagingException(msg) {}
 SessionClosed::SessionClosed() : SessionError("Session Closed") {}
 
 TransactionError::TransactionError(const std::string& msg) : SessionError(msg) {}
 TransactionAborted::TransactionAborted(const std::string& msg) : TransactionError(msg) {}
+TransactionUnknown::TransactionUnknown(const std::string& msg) : TransactionError(msg) {}
 UnauthorizedAccess::UnauthorizedAccess(const std::string& msg) : SessionError(msg) {}
 
 ConnectionError::ConnectionError(const std::string& msg) : MessagingException(msg) {}
+AuthenticationFailure::AuthenticationFailure(const std::string& msg) : ConnectionError(msg) {}
 
 TransportFailure::TransportFailure(const std::string& msg) : MessagingException(msg) {}
 

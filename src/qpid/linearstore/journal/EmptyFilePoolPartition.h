@@ -46,6 +46,8 @@ protected:
 
     const efpPartitionNumber_t partitionNum_;
     const std::string partitionDir_;
+    const bool overwriteBeforeReturnFlag_;
+    const bool truncateFlag_;
     JournalLog& journalLogRef_;
     efpMap_t efpMap_;
     smutex efpMapMutex_;
@@ -53,20 +55,25 @@ protected:
 public:
     EmptyFilePoolPartition(const efpPartitionNumber_t partitionNum,
                            const std::string& partitionDir,
+                           const bool overwriteBeforeReturnFlag,
+                           const bool truncateFlag,
                            JournalLog& journalLogRef);
     virtual ~EmptyFilePoolPartition();
 
     void findEmptyFilePools();
-    EmptyFilePool* getEmptyFilePool(const efpDataSize_kib_t efpDataSize_kib);
+    EmptyFilePool* getEmptyFilePool(const efpDataSize_kib_t efpDataSize_kib, const bool createIfNonExistent);
     void getEmptyFilePools(std::vector<EmptyFilePool*>& efpList);
     void getEmptyFilePoolSizes_kib(std::vector<efpDataSize_kib_t>& efpDataSizesList) const;
     std::string getPartitionDirectory() const;
     efpPartitionNumber_t getPartitionNumber() const;
+    std::string toString(const uint16_t indent) const;
 
     static std::string getPartionDirectoryName(const efpPartitionNumber_t partitionNumber);
     static efpPartitionNumber_t getPartitionNumber(const std::string& name);
 
 protected:
+    EmptyFilePool* createEmptyFilePool(const efpDataSize_kib_t efpDataSize_kib);
+    EmptyFilePool* createEmptyFilePool(const std::string fqEfpDirectoryName);
     void validatePartitionDir();
 };
 
